@@ -136,6 +136,7 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                         privacy: Public,
                         is_final: false,
                         is_synchronized: false,
+                        is_native: false,
                     },
                     name: Id {
                         data: "java.util.ArrayList",
@@ -197,6 +198,7 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 privacy: Public,
                                 is_final: false,
                                 is_synchronized: false,
+                                is_native: false,
                             },
                             args: [
                                 Scalar(
@@ -213,6 +215,7 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 privacy: Public,
                                 is_final: false,
                                 is_synchronized: false,
+                                is_native: false,
                             },
                             args: [],
                             throws: [],
@@ -225,6 +228,7 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 privacy: Public,
                                 is_final: false,
                                 is_synchronized: false,
+                                is_native: false,
                             },
                             args: [
                                 Ref(
@@ -259,6 +263,7 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 privacy: Public,
                                 is_final: false,
                                 is_synchronized: false,
+                                is_native: false,
                             },
                             name: Id {
                                 data: "trimToSize",
@@ -282,6 +287,7 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 privacy: Public,
                                 is_final: false,
                                 is_synchronized: false,
+                                is_native: false,
                             },
                             name: Id {
                                 data: "ensureCapacity",
@@ -309,6 +315,7 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 privacy: Public,
                                 is_final: false,
                                 is_synchronized: false,
+                                is_native: false,
                             },
                             name: Id {
                                 data: "size",
@@ -328,6 +335,7 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 privacy: Public,
                                 is_final: false,
                                 is_synchronized: false,
+                                is_native: false,
                             },
                             name: Id {
                                 data: "isEmpty",
@@ -347,6 +355,7 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 privacy: Public,
                                 is_final: false,
                                 is_synchronized: false,
+                                is_native: false,
                             },
                             name: Id {
                                 data: "contains",
@@ -377,6 +386,7 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 privacy: Public,
                                 is_final: false,
                                 is_synchronized: false,
+                                is_native: false,
                             },
                             name: Id {
                                 data: "indexOf",
@@ -407,6 +417,7 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 privacy: Public,
                                 is_final: false,
                                 is_synchronized: false,
+                                is_native: false,
                             },
                             name: Id {
                                 data: "lastIndexOf",
@@ -437,6 +448,7 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 privacy: Public,
                                 is_final: false,
                                 is_synchronized: false,
+                                is_native: false,
                             },
                             name: Id {
                                 data: "clone",
@@ -463,6 +475,7 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 privacy: Public,
                                 is_final: false,
                                 is_synchronized: false,
+                                is_native: false,
                             },
                             name: Id {
                                 data: "toArray",
@@ -491,6 +504,7 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 privacy: Public,
                                 is_final: false,
                                 is_synchronized: false,
+                                is_native: false,
                             },
                             name: Id {
                                 data: "toArray",
@@ -530,6 +544,7 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 privacy: Public,
                                 is_final: false,
                                 is_synchronized: false,
+                                is_native: false,
                             },
                             name: Id {
                                 data: "get",
@@ -557,6 +572,7 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 privacy: Public,
                                 is_final: false,
                                 is_synchronized: false,
+                                is_native: false,
                             },
                             name: Id {
                                 data: "set",
@@ -591,6 +607,7 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 privacy: Public,
                                 is_final: false,
                                 is_synchronized: false,
+                                is_native: false,
                             },
                             name: Id {
                                 data: "add",
@@ -618,6 +635,7 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 privacy: Public,
                                 is_final: false,
                                 is_synchronized: false,
+                                is_native: false,
                             },
                             name: Id {
                                 data: "add",
@@ -652,6 +670,7 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 privacy: Public,
                                 is_final: false,
                                 is_synchronized: false,
+                                is_native: false,
                             },
                             name: Id {
                                 data: "remove",
@@ -679,6 +698,7 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 privacy: Public,
                                 is_final: false,
                                 is_synchronized: false,
+                                is_native: false,
                             },
                             name: Id {
                                 data: "equals",
@@ -709,6 +729,7 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 privacy: Public,
                                 is_final: false,
                                 is_synchronized: false,
+                                is_native: false,
                             },
                             name: Id {
                                 data: "hashCode",
@@ -728,6 +749,7 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 privacy: Public,
                                 is_final: false,
                                 is_synchronized: false,
+                                is_native: false,
                             },
                             name: Id {
                                 data: "remove",
@@ -758,6 +780,7 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 privacy: Public,
                                 is_final: false,
                                 is_synchronized: false,
+                                is_native: false,
                             },
                             name: Id {
                                 data: "clear",
@@ -781,6 +804,7 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 privacy: Public,
                                 is_final: false,
                                 is_synchronized: false,
+                                is_native: false,
                             },
                             name: Id {
                                 data: "addAll",
@@ -819,6 +843,7 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 privacy: Public,
                                 is_final: false,
                                 is_synchronized: false,
+                                is_native: false,
                             },
                             name: Id {
                                 data: "addAll",
@@ -860,6 +885,7 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 privacy: Public,
                                 is_final: false,
                                 is_synchronized: false,
+                                is_native: false,
                             },
                             name: Id {
                                 data: "removeAll",
@@ -892,6 +918,7 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 privacy: Public,
                                 is_final: false,
                                 is_synchronized: false,
+                                is_native: false,
                             },
                             name: Id {
                                 data: "retainAll",
@@ -924,6 +951,7 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 privacy: Public,
                                 is_final: false,
                                 is_synchronized: false,
+                                is_native: false,
                             },
                             name: Id {
                                 data: "listIterator",
@@ -960,6 +988,7 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 privacy: Public,
                                 is_final: false,
                                 is_synchronized: false,
+                                is_native: false,
                             },
                             name: Id {
                                 data: "listIterator",
@@ -992,6 +1021,7 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 privacy: Public,
                                 is_final: false,
                                 is_synchronized: false,
+                                is_native: false,
                             },
                             name: Id {
                                 data: "iterator",
@@ -1024,6 +1054,7 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 privacy: Public,
                                 is_final: false,
                                 is_synchronized: false,
+                                is_native: false,
                             },
                             name: Id {
                                 data: "subList",
@@ -1063,6 +1094,7 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 privacy: Public,
                                 is_final: false,
                                 is_synchronized: false,
+                                is_native: false,
                             },
                             name: Id {
                                 data: "forEach",
@@ -1105,6 +1137,7 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 privacy: Public,
                                 is_final: false,
                                 is_synchronized: false,
+                                is_native: false,
                             },
                             name: Id {
                                 data: "spliterator",
@@ -1137,6 +1170,7 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 privacy: Public,
                                 is_final: false,
                                 is_synchronized: false,
+                                is_native: false,
                             },
                             name: Id {
                                 data: "removeIf",
@@ -1175,6 +1209,7 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 privacy: Public,
                                 is_final: false,
                                 is_synchronized: false,
+                                is_native: false,
                             },
                             name: Id {
                                 data: "replaceAll",
@@ -1215,6 +1250,7 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 privacy: Public,
                                 is_final: false,
                                 is_synchronized: false,
+                                is_native: false,
                             },
                             name: Id {
                                 data: "sort",
@@ -1254,7 +1290,358 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                         },
                     ],
                 }
-            "#]].assert_debug_eq(&v);
+            "#]]
+            .assert_debug_eq(&v);
+        }
+    };
+}
+
+#[test]
+fn parse_java_lang_Object() {
+    // Output from `javap -public -s java.util.ArrayList`
+    const OUTPUT: &str = r##"
+    Compiled from "Object.java"
+public class java.lang.Object {
+  public java.lang.Object();
+    descriptor: ()V
+
+  public final native java.lang.Class<?> getClass();
+    descriptor: ()Ljava/lang/Class;
+
+  public native int hashCode();
+    descriptor: ()I
+
+  public boolean equals(java.lang.Object);
+    descriptor: (Ljava/lang/Object;)Z
+
+  public java.lang.String toString();
+    descriptor: ()Ljava/lang/String;
+
+  public final native void notify();
+    descriptor: ()V
+
+  public final native void notifyAll();
+    descriptor: ()V
+
+  public final void wait() throws java.lang.InterruptedException;
+    descriptor: ()V
+
+  public final void wait(long) throws java.lang.InterruptedException;
+    descriptor: (J)V
+
+  public final void wait(long, int) throws java.lang.InterruptedException;
+    descriptor: (JI)V
+}
+    "##;
+
+    match javap_parser::ClassInfoParser::new().parse(OUTPUT) {
+        Err(lalrpop_util::ParseError::UnrecognizedToken { token, expected }) => {
+            panic!(
+                "unexpected token `{}` at {:?}; expected `{:?}`",
+                token.1,
+                OUTPUT[token.0..].chars().take(100).collect::<String>(),
+                expected,
+            )
+        }
+        Err(e) => {
+            panic!("{}", format!("{e:?}"))
+        }
+
+        Ok(v) => {
+            expect_test::expect![[r#"
+                ClassInfo {
+                    flags: Flags {
+                        privacy: Public,
+                        is_final: false,
+                        is_synchronized: false,
+                        is_native: false,
+                    },
+                    name: Id {
+                        data: "java.lang.Object",
+                    },
+                    generics: [],
+                    extends: None,
+                    implements: [],
+                    constructors: [
+                        Constructor {
+                            flags: Flags {
+                                privacy: Public,
+                                is_final: false,
+                                is_synchronized: false,
+                                is_native: false,
+                            },
+                            args: [],
+                            throws: [],
+                            descriptor: Descriptor {
+                                string: "()V",
+                            },
+                        },
+                    ],
+                    fields: [],
+                    methods: [
+                        Method {
+                            flags: Flags {
+                                privacy: Public,
+                                is_final: true,
+                                is_synchronized: false,
+                                is_native: true,
+                            },
+                            name: Id {
+                                data: "getClass",
+                            },
+                            generics: [],
+                            argument_tys: [],
+                            return_ty: Ref(
+                                Class(
+                                    ClassRef {
+                                        name: Id {
+                                            data: "java.lang.Class",
+                                        },
+                                        generics: [
+                                            Wildcard,
+                                        ],
+                                    },
+                                ),
+                            ),
+                            throws: [],
+                            descriptor: Descriptor {
+                                string: "()Ljava/lang/Class;",
+                            },
+                        },
+                        Method {
+                            flags: Flags {
+                                privacy: Public,
+                                is_final: false,
+                                is_synchronized: false,
+                                is_native: true,
+                            },
+                            name: Id {
+                                data: "hashCode",
+                            },
+                            generics: [],
+                            argument_tys: [],
+                            return_ty: Scalar(
+                                Int,
+                            ),
+                            throws: [],
+                            descriptor: Descriptor {
+                                string: "()I",
+                            },
+                        },
+                        Method {
+                            flags: Flags {
+                                privacy: Public,
+                                is_final: false,
+                                is_synchronized: false,
+                                is_native: false,
+                            },
+                            name: Id {
+                                data: "equals",
+                            },
+                            generics: [],
+                            argument_tys: [
+                                Ref(
+                                    Class(
+                                        ClassRef {
+                                            name: Id {
+                                                data: "java.lang.Object",
+                                            },
+                                            generics: [],
+                                        },
+                                    ),
+                                ),
+                            ],
+                            return_ty: Scalar(
+                                Boolean,
+                            ),
+                            throws: [],
+                            descriptor: Descriptor {
+                                string: "(Ljava/lang/Object;)Z",
+                            },
+                        },
+                        Method {
+                            flags: Flags {
+                                privacy: Public,
+                                is_final: false,
+                                is_synchronized: false,
+                                is_native: false,
+                            },
+                            name: Id {
+                                data: "toString",
+                            },
+                            generics: [],
+                            argument_tys: [],
+                            return_ty: Ref(
+                                Class(
+                                    ClassRef {
+                                        name: Id {
+                                            data: "java.lang.String",
+                                        },
+                                        generics: [],
+                                    },
+                                ),
+                            ),
+                            throws: [],
+                            descriptor: Descriptor {
+                                string: "()Ljava/lang/String;",
+                            },
+                        },
+                        Method {
+                            flags: Flags {
+                                privacy: Public,
+                                is_final: true,
+                                is_synchronized: false,
+                                is_native: true,
+                            },
+                            name: Id {
+                                data: "notify",
+                            },
+                            generics: [],
+                            argument_tys: [],
+                            return_ty: Ref(
+                                TypeParameter(
+                                    Id {
+                                        data: "void",
+                                    },
+                                ),
+                            ),
+                            throws: [],
+                            descriptor: Descriptor {
+                                string: "()V",
+                            },
+                        },
+                        Method {
+                            flags: Flags {
+                                privacy: Public,
+                                is_final: true,
+                                is_synchronized: false,
+                                is_native: true,
+                            },
+                            name: Id {
+                                data: "notifyAll",
+                            },
+                            generics: [],
+                            argument_tys: [],
+                            return_ty: Ref(
+                                TypeParameter(
+                                    Id {
+                                        data: "void",
+                                    },
+                                ),
+                            ),
+                            throws: [],
+                            descriptor: Descriptor {
+                                string: "()V",
+                            },
+                        },
+                        Method {
+                            flags: Flags {
+                                privacy: Public,
+                                is_final: true,
+                                is_synchronized: false,
+                                is_native: false,
+                            },
+                            name: Id {
+                                data: "wait",
+                            },
+                            generics: [],
+                            argument_tys: [],
+                            return_ty: Ref(
+                                TypeParameter(
+                                    Id {
+                                        data: "void",
+                                    },
+                                ),
+                            ),
+                            throws: [
+                                ClassRef {
+                                    name: Id {
+                                        data: "java.lang.InterruptedException",
+                                    },
+                                    generics: [],
+                                },
+                            ],
+                            descriptor: Descriptor {
+                                string: "()V",
+                            },
+                        },
+                        Method {
+                            flags: Flags {
+                                privacy: Public,
+                                is_final: true,
+                                is_synchronized: false,
+                                is_native: false,
+                            },
+                            name: Id {
+                                data: "wait",
+                            },
+                            generics: [],
+                            argument_tys: [
+                                Scalar(
+                                    Long,
+                                ),
+                            ],
+                            return_ty: Ref(
+                                TypeParameter(
+                                    Id {
+                                        data: "void",
+                                    },
+                                ),
+                            ),
+                            throws: [
+                                ClassRef {
+                                    name: Id {
+                                        data: "java.lang.InterruptedException",
+                                    },
+                                    generics: [],
+                                },
+                            ],
+                            descriptor: Descriptor {
+                                string: "(J)V",
+                            },
+                        },
+                        Method {
+                            flags: Flags {
+                                privacy: Public,
+                                is_final: true,
+                                is_synchronized: false,
+                                is_native: false,
+                            },
+                            name: Id {
+                                data: "wait",
+                            },
+                            generics: [],
+                            argument_tys: [
+                                Scalar(
+                                    Long,
+                                ),
+                                Scalar(
+                                    Int,
+                                ),
+                            ],
+                            return_ty: Ref(
+                                TypeParameter(
+                                    Id {
+                                        data: "void",
+                                    },
+                                ),
+                            ),
+                            throws: [
+                                ClassRef {
+                                    name: Id {
+                                        data: "java.lang.InterruptedException",
+                                    },
+                                    generics: [],
+                                },
+                            ],
+                            descriptor: Descriptor {
+                                string: "(JI)V",
+                            },
+                        },
+                    ],
+                }
+            "#]]
+            .assert_debug_eq(&v);
         }
     };
 }

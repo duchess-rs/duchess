@@ -69,6 +69,7 @@ Flags: Flags = {
     <p:Privacy> => Flags::new(p),
     <f:Flags> "final" => Flags { is_final: true, ..f },
     <f:Flags> "synchronized" => Flags { is_synchronized: true, ..f },
+    <f:Flags> "native" => Flags { is_native: true, ..f },
 };
 
 Privacy: Privacy = {

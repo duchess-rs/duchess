@@ -17,6 +17,7 @@ pub struct Flags {
     pub privacy: Privacy,
     pub is_final: bool,
     pub is_synchronized: bool,
+    pub is_native: bool,
 }
 
 impl Flags {
@@ -25,6 +26,7 @@ impl Flags {
             privacy: p,
             is_final: false,
             is_synchronized: false,
+            is_native: false,
         }
     }
 }
