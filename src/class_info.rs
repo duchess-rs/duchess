@@ -12,6 +12,12 @@ pub struct ClassInfo {
     pub methods: Vec<Method>,
 }
 
+impl ClassInfo {
+    pub fn parse(input: &str) -> anyhow::Result<Self> {
+        javap::parse_class_info(input)
+    }
+}
+
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
 pub struct Flags {
     pub privacy: Privacy,

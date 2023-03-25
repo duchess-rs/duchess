@@ -9,6 +9,7 @@ description = "Experiments with Java-Rust interop"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+anyhow = "1.0.70"
 lalrpop-util = { version = "0.19.9", features = ["lexer"] }
 regex = "1"
 

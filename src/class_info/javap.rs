@@ -1,7 +1,17 @@
 use lalrpop_util::lalrpop_mod;
 
+use super::ClassInfo;
+
 lalrpop_mod!(pub javap_parser, "/class_info/javap_parser.rs"); // synthesized by LALRPOP
 
+pub(super) fn parse_class_info(input: &str) -> anyhow::Result<ClassInfo> {
+    match javap_parser::ClassInfoParser::new().parse(input) {
+        Ok(v) => Ok(v),
+        Err(e) => anyhow::bail!("parse error {e} parsing {input:?}"),
+    }
+}
+
+#[allow(non_snake_case)]
 #[test]
 fn parse_java_util_ArrayList() {
     // Output from `javap -public -s java.util.ArrayList`
@@ -1296,6 +1306,7 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
     };
 }
 
+#[allow(non_snake_case)]
 #[test]
 fn parse_java_lang_Object() {
     // Output from `javap -public -s java.util.ArrayList`
