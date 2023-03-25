@@ -3,8 +3,9 @@ use crate::class_info::*;
 grammar;
 
 pub ClassInfo: ClassInfo = {
-    Header <l:Flags> "class" <n:DotId> 
-        <g:("<" <Comma<Id>> ">")?>
+    Header? 
+    <l:Flags> "class" <n:DotId> 
+        <g:Generics>
         <e:("extends" <ClassRef>)?>
         <i:("implements" <Comma<ClassRef>>)?>
     "{" 
@@ -15,7 +16,7 @@ pub ClassInfo: ClassInfo = {
         ClassInfo {
             flags: l,
             name: n,
-            generics: g.unwrap_or(vec![]),
+            generics: g,
             extends: e,
             implements: i.unwrap_or(vec![]),
             constructors: c,
@@ -25,13 +26,13 @@ pub ClassInfo: ClassInfo = {
     }
 };
 
-Header: () = r#"Compiled from "[a-zA-Z.]+"#;
+#[inline]
+Generics: Vec<Id> = {
+    () => vec![],
+    ("<" <Comma<Id>> ">"),
+};
 
-Privacy: Privacy = {
-    "public" => Privacy::Public,
-    "protected" => Privacy::Protected,
-    () => Privacy::Package,
-}
+Header: () = r#"Compiled from "[a-zA-Z.]+""#;
 
 DotId: Id = {
     <a:Id> "." <b:ID> => a.dot(b),
@@ -42,15 +43,19 @@ Id: Id = {
     <a:ID> => Id::from(a),
 };
 
+ID: &'input str = {
+    r"[a-zA-Z][a-zA-Z0-9]*"
+}
+
 Constructor: Constructor = {
-    <f:Flags> <n:DotId> "(" <a:Comma<Type>> ")" <t:Throws> ";" => {
-        Constructor { flags: f, args: a, throws: t }
+    <f:Flags> <n:DotId> "(" <a:Comma<Type>> ")" <t:Throws> ";" <d:Descriptor> => {
+        Constructor { flags: f, args: a, throws: t, descriptor: d, }
     }
 };
 
 Method: Method = {
-    <f:Flags> <r:Type> <n:Id> "(" <a:Comma<Type>> ")" <t:Throws> ";" => {
-        Method { flags: f, name: n, argument_tys: a, return_ty: r, throws: t }
+    <f:Flags> <g:Generics> <r:Type> <n:Id> "(" <a:Comma<Type>> ")" <t:Throws> ";" <d:Descriptor> => {
+        Method { flags: f, name: n, argument_tys: a, return_ty: r, throws: t, descriptor: d, generics: g }
     }
 };
 
@@ -66,9 +71,15 @@ Flags: Flags = {
     <f:Flags> "synchronized" => Flags { is_synchronized: true, ..f },
 };
 
+Privacy: Privacy = {
+    "public" => Privacy::Public,
+    "protected" => Privacy::Protected,
+    () => Privacy::Package,
+};
+
 Descriptor: Descriptor = {
-    "descriptor" ":" <d:r"([a-zA-Z0-9;]*)[a-zA-Z0-9;]+"> => {
-        Descriptor::from(d.to_string())
+    r"descriptor: \([\[\]a-zA-Z0-9/;]*\)[\[\]a-zA-Z0-9/;]+" => {
+        Descriptor::from(&<>["descriptor: ".len()..])
     }
 };
 
@@ -93,12 +104,16 @@ ScalarType: ScalarType = {
 };
 
 RefType: RefType = {
-    <ClassRef> => RefType::Class(<>),
+    ClassRefOrId,
     <RefType> "[" "]" => RefType::Array(Arc::new(<>)),
-    <Id> => RefType::TypeParameter(<>),
-    "?" "extends" <ClassRef> => RefType::Extends(<>),
-    "?" "super" <ClassRef> => RefType::Super(<>),
+    "?" "extends" <ClassRefOrId> => RefType::Extends(Arc::new(<>)),
+    "?" "super" <ClassRefOrId> => RefType::Super(Arc::new(<>)),
     "?" => RefType::Wildcard,
+};
+
+ClassRefOrId: RefType = {
+    <ClassRef> => RefType::Class(<>),
+    <Id> => RefType::TypeParameter(<>),
 };
 
 ClassRef: ClassRef = {
@@ -119,41 +134,3 @@ Comma1<E>: Vec<E> = {
         v
     }
 }
-
-match {
-    r"[a-zA-Z][a-zA-Z0-9]*" => ID,
-    _
-}
-
-// Compiled from "Object.java"
-// public class java.lang.Object {
-//   public java.lang.Object();
-//     descriptor: ()V
-// 
-//   public final native java.lang.Class<?> getClass();
-//     descriptor: ()Ljava/lang/Class;
-// 
-//   public native int hashCode();
-//     descriptor: ()I
-// 
-//   public boolean equals(java.lang.Object);
-//     descriptor: (Ljava/lang/Object;)Z
-// 
-//   public java.lang.String toString();
-//     descriptor: ()Ljava/lang/String;
-// 
-//   public final native void notify();
-//     descriptor: ()V
-// 
-//   public final native void notifyAll();
-//     descriptor: ()V
-// 
-//   public final void wait() throws java.lang.InterruptedException;
-//     descriptor: ()V
-// 
-//   public final void wait(long) throws java.lang.InterruptedException;
-//     descriptor: (J)V
-// 
-//   public final void wait(long, int) throws java.lang.InterruptedException;
-//     descriptor: (JI)V
-// }

@@ -41,6 +41,7 @@ pub struct Constructor {
     pub flags: Flags,
     pub args: Vec<Type>,
     pub throws: Vec<ClassRef>,
+    pub descriptor: Descriptor,
 }
 
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
@@ -54,9 +55,11 @@ pub struct Field {
 pub struct Method {
     pub flags: Flags,
     pub name: Id,
+    pub generics: Vec<Id>,
     pub argument_tys: Vec<Type>,
     pub return_ty: Type,
     pub throws: Vec<ClassRef>,
+    pub descriptor: Descriptor,
 }
 
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
@@ -76,8 +79,8 @@ pub enum RefType {
     Class(ClassRef),
     Array(Arc<RefType>),
     TypeParameter(Id),
-    Extends(ClassRef),
-    Super(ClassRef),
+    Extends(Arc<RefType>),
+    Super(Arc<RefType>),
     Wildcard,
 }
 
@@ -92,13 +95,16 @@ pub enum ScalarType {
     Boolean,
 }
 
+#[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
 pub struct Descriptor {
     pub string: String,
 }
 
-impl From<String> for Descriptor {
-    fn from(value: String) -> Self {
-        Descriptor { string: value }
+impl From<&str> for Descriptor {
+    fn from(value: &str) -> Self {
+        Descriptor {
+            string: value.to_string(),
+        }
     }
 }
 
