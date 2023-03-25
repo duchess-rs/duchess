@@ -1,0 +1,159 @@
+use crate::class_info::*;
+
+grammar;
+
+pub ClassInfo: ClassInfo = {
+    Header <l:Flags> "class" <n:DotId> 
+        <g:("<" <Comma<Id>> ">")?>
+        <e:("extends" <ClassRef>)?>
+        <i:("implements" <Comma<ClassRef>>)?>
+    "{" 
+        <f:Field*>
+        <c:Constructor*>
+        <m:Method*>
+    "}" => {
+        ClassInfo {
+            flags: l,
+            name: n,
+            generics: g.unwrap_or(vec![]),
+            extends: e,
+            implements: i.unwrap_or(vec![]),
+            constructors: c,
+            methods: m,
+            fields: f,
+        }
+    }
+};
+
+Header: () = r#"Compiled from "[a-zA-Z.]+"#;
+
+Privacy: Privacy = {
+    "public" => Privacy::Public,
+    "protected" => Privacy::Protected,
+    () => Privacy::Package,
+}
+
+DotId: Id = {
+    <a:Id> "." <b:ID> => a.dot(b),
+    <i:DotId> "." <s:ID> => i.dot(s),
+};
+
+Id: Id = {
+    <a:ID> => Id::from(a),
+};
+
+Constructor: Constructor = {
+    <f:Flags> <n:DotId> "(" <a:Comma<Type>> ")" <t:Throws> ";" => {
+        Constructor { flags: f, args: a, throws: t }
+    }
+};
+
+Method: Method = {
+    <f:Flags> <r:Type> <n:Id> "(" <a:Comma<Type>> ")" <t:Throws> ";" => {
+        Method { flags: f, name: n, argument_tys: a, return_ty: r, throws: t }
+    }
+};
+
+Field: Field = {
+    <f:Flags> <t:Type> <n:Id> ";" => {
+        Field { flags: f, name: n, ty: t }
+    }
+};
+
+Flags: Flags = {
+    <p:Privacy> => Flags::new(p),
+    <f:Flags> "final" => Flags { is_final: true, ..f },
+    <f:Flags> "synchronized" => Flags { is_synchronized: true, ..f },
+};
+
+Descriptor: Descriptor = {
+    "descriptor" ":" <d:r"([a-zA-Z0-9;]*)[a-zA-Z0-9;]+"> => {
+        Descriptor::from(d.to_string())
+    }
+};
+
+Throws: Vec<ClassRef> = {
+    () => vec![],
+    "throws" <Comma1<ClassRef>>,
+}
+
+Type: Type = {
+    <ScalarType> => Type::Scalar(<>),
+    <RefType> => Type::Ref(<>),
+};
+
+ScalarType: ScalarType = {
+    "byte" => ScalarType::Byte,
+    "short" => ScalarType::Short,
+    "int" => ScalarType::Int,
+    "long" => ScalarType::Long,
+    "float" => ScalarType::F32,
+    "double" => ScalarType::F64,
+    "boolean" => ScalarType::Boolean,
+};
+
+RefType: RefType = {
+    <ClassRef> => RefType::Class(<>),
+    <RefType> "[" "]" => RefType::Array(Arc::new(<>)),
+    <Id> => RefType::TypeParameter(<>),
+    "?" "extends" <ClassRef> => RefType::Extends(<>),
+    "?" "super" <ClassRef> => RefType::Super(<>),
+    "?" => RefType::Wildcard,
+};
+
+ClassRef: ClassRef = {
+    <name:DotId> => ClassRef { name, generics: vec![] },
+    <name:DotId> "<" <generics:Comma<RefType>> ">" => ClassRef { <> },
+};
+
+Comma<E>: Vec<E> = {
+    () => vec![],
+    Comma1<E>,
+};
+
+Comma1<E>: Vec<E> = {
+    E => vec![<>],
+    <v:Comma<E>> "," <e:E> => {
+        let mut v = v;
+        v.push(e);
+        v
+    }
+}
+
+match {
+    r"[a-zA-Z][a-zA-Z0-9]*" => ID,
+    _
+}
+
+// Compiled from "Object.java"
+// public class java.lang.Object {
+//   public java.lang.Object();
+//     descriptor: ()V
+// 
+//   public final native java.lang.Class<?> getClass();
+//     descriptor: ()Ljava/lang/Class;
+// 
+//   public native int hashCode();
+//     descriptor: ()I
+// 
+//   public boolean equals(java.lang.Object);
+//     descriptor: (Ljava/lang/Object;)Z
+// 
+//   public java.lang.String toString();
+//     descriptor: ()Ljava/lang/String;
+// 
+//   public final native void notify();
+//     descriptor: ()V
+// 
+//   public final native void notifyAll();
+//     descriptor: ()V
+// 
+//   public final void wait() throws java.lang.InterruptedException;
+//     descriptor: ()V
+// 
+//   public final void wait(long) throws java.lang.InterruptedException;
+//     descriptor: (J)V
+// 
+//   public final void wait(long, int) throws java.lang.InterruptedException;
+//     descriptor: (JI)V
+// }
