@@ -1,0 +1,20 @@
+[package]
+name = "duchess-macro"
+version.workspace = true
+edition = "2021"
+license.workspace = true
+repository.workspace = true
+
+[lib]
+proc-macro = true
+
+[dependencies]
+anyhow = "1.0.70"
+lalrpop-util = { version = "0.19.9", features = ["lexer"] }
+regex = "1"
+
+[dev-dependencies]
+expect-test = "1.4.1"
+
+[build-dependencies]
+lalrpop = "0.19.9"

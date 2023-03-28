@@ -1,22 +1,3 @@
-use proc_macro::TokenStream;
+//! Experiments with Java-Rust interop.
 
-mod class_info;
-
-/// The main duchess macro, used like so
-///
-/// ```rust
-/// duchess! {
-///     mod java {
-///         java.lang.Object,
-///         java.util.ArrayList { new, foo, bar },
-///     }
-/// }
-/// ```
-///
-/// The
-#[proc_macro]
-pub fn duchess(input: TokenStream) -> TokenStream {
-    input
-}
-
-struct DuchessDeclaration {}
+pub use duchess_macro::duchess;
