@@ -13,6 +13,9 @@ anyhow = "1.0.70"
 lalrpop-util = { version = "0.19.9", features = ["lexer"] }
 regex = "1"
 
+[lib]
+proc-macro = true
+
 [build-dependencies]
 lalrpop = "0.19.9"
 
