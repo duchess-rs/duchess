@@ -72,8 +72,10 @@ Logger.globalLogger().log("Hello, world");
 you can write Rust like this
 
 ```rust
-use me::ferris::Logger;
-Logger::globalLogger(jni).log(jni, "Hello, world");
+duchess::with_jvm(|jni| {
+    use me::ferris::Logger;
+    Logger::globalLogger(jni).log(jni, "Hello, world");
+});
 ```
 
 and instead of this Java code
@@ -86,9 +88,11 @@ Logger.globalLogger().log(m);
 you can write Rust like this
 
 ```rust
-use me::ferris::{Logger, LogMessage};
-LogMessage::new(jni, "Hello, world").level(jni, 22);
-Logger::globalLogger(jni).log(jni, &m);
+duchess::with_jvm(|jni| {
+    use me::ferris::{Logger, LogMessage};
+    LogMessage::new(jni, "Hello, world").level(jni, 22);
+    Logger::globalLogger(jni).log(jni, &m);
+});
 ```
 
 Huzzah!
@@ -108,18 +112,18 @@ The procedural macro will create a module named `jlog` and, for each class that 
 ```rust
 mod me {
     pub mod ferris {
-        pub struct Logger<'jni> { ... }    
+        pub struct Logger<'jvm> { ... }    
     
-        impl<'jni> Logger<'jni> {
-            pub fn globalLogger() -> Logger<'jni> {
+        impl<'jvm> Logger<'jvm> {
+            pub fn globalLogger(jvm: Jvm<'jvm>) -> Logger<'jvm> {
                 ...
             }
 
-            pub fn log(&self, s: impl IntoJavaString) {
+            pub fn log(&self, jvm: Jvm<'jvm>, s: impl AsJavaString) {
                 ...
             }
 
-            pub fn log_full(&self, s: &impl AsRef<LogMessage<'jni>>) {
+            pub fn log_full(&self, jvm: Jvm<'jvm>, s: &impl AsRef<LogMessage<'jvm>>) {
                 ...
             }
         }
@@ -129,10 +133,10 @@ mod me {
 }
 ```
 
-Where possible, we translate the Java argument types into Rust-like forms. References to Java strings, for example, compile to `impl IntoJavaString`, a trait which is implemented for `&str` and `String` (but also for a reflected Java string).
+Where possible, we translate the Java argument types into Rust-like forms. References to Java strings, for example, compile to `impl AsJavaString`, a trait which is implemented for `&str` and `String` (but also for a reflected Java string).
 
 ```rust
-pub fn log(&self, s: impl IntoJavaString) {
+pub fn log(&self, jvm: Jvm<'jvm>, s: impl AsJavaString) {
     ...
 }
 ```
@@ -140,7 +144,7 @@ pub fn log(&self, s: impl IntoJavaString) {
 In some cases, methods will reference Java classes besides the one that appeared in the proc macro, like `me.ferris.LogMessage`:
 
 ```rust
-pub fn log_full(&self, s: &impl AsRef<LogMessage<'jni>>)
+pub fn log_full(&self, jvm: Jvm<'jvm>, s: &impl AsRef<LogMessage<'jvm>>)
 ```
 
 These extra types get translated to structs as well. But these structs don't have impl blocks or methods. They're just opaque values you can pass around:
@@ -149,11 +153,11 @@ These extra types get translated to structs as well. But these structs don't hav
 mod me {
     pub mod ferris {
         // From before:
-        pub struct Logger<'jni> { ... }
-        impl<'jni> Logger<'jni> { ... }
+        pub struct Logger<'jvm> { ... }
+        impl<'jvm> Logger<'jvm> { ... }
 
         // Also generated:
-        pub struct LogMessage<'jni> { ... }
+        pub struct LogMessage<'jvm> { ... }
     }
 
     ...
@@ -166,8 +170,8 @@ In fact, we'll also generate entries for other Java classes, like
 mod me {...}
 mod java {
     pub mod lang {
-        pub struct Object<'jni> { ... }
-        pub struct String<'jni> { ... }
+        pub struct Object<'jvm> { ... }
+        pub struct String<'jvm> { ... }
     }
 }
 ```
@@ -178,11 +182,11 @@ Finally, we generate various `AsRef` (and `From`) impls that allow for upcasting
 mod me { /* as before */  }
 mod java { /* as before */ }
 
-impl<'jni> AsRef<java::lang::Object<'jni>> for me::ferris::Logger<'jni> { ... }
-impl<'jni> AsRef<java::lang::Object<'jni>> for me::ferris::LogMessage<'jni> { ... }
+impl<'jvm> AsRef<java::lang::Object<'jvm>> for me::ferris::Logger<'jvm> { ... }
+impl<'jvm> AsRef<java::lang::Object<'jvm>> for me::ferris::LogMessage<'jvm> { ... }
 
-impl<'jni> From<me::ferris::Logger<'jni>> for java::lang::Object<'jni>> { ... }
-impl<'jni> From<me::ferris::LogMessage<'jni>> for java::lang::Object<'jni>> { ... }
+impl<'jvm> From<me::ferris::Logger<'jvm>> for java::lang::Object<'jvm>> { ... }
+impl<'jvm> From<me::ferris::LogMessage<'jvm>> for java::lang::Object<'jvm>> { ... }
 ```
 
 ### Implementation details
@@ -193,8 +197,8 @@ Our structs are actually [thin wrappers around jni::JObject][JO]:
 
 ```rust
 #[repr(transparent)]
-pub struct Logger<'jni> {
-    object: jni::JObject<'jni>
+pub struct Logger<'jvm> {
+    object: jni::JObject<'jvm>
 }
 ```
 
@@ -202,5 +206,12 @@ In some cases, the JNI crate only supplies `&JObject` values. These can be safel
 
 [rrtr]: https://doc.rust-lang.org/reference/type-layout.html?highlight=transparent#the-transparent-representation
 
+### Creating a jni
+
+The `duchess::with_jvm` code starts a JVM and invokes your closure. Clearly this needs to be cached, and we have to think about attaching threads and the like.
+
+### Deleting locals
+
+It'd be nice to delete locals automatically. I wonder if we can do this via a `Drop` impl. It'll require a thread-local to get access to the JVM. Seems ok.
 
 

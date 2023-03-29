@@ -15,3 +15,4 @@ description = "Experiments with Java-Rust interop"
 
 [dependencies]
 duchess-macro = { path = "macro" }
+jni = "0.21.1"
