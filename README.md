@@ -58,10 +58,8 @@ For the impatient among you, here is the kind of code you're going to be able to
 
 ```rust
 duchess::duchess! {
-    mod jlog {
-        me.ferris.Logger,
-        me.ferris.LogMessage,
-    }
+    me.ferris.Logger,
+    me.ferris.LogMessage,
 }
 ```
 
@@ -74,7 +72,8 @@ Logger.globalLogger().log("Hello, world");
 you can write Rust like this
 
 ```rust
-jlog::Logger::globalLogger(jni).log(jni, "Hello, world");
+use me::ferris::Logger;
+Logger::globalLogger(jni).log(jni, "Hello, world");
 ```
 
 and instead of this Java code
@@ -87,8 +86,9 @@ Logger.globalLogger().log(m);
 you can write Rust like this
 
 ```rust
-jlog::LogMessage::new(jni, "Hello, world").level(jni, 22);
-jlog::Logger::globalLogger(jni).log(jni, &m);
+use me::ferris::{Logger, LogMessage};
+LogMessage::new(jni, "Hello, world").level(jni, 22);
+Logger::globalLogger(jni).log(jni, &m);
 ```
 
 Huzzah!
@@ -99,31 +99,29 @@ Let's walk through this in more detail. To start, use the `duchess!` macro to cr
 
 ```rust
 duchess::duchess! {
-    mod jlog {
-        me.ferris.Logger // Always list the java classes by their full dotted name!
-    }
+    me.ferris.Logger // Always list the java classes by their full dotted name!
 }
 ```
 
 The procedural macro will create a module named `jlog` and, for each class that you name, a struct and an impl containing all of its methods, but mirrored into Rust. The structs are named after the full Java name (including the package), but there are type aliases for more convenient access:
 
 ```rust
-mod java {
-    pub struct me_ferris_Logger<'jni> { ... }
+mod me {
+    pub mod ferris {
+        pub struct Logger<'jni> { ... }    
+    
+        impl<'jni> Logger<'jni> {
+            pub fn globalLogger() -> Logger<'jni> {
+                ...
+            }
 
-    pub type Logger<'jni> = me_ferris_Logger<'jni>;
+            pub fn log(&self, s: impl IntoJavaString) {
+                ...
+            }
 
-    impl<'jni> me_ferris_Logger<'jni> {
-        pub fn globalLogger() -> me_ferris_Logger<'jni> {
-            ...
-        }
-
-        pub fn log(&self, s: impl AsRef<str>) {
-            ...
-        }
-
-        pub fn log_full(&self, s: &me_ferris_LogMessage<'jni>) {
-            ...
+            pub fn log_full(&self, s: &impl AsRef<LogMessage<'jni>>) {
+                ...
+            }
         }
     }
 
@@ -131,10 +129,10 @@ mod java {
 }
 ```
 
-Where possible, we translate the Java argument types into Rust-like forms. References to Java strings, for example, compile to `impl AsRef<str>`:
+Where possible, we translate the Java argument types into Rust-like forms. References to Java strings, for example, compile to `impl IntoJavaString`, a trait which is implemented for `&str` and `String` (but also for a reflected Java string).
 
 ```rust
-pub fn log(&self, s: impl AsRef<str>) {
+pub fn log(&self, s: impl IntoJavaString) {
     ...
 }
 ```
@@ -142,53 +140,67 @@ pub fn log(&self, s: impl AsRef<str>) {
 In some cases, methods will reference Java classes besides the one that appeared in the proc macro, like `me.ferris.LogMessage`:
 
 ```rust
-pub fn log_full(&self, s: &me_ferris_LogMessage<'jni>)
+pub fn log_full(&self, s: &impl AsRef<LogMessage<'jni>>)
 ```
 
 These extra types get translated to structs as well. But these structs don't have impl blocks or methods. They're just opaque values you can pass around:
 
 ```rust
+mod me {
+    pub mod ferris {
+        // From before:
+        pub struct Logger<'jni> { ... }
+        impl<'jni> Logger<'jni> { ... }
+
+        // Also generated:
+        pub struct LogMessage<'jni> { ... }
+    }
+
+    ...
+}
+```
+
+In fact, we'll also generate entries for other Java classes, like
+
+```rust
+mod me {...}
 mod java {
-    // From before:
-    pub struct me_ferris_Logger<'jni> { ... }
-    pub type Logger<'jni> = me_ferris_Logger<'jni>;
-    impl<'jni> me_ferris_Logger<'jni> { ... }
-
-    // Other types not explicitly listed:
-    pub struct me_ferris_LogMessage<'jni> { ... }
-    pub struct java_lang_Object<'jni> { ... } // java.lang.Object
-
-    // ... more to come
+    pub mod lang {
+        pub struct Object<'jni> { ... }
+        pub struct String<'jni> { ... }
+    }
 }
 ```
 
-Finally, we generate various `Into` impls that allow for upcasting between Java types:
+Finally, we generate various `AsRef` (and `From`) impls that allow for upcasting between Java types:
 
 ```rust
-mod java {
-    // From before:
-    pub struct me_ferris_Logger<'jni> { ... }
-    pub type Logger<'jni> = me_ferris_Logger<'jni>;
-    impl<'jni> me_ferris_Logger<'jni> { ... }
-    pub struct me_ferris_LogMessage<'jni> { ... }
-    pub struct java_lang_Object<'jni> { ... } // java.lang.Object
+mod me { /* as before */  }
+mod java { /* as before */ }
 
-    // Into impls
-    impl<'jni> Into<java_lang_Object<'jni>> for me_ferris_Logger<'jni> { ... }
-    impl<'jni> Into<java_lang_Object<'jni>> for me_ferris_LogMessage<'jni> { ... }
-}
+impl<'jni> AsRef<java::lang::Object<'jni>> for me::ferris::Logger<'jni> { ... }
+impl<'jni> AsRef<java::lang::Object<'jni>> for me::ferris::LogMessage<'jni> { ... }
+
+impl<'jni> From<me::ferris::Logger<'jni>> for java::lang::Object<'jni>> { ... }
+impl<'jni> From<me::ferris::LogMessage<'jni>> for java::lang::Object<'jni>> { ... }
 ```
 
-### Implementaton details
+### Implementation details
+
+Our structs are actually [thin wrappers around jni::JObject][JO]:
+
+[JO]: https://docs.rs/jni/0.21.1/jni/objects/struct.JObject.html
 
 ```rust
-pub struct me_ferris_Logger<'jni> {
-    object: JObject<'jni>
+#[repr(transparent)]
+pub struct Logger<'jni> {
+    object: jni::JObject<'jni>
 }
 ```
 
-```rust
-pub struct me_ferris_Logger<'jni> {
-    object: JObject<'jni>
-}
-```
+In some cases, the JNI crate only supplies `&JObject` values. These can be safely transmuted into (e.g.) `&Logger` values because of the `repr(transprent)` layout (c.f. [rust reference][rrtr], though I'd like to check on the details here --nikomatsakis). We provide a helper function `cast` for this purpose.
+
+[rrtr]: https://doc.rust-lang.org/reference/type-layout.html?highlight=transparent#the-transparent-representation
+
+
+
