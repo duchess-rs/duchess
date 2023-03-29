@@ -179,4 +179,16 @@ mod java {
 }
 ```
 
-### What code does the macro generate?
+### Implementaton details
+
+```rust
+pub struct me_ferris_Logger<'jni> {
+    object: JObject<'jni>
+}
+```
+
+```rust
+pub struct me_ferris_Logger<'jni> {
+    object: JObject<'jni>
+}
+```
