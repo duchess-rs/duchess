@@ -24,6 +24,8 @@ Let's suppose that you have a java class `me.ferris.Logger`:
 class Logger {
     public static Logger globalLogger();
 
+    public Logger();
+
     // Simple, convenient log method
     public void log(String data);
 
