@@ -1,9 +1,9 @@
 use jni::{
-    objects::{JString, JValue, JValueGen},
+    objects::{AutoLocal, JString, JValue, JValueGen},
     strings::JNIString,
 };
 
-use crate::jvm::{Anchor, JavaObject, JdkOp, Jvm, Local};
+use crate::jvm::{JavaObject, JavaObjectExt, JdkOp, Jvm, Local};
 
 pub struct Logger {
     _dummy: (),
@@ -35,7 +35,7 @@ impl JdkOp for LoggerConstructor {
         let class = env.find_class("me/ferris/Logger")?;
 
         env.new_object(class, "()", &[])
-            .map(|o| unsafe { Local::from_jobject(o) })
+            .map(|o| unsafe { Local::from_jni(AutoLocal::new(o, &env)) })
     }
 }
 
@@ -66,8 +66,12 @@ where
         let data = self.data.execute(jvm)?;
         let data: i32 = data.into();
 
-        let this = Anchor::from(&*this);
-        match env.call_method(&this, "log", "(Ljava/lang/String;)V", &[JValue::from(data)])? {
+        match env.call_method(
+            this.as_jobject(),
+            "log",
+            "(Ljava/lang/String;)V",
+            &[JValue::from(data)],
+        )? {
             JValueGen::Void => Ok(()),
             _ => panic!("class file out of sync"),
         }

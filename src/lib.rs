@@ -3,4 +3,4 @@
 pub use duchess_macro::duchess;
 
 mod example;
-mod jvm;
+pub mod jvm;
