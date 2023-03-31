@@ -26,6 +26,21 @@ impl Jvm {
     pub(crate) fn to_env(&self) -> JNIEnv<'_> {
         unsafe { JNIEnv::from_raw(self.env).unwrap() }
     }
+
+    pub fn local<'r, R>(&self, r: &'r R) -> Local<'r, R>
+    where
+        R: JavaObject,
+    {
+        unsafe {
+            let raw = r.to_raw();
+            assert!(!raw.is_null());
+            let internal = self.to_env().get_native_interface();
+            let new_local_ref = (**internal).NewLocalRef.unwrap();
+            let new_raw = new_local_ref(internal, raw);
+            assert!(!new_raw.is_null());
+            Local::from_jobject(new_raw)
+        }
+    }
 }
 
 /// Only safe to be implemented by the Java types we create.
@@ -34,7 +49,7 @@ impl Jvm {
 /// to be a JVM (local || global) reference in the currently active JVM.
 pub unsafe trait JavaObject {
     fn to_raw(&self) -> sys::jobject {
-        self as sys::jobject
+        self as *const _ as sys::jobject
     }
 }
 
@@ -84,11 +99,10 @@ where
     /// Unsafety conditions:
     ///
     /// * jobject must be an instance of `R`
-    /// * the value must be a local ref tied to `jvm`
-    pub(crate) unsafe fn from_jobject(jvm: &'jvm Jvm, jobject: JObject<'jvm>) -> Self {
-        let raw = jobject.as_raw();
+    pub(crate) unsafe fn from_jobject(jobject: impl IntoRawJObject) -> Self {
+        let jobject = jobject.into_raw();
         Local {
-            data: raw as *mut R,
+            data: jobject as *mut R,
             phantom: PhantomData,
         }
     }
@@ -97,7 +111,7 @@ where
         todo!()
     }
 
-    fn to_raw(self) -> sys::jobject {
+    fn to_raw(&self) -> sys::jobject {
         self.data as sys::jobject
     }
 
@@ -170,5 +184,30 @@ where
             let delete_global_ref = (**internal).DeleteGlobalRef.unwrap();
             delete_global_ref(internal, self.to_raw());
         }
+    }
+}
+
+pub(crate) trait IntoRawJObject {
+    fn into_raw(self) -> sys::jobject;
+}
+
+impl IntoRawJObject for JObject<'_> {
+    fn into_raw(self) -> sys::jobject {
+        self.into_raw()
+    }
+}
+
+impl IntoRawJObject for sys::jobject {
+    fn into_raw(self) -> sys::jobject {
+        self
+    }
+}
+
+impl<R> IntoRawJObject for &R
+where
+    R: JavaObject,
+{
+    fn into_raw(self) -> sys::jobject {
+        self.to_raw()
     }
 }
