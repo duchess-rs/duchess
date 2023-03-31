@@ -3,7 +3,7 @@ use jni::{
     strings::JNIString,
 };
 
-use crate::jvm::{Anchor, JavaObject, Jvm, Local};
+use crate::jvm::{Anchor, JavaObject, JdkOp, Jvm, Local};
 
 pub struct Logger {
     _dummy: (),
@@ -11,15 +11,24 @@ pub struct Logger {
 
 unsafe impl JavaObject for Logger {}
 
-pub struct LogMessage {
-    _dummy: (),
-}
-
-unsafe impl JavaObject for LogMessage {}
+// class Logger {
+//    public Logger();
+// }
 
 impl Logger {
-    // constructors require the `jvm` argument to limit the lifetime of the returned local ref
-    pub fn new<'jvm>(jvm: &'jvm Jvm) -> jni::errors::Result<Local<'jvm, Self>> {
+    pub fn new() -> LoggerConstructor {
+        LoggerConstructor { private: () }
+    }
+}
+
+pub struct LoggerConstructor {
+    private: (),
+}
+
+impl JdkOp for LoggerConstructor {
+    type Output<'jvm> = Local<'jvm, Logger>;
+
+    fn execute<'jvm>(self, jvm: &'jvm Jvm) -> jni::errors::Result<Self::Output<'jvm>> {
         let mut env = jvm.to_env();
 
         // FIXME: how do we cache this
@@ -28,7 +37,44 @@ impl Logger {
         env.new_object(class, "()", &[])
             .map(|o| unsafe { Local::from_jobject(o) })
     }
+}
 
+// class Logger {
+//     public void log(String data);
+// }
+
+struct LoggerLog<J, S> {
+    this: J,
+    data: S,
+}
+
+impl<J, S> JdkOp for LoggerLog<J, S>
+where
+    J: for<'jvm> JdkOp<Output<'jvm> = &'jvm Logger>,
+    S: for<'jvm> JdkOp<Output<'jvm> = JNIString>,
+{
+    type Output<'jvm> = ();
+
+    fn execute<'jvm>(self, jvm: &'jvm Jvm) -> jni::errors::Result<Self::Output<'jvm>> {
+        let this = self.this.execute(jvm)?;
+        let mut env = jvm.to_env();
+
+        let data = self.data.execute(jvm)?;
+
+        let this = Anchor::from(&*this);
+        match env.call_method(
+            &this,
+            "log",
+            "(Ljava/lang/String;)V",
+            &[JValue::from(&data)],
+        )? {
+            JValueGen::Void => Ok(()),
+            _ => panic!("class file out of sync"),
+        }
+    }
+}
+
+impl Logger {
     // static methods require the `jvm` argument to limit the lifetime of the returned local ref
     pub fn global_logger<'jvm>(jvm: &'jvm Jvm) -> jni::errors::Result<Local<'jvm, Self>> {
         let mut env = jvm.to_env();

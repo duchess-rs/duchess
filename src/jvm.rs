@@ -1,6 +1,27 @@
 use jni::{objects::JObject, sys, JNIEnv};
 use std::{marker::PhantomData, ops::Deref};
 
+pub trait JdkOp {
+    type Output<'jvm>;
+
+    fn execute<'jvm>(self, jvm: &'jvm Jvm) -> jni::errors::Result<Self::Output<'jvm>>;
+}
+
+
+pub trait JdkOp1<R>: JdkOp where R: JavaObject {
+    type ObjOutput<'jvm>: AsRef<R>;
+
+    fn execute1<'jvm>(
+        self, 
+        jvm: &'jvm Jvm,
+        op: impl FnOnce(&R)
+    ) -> jni::errors::Result<&'R J> {
+        op()
+    }
+}
+
+impl<T: JdkOp> Jdk
+
 #[repr(transparent)]
 pub struct Jvm {
     env: *mut sys::JNIEnv,

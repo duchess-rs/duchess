@@ -73,7 +73,8 @@ We have a conflict:
 * Or... we go into a suspended mode...
 
 ```rust
-MyObject::new(x, y, z).execute(jdk);
+MyObject::new(x, y, z)
+    .execute(jdk);
 
 MyObject::new(x, y, z)
     .blah(something)
