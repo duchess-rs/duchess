@@ -2,6 +2,10 @@
 
 How the generated code works and why.
 
+## Tracking the JNI environment
+
+
+
 ## Representing Java objects
 
 Java objects are represented by a dummy struct:
@@ -40,4 +44,54 @@ The `jdk` object offers a method to create a Global reference a Java object. Glo
 
 The underlying `sys::jobject` can be null, but we maintain the invariant that this is never the case, instead using `Option<&R>` etc.
 
+## Frequently asked questions
+
+Covers various bits of rationale.
+
+### Why do you not supported nested frames in the JNI?
+
+We do not want users to have to supply a context object on every method call, so instead we take the lifetime of the returned java reference and tie it to the inputs:
+
+```rust
+// from Java, and ignoring exceptions / null for clarity:
+//
+// class MyObject { ReturnType some_method(); }
+impl MyObject {
+    pub fn some_method<'jvm>(&'jvm self) -> Local<'jvm, ReturnType> {
+        //                    ----                ----
+        //           Lifetime in the return is derived from `self`.
+        ...
+    }
+}
+```
+
+This implies though that every 
+
+We have a conflict:
+
+* Either we make every method take a jdk pointer context.
+* Or... we go into a suspended mode...
+
+```rust
+MyObject::new(x, y, z).execute(jdk);
+
+MyObject::new(x, y, z)
+    .blah(something)
+    .blah(somethingElse)
+    .execute(jdk);
+
+MyObject::new(x, y, z)
+    .blah(something)
+    .blah(somethingElse)
+    .map(|x| {
+        x.someMethod()
+    })
+    .execute(jdk);
+```
+
+...this can start by compiling to jdk calls... and then later we can generate byte code and a custom class, no?
+
+
+
+If we supported nested frames, we would have to always take a "context" object and use that to derive the lifetime of each `Local<'l, MyObject>` reference. But that is annoying for users, who then have to add an artificial seeming environment as a parameter to various operations. (As it is, we still need it for static methods and constructors, which is unfortunate.)
 
