@@ -1,9 +1,5 @@
-use jni::{
-    objects::{AutoLocal, JString, JValue, JValueGen},
-    strings::JNIString,
-};
-
-use crate::jvm::{JavaObject, JavaObjectExt, JdkOp, Jvm, Local};
+use duchess::jvm::{JavaObject, JavaObjectExt, JdkOp, Jvm, Local};
+use jni::objects::{AutoLocal, JValue, JValueGen};
 
 pub struct Logger {
     _dummy: (),
@@ -76,4 +72,8 @@ where
             _ => panic!("class file out of sync"),
         }
     }
+}
+
+fn main() {
+    todo!()
 }

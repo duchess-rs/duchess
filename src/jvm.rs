@@ -37,7 +37,7 @@ impl Jvm {
         })
     }
 
-    pub(crate) fn to_env(&self) -> JNIEnv<'_> {
+    pub fn to_env(&self) -> JNIEnv<'_> {
         unsafe { JNIEnv::from_raw(self.env).unwrap() }
     }
 
