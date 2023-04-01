@@ -2,14 +2,20 @@
 
 pub use duchess_macro::duchess;
 
+mod jvm;
 mod ops;
+mod str;
+
+pub use jni::errors::Result;
+pub use jvm::Global;
+pub use jvm::JavaObject;
+pub use jvm::Jvm;
+pub use jvm::JvmOp;
+pub use jvm::Local;
 
 /// Internal module containing non-semver protected
 /// names used by generated code.
-pub mod plumbing;
-
-pub use plumbing::Global;
-pub use plumbing::JavaObject;
-pub use plumbing::Jvm;
-pub use plumbing::JvmOp;
-pub use plumbing::Local;
+pub mod plumbing {
+    pub use crate::jvm::JavaObjectExt;
+    pub use crate::str::ToJavaStringOp;
+}
