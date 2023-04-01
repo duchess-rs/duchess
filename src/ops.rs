@@ -32,12 +32,9 @@ identity_jvm_op! {
     [] f64, // double
 
     [R: JavaObject] &R,
-    [R: JavaObject] Local<'_, R>,
     [R: JavaObject] &Local<'_, R>,
-    [R: JavaObject] Global<R>,
     [R: JavaObject] &Global<R>,
 
     [] &str,
     [] &String,
-    [] String,
 }

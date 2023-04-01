@@ -148,5 +148,10 @@ where
 }
 
 fn main() -> jni::errors::Result<()> {
-    Jvm::with(|jvm| Logger::new().log_int(22).execute(jvm))
+    Jvm::with(|jvm| {
+        let l = Logger::new().execute(jvm)?;
+        l.log_int(22).execute(jvm)?;
+        l.log_string("Hello, Duchess!").execute(jvm)?;
+        Ok(())
+    })
 }
