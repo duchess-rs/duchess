@@ -25,6 +25,11 @@ pub trait LoggerExt: Sized {
     where
         D: JvmOp,
         for<'jvm> D::Output<'jvm>: Into<i32>;
+
+    fn log_string<D>(self, data: D) -> LoggerLogString<Self, D>
+    where
+        D: JvmOp,
+        for<'jvm> D::Output<'jvm>: Into<JNIString>;
 }
 
 impl<T> LoggerExt for T
@@ -38,6 +43,14 @@ where
         for<'jvm> D::Output<'jvm>: Into<i32>,
     {
         LoggerLogInt { this: self, data }
+    }
+
+    fn log_string<D>(self, data: D) -> LoggerLogString<Self, D>
+    where
+        D: JvmOp,
+        for<'jvm> D::Output<'jvm>: Into<JNIString>,
+    {
+        LoggerLogString { this: self, data }
     }
 }
 
@@ -95,7 +108,7 @@ where
 }
 
 // class Logger {
-//     public void logInt(int data);
+//     public void logString(String data);
 // }
 
 pub struct LoggerLogString<J, S> {
@@ -122,7 +135,12 @@ where
 
         let env = jvm.to_env();
         let data = data.as_jobject();
-        match env.call_method(this.as_jobject(), "logInt", "(I)V", &[JValue::from(&data)])? {
+        match env.call_method(
+            this.as_jobject(),
+            "logString",
+            "(Ljava/lang/String;)V",
+            &[JValue::from(&data)],
+        )? {
             JValueGen::Void => Ok(()),
             _ => panic!("class file out of sync"),
         }
