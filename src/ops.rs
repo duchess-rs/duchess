@@ -3,7 +3,6 @@ use crate::jvm::JvmOp;
 use crate::Global;
 use crate::JavaObject;
 use crate::Local;
-use jni::errors::Result as JniResult;
 
 macro_rules! identity_jvm_op {
     ($([$($param:tt)*] $t:ty,)*) => {
@@ -11,7 +10,7 @@ macro_rules! identity_jvm_op {
             impl<$($param)*> JvmOp for $t {
                 type Output<'jvm> = Self;
 
-                fn execute<'jvm>(self, _jvm: &mut Jvm<'jvm>) -> JniResult<Self::Output<'jvm>> {
+                fn execute<'jvm>(self, _jvm: &mut Jvm<'jvm>) -> crate::Result<Self::Output<'jvm>> {
                     Ok(self)
                 }
             }

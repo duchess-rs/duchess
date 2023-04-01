@@ -5,7 +5,6 @@ use std::{
 };
 
 use jni::{
-    errors::Result as JniResult,
     objects::{AutoLocal, GlobalRef, JObject},
     sys, InitArgsBuilder, JNIEnv, JavaVM,
 };
@@ -22,7 +21,7 @@ use once_cell::sync::Lazy;
 pub trait JvmOp {
     type Output<'jvm>;
 
-    fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> JniResult<Self::Output<'jvm>>;
+    fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<Self::Output<'jvm>>;
 }
 
 static GLOBAL_JVM: Lazy<JavaVM> = Lazy::new(|| {
@@ -42,7 +41,7 @@ pub struct Jvm<'jvm> {
 }
 
 impl<'jvm> Jvm<'jvm> {
-    pub fn with<R>(op: impl FnOnce(&mut Jvm<'_>) -> JniResult<R>) -> JniResult<R> {
+    pub fn with<R>(op: impl FnOnce(&mut Jvm<'_>) -> crate::Result<R>) -> crate::Result<R> {
         let guard = GLOBAL_JVM.attach_current_thread()?;
 
         // Safety condition: must not be used to create new references
