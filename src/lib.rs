@@ -2,12 +2,14 @@
 
 pub use duchess_macro::duchess;
 
-mod jvm;
 mod ops;
 
-pub use jvm::Global;
-pub use jvm::JavaObject;
-pub use jvm::JavaObjectExt;
-pub use jvm::Jvm;
-pub use jvm::JvmOp;
-pub use jvm::Local;
+/// Internal module containing non-semver protected
+/// names used by generated code.
+pub mod plumbing;
+
+pub use plumbing::Global;
+pub use plumbing::JavaObject;
+pub use plumbing::Jvm;
+pub use plumbing::JvmOp;
+pub use plumbing::Local;

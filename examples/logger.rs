@@ -1,4 +1,4 @@
-use duchess::{JavaObject, JavaObjectExt, Jvm, JvmOp, Local};
+use duchess::{JavaObject, Jvm, JvmOp, Local};
 use jni::{
     objects::{AutoLocal, JValue, JValueGen},
     strings::JNIString,
@@ -78,6 +78,8 @@ where
     type Output<'jvm> = ();
 
     fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> jni::errors::Result<Self::Output<'jvm>> {
+        use duchess::plumbing::JavaObjectExt;
+
         let this = self.this.execute(jvm)?;
         let this: &Logger = this.as_ref();
 

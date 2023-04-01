@@ -1,5 +1,5 @@
-use crate::jvm::Jvm;
-use crate::jvm::JvmOp;
+use crate::plumbing::Jvm;
+use crate::plumbing::JvmOp;
 use crate::Global;
 use crate::JavaObject;
 use crate::Local;
