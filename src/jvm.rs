@@ -239,3 +239,29 @@ where
 //         self.to_raw()
 //     }
 // }
+
+impl<R> AsRef<R> for Local<'_, R>
+where
+    R: JavaObject,
+{
+    fn as_ref(&self) -> &R {
+        self
+    }
+}
+
+impl<R> AsRef<R> for Global<R>
+where
+    R: JavaObject,
+{
+    fn as_ref(&self) -> &R {
+        self
+    }
+}
+
+impl JvmOp for i32 {
+    type Output<'jvm> = Self;
+
+    fn execute<'jvm>(self, _jvm: &mut Jvm<'jvm>) -> JniResult<Self::Output<'jvm>> {
+        Ok(self)
+    }
+}

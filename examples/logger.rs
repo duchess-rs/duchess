@@ -17,6 +17,27 @@ impl Logger {
     }
 }
 
+pub trait LoggerExt: Sized {
+    fn log<D>(self, data: D) -> LoggerLog<Self, D>
+    where
+        D: JvmOp,
+        for<'jvm> D::Output<'jvm>: Into<i32>;
+}
+
+impl<T> LoggerExt for T
+where
+    T: JvmOp,
+    for<'jvm> T::Output<'jvm>: AsRef<Logger>,
+{
+    fn log<D>(self, data: D) -> LoggerLog<Self, D>
+    where
+        D: JvmOp,
+        for<'jvm> D::Output<'jvm>: Into<i32>,
+    {
+        LoggerLog { this: self, data }
+    }
+}
+
 pub struct LoggerConstructor {
     _private: (),
 }
@@ -39,7 +60,7 @@ impl JvmOp for LoggerConstructor {
 //     public void log(int data);
 // }
 
-struct LoggerLog<J, S> {
+pub struct LoggerLog<J, S> {
     this: J,
     data: S,
 }
@@ -73,6 +94,6 @@ where
     }
 }
 
-fn main() {
-    todo!()
+fn main() -> jni::errors::Result<()> {
+    Jvm::with(|jvm| Logger::new().log(22).execute(jvm))
 }
