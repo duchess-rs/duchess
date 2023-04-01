@@ -5,10 +5,10 @@ use crate::JavaObject;
 use crate::Local;
 use jni::errors::Result as JniResult;
 
-macro_rules! scalar_jvm_op {
-    ($($t:ty,)*) => {
+macro_rules! identity_jvm_op {
+    ($([$($param:tt)*] $t:ty,)*) => {
         $(
-            impl JvmOp for $t {
+            impl<$($param)*> JvmOp for $t {
                 type Output<'jvm> = Self;
 
                 fn execute<'jvm>(self, _jvm: &mut Jvm<'jvm>) -> JniResult<Self::Output<'jvm>> {
@@ -19,43 +19,26 @@ macro_rules! scalar_jvm_op {
     };
 }
 
-scalar_jvm_op! {
-    i8,  // byte
-    i16, // short
-    i32, // int
-    i64, // long
+identity_jvm_op! {
+    [] i8,  // byte
+    [] i16, // short
+    [] i32, // int
+    [] i64, // long
 
-    char, // char
+    [] char, // char
 
-    (),  // void
+    [] (),  // void
 
-    f32, // float
-    f64, // double
-}
+    [] f32, // float
+    [] f64, // double
 
-macro_rules! obj_op {
-    ($R:ident => { $($t:ty,)* }) => {
-        $(
-            impl<$R> JvmOp for $t
-            where
-                $R: JavaObject,
-            {
-                type Output<'jvm> = Self;
+    [R: JavaObject] &R,
+    [R: JavaObject] Local<'_, R>,
+    [R: JavaObject] &Local<'_, R>,
+    [R: JavaObject] Global<R>,
+    [R: JavaObject] &Global<R>,
 
-                fn execute<'jvm>(self, _jvm: &mut Jvm<'jvm>) -> JniResult<Self> {
-                    Ok(self)
-                }
-            }
-        )*
-    }
-}
-
-obj_op! {
-    R => {
-        &R,
-        Local<'_, R>,
-        &Local<'_, R>,
-        Global<R>,
-        &Global<R>,
-    }
+    [] &str,
+    [] &String,
+    [] String,
 }
