@@ -1,4 +1,4 @@
-use crate::inspect::Inspect;
+use crate::inspect::{ArgOp, Inspect};
 
 use std::{
     marker::PhantomData,
@@ -29,6 +29,19 @@ pub trait JvmOp: Clone {
         Self::Input<'jvm>: IsVoid,
     {
         Self::execute_with(self, jvm, Default::default())
+    }
+
+    /// "Inspect" executes an operation on this value that results in unit
+    /// and then yields up this value again for further use. If the result
+    /// of `self` is the java value `x`, then `self.inspect(|x| x.foo()).bar()`
+    /// is equivalent to the Java code `x.foo(); return x.bar()`.
+    fn inspect<K>(self, op: impl FnOnce(ArgOp<Self>) -> K) -> Inspect<Self, K>
+    where
+        for<'jvm> Self::Output<'jvm>: CloneIn<'jvm>,
+        K: JvmOp,
+        for<'jvm> K: JvmOp<Input<'jvm> = Self::Output<'jvm>, Output<'jvm> = ()>,
+    {
+        Inspect::new(self, op)
     }
 
     fn execute_with<'jvm>(
@@ -90,6 +103,13 @@ impl<'jvm> Jvm<'jvm> {
             assert!(!new_local_ref.is_null());
             Local::from_jni(AutoLocal::new(new_local_ref, &env))
         }
+    }
+
+    pub fn global<R>(&mut self, r: &R) -> Global<R>
+    where
+        R: JavaObject,
+    {
+        todo!()
     }
 }
 
@@ -274,5 +294,36 @@ where
 {
     fn as_ref(&self) -> &R {
         self
+    }
+}
+
+pub trait CloneIn<'jvm> {
+    fn clone_in(&self, jvm: &mut Jvm<'jvm>) -> Self;
+}
+
+impl<T> CloneIn<'_> for T
+where
+    T: Clone,
+{
+    fn clone_in(&self, jvm: &mut Jvm<'_>) -> Self {
+        self.clone()
+    }
+}
+
+impl<'jvm, T> CloneIn<'jvm> for Local<'jvm, T>
+where
+    T: JavaObject,
+{
+    fn clone_in(&self, jvm: &mut Jvm<'jvm>) -> Self {
+        jvm.local(self)
+    }
+}
+
+impl<'jvm, T> CloneIn<'jvm> for Global<T>
+where
+    T: JavaObject,
+{
+    fn clone_in(&self, jvm: &mut Jvm<'jvm>) -> Self {
+        jvm.global(self)
     }
 }
