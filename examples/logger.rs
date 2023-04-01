@@ -1,5 +1,8 @@
-use duchess::jvm::{JavaObject, JavaObjectExt, Jvm, JvmOp, Local};
-use jni::objects::{AutoLocal, JValue, JValueGen};
+use duchess::{JavaObject, JavaObjectExt, Jvm, JvmOp, Local};
+use jni::{
+    objects::{AutoLocal, JValue, JValueGen},
+    strings::JNIString,
+};
 
 pub struct Logger {
     _dummy: (),
@@ -57,7 +60,7 @@ impl JvmOp for LoggerConstructor {
 }
 
 // class Logger {
-//     public void log(int data);
+//     public void logInt(int data);
 // }
 
 pub struct LoggerLog<J, S> {

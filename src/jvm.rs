@@ -258,31 +258,3 @@ where
         self
     }
 }
-
-macro_rules! scalar_jvm_op {
-    ($($t:ty,)*) => {
-        $(
-            impl JvmOp for $t {
-                type Output<'jvm> = Self;
-
-                fn execute<'jvm>(self, _jvm: &mut Jvm<'jvm>) -> JniResult<Self::Output<'jvm>> {
-                    Ok(self)
-                }
-            }
-        )*
-    };
-}
-
-scalar_jvm_op! {
-    i8,  // byte
-    i16, // short
-    i32, // int
-    i64, // long
-
-    char, // char
-
-    (),  // void
-
-    f32, // float
-    f64, // double
-}

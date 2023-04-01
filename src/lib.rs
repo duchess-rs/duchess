@@ -2,4 +2,12 @@
 
 pub use duchess_macro::duchess;
 
-pub mod jvm;
+mod jvm;
+mod ops;
+
+pub use jvm::Global;
+pub use jvm::JavaObject;
+pub use jvm::JavaObjectExt;
+pub use jvm::Jvm;
+pub use jvm::JvmOp;
+pub use jvm::Local;
