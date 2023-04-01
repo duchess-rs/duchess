@@ -5,7 +5,7 @@ class Logger {
 
     }
 
-    void log(int data) {
+    void logInt(int data) {
         System.out.println(data);
     }
 }

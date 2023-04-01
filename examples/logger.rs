@@ -18,7 +18,7 @@ impl Logger {
 }
 
 pub trait LoggerExt: Sized {
-    fn log<D>(self, data: D) -> LoggerLog<Self, D>
+    fn logInt<D>(self, data: D) -> LoggerLog<Self, D>
     where
         D: JvmOp,
         for<'jvm> D::Output<'jvm>: Into<i32>;
@@ -29,7 +29,7 @@ where
     T: JvmOp,
     for<'jvm> T::Output<'jvm>: AsRef<Logger>,
 {
-    fn log<D>(self, data: D) -> LoggerLog<Self, D>
+    fn logInt<D>(self, data: D) -> LoggerLog<Self, D>
     where
         D: JvmOp,
         for<'jvm> D::Output<'jvm>: Into<i32>,
@@ -82,7 +82,7 @@ where
         let data: i32 = data.into();
 
         let env = jvm.to_env();
-        match env.call_method(this.as_jobject(), "log", "(I)V", &[JValue::from(data)])? {
+        match env.call_method(this.as_jobject(), "logInt", "(I)V", &[JValue::from(data)])? {
             JValueGen::Void => Ok(()),
             _ => panic!("class file out of sync"),
         }
@@ -90,5 +90,5 @@ where
 }
 
 fn main() -> jni::errors::Result<()> {
-    Jvm::with(|jvm| Logger::new().log(22).execute(jvm))
+    Jvm::with(|jvm| Logger::new().logInt(22).execute(jvm))
 }
