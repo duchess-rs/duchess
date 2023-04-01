@@ -51,7 +51,7 @@ impl JvmOp for LoggerConstructor {
         // FIXME: how do we cache this
         let class = env.find_class("me/ferris/Logger")?;
 
-        env.new_object(class, "()", &[])
+        env.new_object(class, "()V", &[])
             .map(|o| unsafe { Local::from_jni(AutoLocal::new(o, &env)) })
     }
 }
@@ -82,12 +82,7 @@ where
         let data: i32 = data.into();
 
         let env = jvm.to_env();
-        match env.call_method(
-            this.as_jobject(),
-            "log",
-            "(Ljava/lang/String;)V",
-            &[JValue::from(data)],
-        )? {
+        match env.call_method(this.as_jobject(), "log", "(I)V", &[JValue::from(data)])? {
             JValueGen::Void => Ok(()),
             _ => panic!("class file out of sync"),
         }

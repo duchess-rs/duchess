@@ -1,3 +1,5 @@
+package me.ferris;
+
 class Logger {
     Logger() {
 

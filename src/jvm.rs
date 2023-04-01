@@ -29,6 +29,7 @@ static GLOBAL_JVM: Lazy<JavaVM> = Lazy::new(|| {
     let jvm_args = InitArgsBuilder::new()
         .version(jni::JNIVersion::V8)
         .option("-Xcheck:jni")
+        .option("-Djava.class.path=java")
         .build()
         .unwrap();
 
