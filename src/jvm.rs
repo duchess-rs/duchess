@@ -9,10 +9,22 @@ use jni::{
     sys, JNIEnv,
 };
 
-pub trait JdkOp {
+/// A "jdk op" is a suspended operation that, when executed, will run
+/// on the jvm, producing a value of type `Output`. These ops typically
+/// represent constructor or method calls, and they can be chained
+/// together.
+///
+/// *Eventual goal:* Each call to `execute` represents a single crossing
+/// over into the JVM, so the more you can chain together your jvm-ops,
+/// the better.
+pub trait JvmOp {
     type Output<'jvm>;
 
     fn execute<'jvm>(self, jvm: &'jvm Jvm) -> jni::errors::Result<Self::Output<'jvm>>;
+}
+
+thread_local! {
+    static IN_JVM_CALLBACK: bool = false
 }
 
 #[repr(transparent)]

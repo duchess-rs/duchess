@@ -1,4 +1,4 @@
-use duchess::jvm::{JavaObject, JavaObjectExt, JdkOp, Jvm, Local};
+use duchess::jvm::{JavaObject, JavaObjectExt, Jvm, JvmOp, Local};
 use jni::objects::{AutoLocal, JValue, JValueGen};
 
 pub struct Logger {
@@ -21,7 +21,7 @@ pub struct LoggerConstructor {
     _private: (),
 }
 
-impl JdkOp for LoggerConstructor {
+impl JvmOp for LoggerConstructor {
     type Output<'jvm> = Local<'jvm, Logger>;
 
     fn execute<'jvm>(self, jvm: &'jvm Jvm) -> jni::errors::Result<Self::Output<'jvm>> {
@@ -36,7 +36,7 @@ impl JdkOp for LoggerConstructor {
 }
 
 // class Logger {
-//     public void log(String data);
+//     public void log(int data);
 // }
 
 struct LoggerLog<J, S> {
@@ -44,11 +44,11 @@ struct LoggerLog<J, S> {
     data: S,
 }
 
-impl<J, S> JdkOp for LoggerLog<J, S>
+impl<J, S> JvmOp for LoggerLog<J, S>
 where
-    J: JdkOp,
+    J: JvmOp,
     for<'jvm> J::Output<'jvm>: AsRef<Logger>,
-    S: JdkOp,
+    S: JvmOp,
     for<'jvm> S::Output<'jvm>: Into<i32>,
 {
     type Output<'jvm> = ();
