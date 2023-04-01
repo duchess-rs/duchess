@@ -77,6 +77,8 @@ you can write Rust like this
 duchess::with_jvm(|jni| {
     use me::ferris::Logger;
     Logger::globalLogger(jni).log(jni, "Hello, world");
+
+    Logger::globalLogger().log("Hello, world").execute(jni);
 });
 ```
 

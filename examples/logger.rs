@@ -13,12 +13,12 @@ unsafe impl JavaObject for Logger {}
 
 impl Logger {
     pub fn new() -> LoggerConstructor {
-        LoggerConstructor { private: () }
+        LoggerConstructor { _private: () }
     }
 }
 
 pub struct LoggerConstructor {
-    private: (),
+    _private: (),
 }
 
 impl JdkOp for LoggerConstructor {
