@@ -18,7 +18,7 @@ use once_cell::sync::Lazy;
 /// *Eventual goal:* Each call to `execute` represents a single crossing
 /// over into the JVM, so the more you can chain together your jvm-ops,
 /// the better.
-pub trait JvmOp {
+pub trait JvmOp: Clone {
     type Output<'jvm>;
 
     fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<Self::Output<'jvm>>;

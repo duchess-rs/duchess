@@ -24,6 +24,7 @@ where
     }
 }
 
+#[derive(Clone)]
 pub struct JavaStringOp<J: JvmOp> {
     op: J,
 }

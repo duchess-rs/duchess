@@ -20,7 +20,7 @@ impl Logger {
     }
 }
 
-pub trait LoggerExt: Sized {
+pub trait LoggerExt: JvmOp + Sized {
     fn log_int<D>(self, data: D) -> LoggerLogInt<Self, D>
     where
         D: JvmOp,
@@ -54,6 +54,7 @@ where
     }
 }
 
+#[derive(Clone)]
 pub struct LoggerConstructor {
     _private: (),
 }
@@ -76,7 +77,8 @@ impl JvmOp for LoggerConstructor {
 //     public void logInt(int data);
 // }
 
-pub struct LoggerLogInt<J, S> {
+#[derive(Clone)]
+pub struct LoggerLogInt<J: JvmOp, S: JvmOp> {
     this: J,
     data: S,
 }
@@ -111,7 +113,8 @@ where
 //     public void logString(String data);
 // }
 
-pub struct LoggerLogString<J, S> {
+#[derive(Clone)]
+pub struct LoggerLogString<J: JvmOp, S: JvmOp> {
     this: J,
     data: S,
 }
