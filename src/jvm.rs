@@ -5,9 +5,11 @@ use std::{
 };
 
 use jni::{
+    errors::Result as JniResult,
     objects::{AutoLocal, GlobalRef, JObject},
-    sys, JNIEnv,
+    sys, InitArgsBuilder, JNIEnv, JavaVM,
 };
+use once_cell::sync::Lazy;
 
 /// A "jdk op" is a suspended operation that, when executed, will run
 /// on the jvm, producing a value of type `Output`. These ops typically
@@ -20,40 +22,44 @@ use jni::{
 pub trait JvmOp {
     type Output<'jvm>;
 
-    fn execute<'jvm>(self, jvm: &'jvm Jvm) -> jni::errors::Result<Self::Output<'jvm>>;
+    fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> JniResult<Self::Output<'jvm>>;
 }
 
-thread_local! {
-    static IN_JVM_CALLBACK: bool = false
-}
+static GLOBAL_JVM: Lazy<JavaVM> = Lazy::new(|| {
+    let jvm_args = InitArgsBuilder::new()
+        .version(jni::JNIVersion::V8)
+        .option("-Xcheck:jni")
+        .build()
+        .unwrap();
+
+    JavaVM::new(jvm_args).unwrap()
+});
 
 #[repr(transparent)]
-pub struct Jvm {
-    env: *mut sys::JNIEnv,
-    data: PhantomData<*mut ()>, // Disable send, sync, etc
+pub struct Jvm<'jvm> {
+    env: JNIEnv<'jvm>,
 }
 
-thread_local! {
-    static JVM_REF: Option<Jvm> = None
-}
+impl<'jvm> Jvm<'jvm> {
+    pub fn with<R>(op: impl FnOnce(&mut Jvm<'_>) -> JniResult<R>) -> JniResult<R> {
+        let guard = GLOBAL_JVM.attach_current_thread()?;
 
-impl Jvm {
-    pub fn with<R>(f: impl FnOnce(&Jvm) -> R) -> R {
-        unsafe { f(&Jvm::get()) }
+        // Safety condition: must not be used to create new references
+        // unless they are contained by `guard`. In this case, the
+        // cloned env is fully contained within the lifetime of `guard`
+        // and basically takes its place. The only purpose here is to
+        // avoid having two lifetime parameters on `Jvm`; trying to
+        // keep the interface simpler.
+        let env = unsafe { guard.unsafe_clone() };
+
+        op(&mut Jvm { env })
     }
 
-    unsafe fn get() -> Jvm {
-        JVM_REF.with(|r| match r {
-            &Some(Jvm { env, data }) => Jvm { env, data },
-            None => panic!("not form an attached thread, this shouldn't happen"),
-        })
+    pub fn to_env(&mut self) -> &mut JNIEnv<'jvm> {
+        &mut self.env
     }
 
-    pub fn to_env(&self) -> JNIEnv<'_> {
-        unsafe { JNIEnv::from_raw(self.env).unwrap() }
-    }
-
-    pub fn local<'r, R>(&'r self, r: &'r R) -> Local<'r, R>
+    pub fn local<R>(&mut self, r: &R) -> Local<'jvm, R>
     where
         R: JavaObject,
     {

@@ -24,8 +24,8 @@ pub struct LoggerConstructor {
 impl JvmOp for LoggerConstructor {
     type Output<'jvm> = Local<'jvm, Logger>;
 
-    fn execute<'jvm>(self, jvm: &'jvm Jvm) -> jni::errors::Result<Self::Output<'jvm>> {
-        let mut env = jvm.to_env();
+    fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> jni::errors::Result<Self::Output<'jvm>> {
+        let env = jvm.to_env();
 
         // FIXME: how do we cache this
         let class = env.find_class("me/ferris/Logger")?;
@@ -53,15 +53,14 @@ where
 {
     type Output<'jvm> = ();
 
-    fn execute<'jvm>(self, jvm: &'jvm Jvm) -> jni::errors::Result<Self::Output<'jvm>> {
+    fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> jni::errors::Result<Self::Output<'jvm>> {
         let this = self.this.execute(jvm)?;
         let this: &Logger = this.as_ref();
-
-        let mut env = jvm.to_env();
 
         let data = self.data.execute(jvm)?;
         let data: i32 = data.into();
 
+        let env = jvm.to_env();
         match env.call_method(
             this.as_jobject(),
             "log",
