@@ -33,10 +33,15 @@ impl<J: JvmOp> JvmOp for JavaStringOp<J>
 where
     for<'jvm> J::Output<'jvm>: Into<JNIString>,
 {
+    type Input<'jvm> = J::Input<'jvm>;
     type Output<'jvm> = Local<'jvm, JavaString>;
 
-    fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<Self::Output<'jvm>> {
-        let data = self.op.execute(jvm)?;
+    fn execute_with<'jvm>(
+        self,
+        jvm: &mut Jvm<'jvm>,
+        input: Self::Input<'jvm>,
+    ) -> crate::Result<Self::Output<'jvm>> {
+        let data = self.op.execute_with(jvm, input)?;
         let data: JNIString = data.into();
 
         let env = jvm.to_env();

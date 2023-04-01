@@ -60,9 +60,14 @@ pub struct LoggerConstructor {
 }
 
 impl JvmOp for LoggerConstructor {
+    type Input<'jvm> = ();
     type Output<'jvm> = Local<'jvm, Logger>;
 
-    fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> jni::errors::Result<Self::Output<'jvm>> {
+    fn execute_with<'jvm>(
+        self,
+        jvm: &mut Jvm<'jvm>,
+        (): (),
+    ) -> jni::errors::Result<Self::Output<'jvm>> {
         let env = jvm.to_env();
 
         // FIXME: how do we cache this
@@ -88,17 +93,23 @@ where
     J: JvmOp,
     for<'jvm> J::Output<'jvm>: AsRef<Logger>,
     S: JvmOp,
+    for<'jvm> S: JvmOp<Input<'jvm> = ()>,
     for<'jvm> S::Output<'jvm>: Into<i32>,
 {
+    type Input<'jvm> = J::Input<'jvm>;
     type Output<'jvm> = ();
 
-    fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> jni::errors::Result<Self::Output<'jvm>> {
+    fn execute_with<'jvm>(
+        self,
+        jvm: &mut Jvm<'jvm>,
+        input: J::Input<'jvm>,
+    ) -> jni::errors::Result<Self::Output<'jvm>> {
         use duchess::plumbing::JavaObjectExt;
 
-        let this = self.this.execute(jvm)?;
+        let this = self.this.execute_with(jvm, input)?;
         let this: &Logger = this.as_ref();
 
-        let data = self.data.execute(jvm)?;
+        let data = self.data.execute_with(jvm, ())?;
         let data: i32 = data.into();
 
         let env = jvm.to_env();
@@ -124,17 +135,23 @@ where
     J: JvmOp,
     for<'jvm> J::Output<'jvm>: AsRef<Logger>,
     S: JvmOp,
+    for<'jvm> S: JvmOp<Input<'jvm> = ()>,
     for<'jvm> S::Output<'jvm>: Into<JNIString>,
 {
+    type Input<'jvm> = J::Input<'jvm>;
     type Output<'jvm> = ();
 
-    fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> jni::errors::Result<Self::Output<'jvm>> {
+    fn execute_with<'jvm>(
+        self,
+        jvm: &mut Jvm<'jvm>,
+        input: J::Input<'jvm>,
+    ) -> jni::errors::Result<Self::Output<'jvm>> {
         use duchess::plumbing::{JavaObjectExt, ToJavaStringOp};
 
-        let this = self.this.execute(jvm)?;
+        let this = self.this.execute_with(jvm, input)?;
         let this: &Logger = this.as_ref();
 
-        let data = self.data.to_java_string().execute(jvm)?;
+        let data = self.data.to_java_string().execute_with(jvm, ())?;
 
         let env = jvm.to_env();
         let data = data.as_jobject();

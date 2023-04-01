@@ -1,3 +1,5 @@
+use crate::inspect::Inspect;
+
 use std::{
     marker::PhantomData,
     ops::{Deref, DerefMut},
@@ -19,10 +21,27 @@ use once_cell::sync::Lazy;
 /// over into the JVM, so the more you can chain together your jvm-ops,
 /// the better.
 pub trait JvmOp: Clone {
+    type Input<'jvm>;
     type Output<'jvm>;
 
-    fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<Self::Output<'jvm>>;
+    fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<Self::Output<'jvm>>
+    where
+        Self::Input<'jvm>: IsVoid,
+    {
+        Self::execute_with(self, jvm, Default::default())
+    }
+
+    fn execute_with<'jvm>(
+        self,
+        jvm: &mut Jvm<'jvm>,
+        arg: Self::Input<'jvm>,
+    ) -> crate::Result<Self::Output<'jvm>>;
 }
+
+/// This trait is only implemented for `()`; it allows the `JvmOp::execute` method to only
+/// be used for `()`.
+pub trait IsVoid: Default {}
+impl IsVoid for () {}
 
 static GLOBAL_JVM: Lazy<JavaVM> = Lazy::new(|| {
     let jvm_args = InitArgsBuilder::new()

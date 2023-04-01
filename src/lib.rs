@@ -2,6 +2,7 @@
 
 pub use duchess_macro::duchess;
 
+mod inspect;
 mod jvm;
 mod ops;
 mod str;

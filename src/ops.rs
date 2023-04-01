@@ -8,9 +8,10 @@ macro_rules! identity_jvm_op {
     ($([$($param:tt)*] $t:ty,)*) => {
         $(
             impl<$($param)*> JvmOp for $t {
+                type Input<'jvm> = ();
                 type Output<'jvm> = Self;
 
-                fn execute<'jvm>(self, _jvm: &mut Jvm<'jvm>) -> crate::Result<Self::Output<'jvm>> {
+                fn execute_with<'jvm>(self, _jvm: &mut Jvm<'jvm>, (): ()) -> crate::Result<Self::Output<'jvm>> {
                     Ok(self)
                 }
             }
