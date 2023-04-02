@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use crate::{jvm::CloneIn, JavaObject, JvmOp, Local};
+use crate::{jvm::CloneIn, JvmOp};
 
 #[derive(Clone)]
 pub struct Inspect<J: JvmOp, K: JvmOp> {
@@ -61,7 +61,7 @@ where
 
     fn execute_with<'jvm>(
         self,
-        jvm: &mut crate::Jvm<'jvm>,
+        _jvm: &mut crate::Jvm<'jvm>,
         arg: Self::Input<'jvm>,
     ) -> crate::Result<Self::Output<'jvm>> {
         Ok(arg)

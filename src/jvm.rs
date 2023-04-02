@@ -105,7 +105,7 @@ impl<'jvm> Jvm<'jvm> {
         }
     }
 
-    pub fn global<R>(&mut self, r: &R) -> Global<R>
+    pub fn global<R>(&mut self, _r: &R) -> Global<R>
     where
         R: JavaObject,
     {
@@ -305,7 +305,7 @@ impl<T> CloneIn<'_> for T
 where
     T: Clone,
 {
-    fn clone_in(&self, jvm: &mut Jvm<'_>) -> Self {
+    fn clone_in(&self, _jvm: &mut Jvm<'_>) -> Self {
         self.clone()
     }
 }
