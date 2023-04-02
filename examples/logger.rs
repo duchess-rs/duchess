@@ -174,7 +174,6 @@ fn main() -> jni::errors::Result<()> {
         l.log_string("Hello, Duchess!").execute(jvm)?;
 
         Logger::new()
-            .execute(jvm)?
             .inspect(|l| l.log_int(23))
             .inspect(|l| l.log_string("Hello again, Duchess!"))
             .execute(jvm)?;
