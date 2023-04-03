@@ -8,7 +8,7 @@ use jni::{
     objects::{AutoLocal, JObject, JPrimitiveArray},
 };
 
-pub struct JavaArray<T> {
+pub struct JavaArray<T: ArrayElement> {
     _element: PhantomData<T>,
 }
 
@@ -20,9 +20,14 @@ unsafe impl<T: ArrayElement> JavaObject for JavaArray<T> {}
 
 unsafe impl<T: ArrayElement> Upcast<JavaArray<T>> for JavaArray<T> {}
 
-pub trait IntoJavaArray<T>: IntoJava<JavaArray<T>> {}
+pub trait IntoJavaArray<T: ArrayElement>: IntoJava<JavaArray<T>> {}
 
-impl<I, T> IntoJavaArray<T> for I where I: IntoJava<JavaArray<T>> {}
+impl<I, T> IntoJavaArray<T> for I
+where
+    T: ArrayElement,
+    I: IntoJava<JavaArray<T>>,
+{
+}
 
 #[derive(Clone)]
 pub struct IntoRustVec<J, T> {
