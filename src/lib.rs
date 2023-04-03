@@ -26,3 +26,13 @@ pub mod plumbing {
     pub use crate::jvm::{JavaObjectExt, Upcast};
     pub use crate::str::{IntoJavaString, JavaString, ToJavaStringOp};
 }
+
+pub use crate::array::JavaArray;
+
+pub mod java {
+    pub mod util {
+        pub use crate::collections::list::ArrayList;
+        pub use crate::collections::list::List;
+        pub use crate::collections::map::HashMap;
+    }
+}
