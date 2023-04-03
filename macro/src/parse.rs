@@ -1,5 +1,6 @@
 use std::iter::Peekable;
 
+use litrs::StringLit;
 use proc_macro2::{Span, TokenStream, TokenTree};
 
 use crate::span_error::SpanError;
@@ -74,6 +75,13 @@ impl Parser {
         self.eat_if(|t| match t {
             TokenTree::Ident(i) => Some(i.to_string()),
             _ => None,
+        })
+    }
+
+    pub fn eat_string_literal(&mut self) -> Option<String> {
+        self.eat_if(|t| match StringLit::try_from(t) {
+            Ok(v) => Some(v.into_value().into_owned()),
+            Err(_) => None,
         })
     }
 

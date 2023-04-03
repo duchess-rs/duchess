@@ -14,6 +14,7 @@ pub ClassInfo: ClassInfo = {
         <m:Method*>
     "}" => {
         ClassInfo {
+            span: span.clone(),
             flags: l,
             name: n,
             generics: g,

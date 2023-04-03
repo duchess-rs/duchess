@@ -1,5 +1,33 @@
 use std::sync::Arc;
 
+use proc_macro2::Span;
+
+use crate::{parse::Parse, span_error::SpanError};
+
+pub struct SpannedClassInfo {
+    pub span: Span,
+    pub info: ClassInfo,
+}
+
+impl Parse for SpannedClassInfo {
+    fn parse(p: &mut crate::parse::Parser) -> Result<Option<Self>, SpanError> {
+        let Some(t) = p.eat_string_literal() else {
+            return Ok(None);
+        };
+
+        let span = p.last_span().unwrap();
+
+        match javap::parse_class_info(&t) {
+            Ok(info) => Ok(Some(SpannedClassInfo { span, info })),
+            Err(message) => Err(SpanError { span, message }),
+        }
+    }
+
+    fn description() -> String {
+        format!("output from `javap -public -s`")
+    }
+}
+
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
 pub struct ClassInfo {
     pub flags: Flags,
@@ -10,12 +38,6 @@ pub struct ClassInfo {
     pub constructors: Vec<Constructor>,
     pub fields: Vec<Field>,
     pub methods: Vec<Method>,
-}
-
-impl ClassInfo {
-    pub fn parse(input: &str) -> anyhow::Result<Self> {
-        javap::parse_class_info(input)
-    }
 }
 
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
@@ -119,6 +141,14 @@ impl From<&str> for Descriptor {
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
 pub struct Id {
     pub data: Arc<String>,
+}
+
+impl std::ops::Deref for Id {
+    type Target = String;
+
+    fn deref(&self) -> &String {
+        &self.data
+    }
 }
 
 impl From<String> for Id {

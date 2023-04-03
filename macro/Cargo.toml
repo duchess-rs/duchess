@@ -11,6 +11,7 @@ proc-macro = true
 [dependencies]
 anyhow = "1.0.70"
 lalrpop-util = { version = "0.19.9", features = ["lexer"] }
+litrs = "0.4.0"
 proc-macro2 = "1.0.56"
 quote = "1.0.26"
 regex = "1"

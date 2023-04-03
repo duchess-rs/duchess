@@ -1,7 +1,5 @@
 //! Experiments with Java-Rust interop.
 
-pub use duchess_macro::duchess;
-
 mod array;
 mod collections;
 mod inspect;
@@ -9,6 +7,7 @@ mod jvm;
 mod ops;
 mod str;
 
+pub use duchess_macro::duchess;
 pub use jni::errors::Result;
 pub use jvm::Global;
 pub use jvm::JavaObject;
