@@ -76,8 +76,6 @@ you can write Rust like this
 ```rust
 duchess::with_jvm(|jni| {
     use me::ferris::Logger;
-    Logger::globalLogger(jni).log(jni, "Hello, world");
-
     Logger::globalLogger().log("Hello, world").execute(jni);
 });
 ```
@@ -94,8 +92,8 @@ you can write Rust like this
 ```rust
 duchess::with_jvm(|jni| {
     use me::ferris::{Logger, LogMessage};
-    LogMessage::new(jni, "Hello, world").level(jni, 22);
-    Logger::globalLogger(jni).log(jni, &m);
+    LogMessage::new("Hello, world").level(22).execute(jni);
+    Logger::globalLogger().log(&m).execute(jni);
 });
 ```
 
