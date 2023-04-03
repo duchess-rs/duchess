@@ -8,9 +8,7 @@ pub struct Logger {
     _dummy: (),
 }
 
-unsafe impl JavaObject for Logger {
-    const CLASS_NAME: &'static str = "me/ferris/Logger";
-}
+unsafe impl JavaObject for Logger {}
 
 // class Logger {
 //    public Logger();

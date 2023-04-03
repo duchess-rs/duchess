@@ -13,9 +13,7 @@ pub struct JavaString {
     _private: (),
 }
 
-unsafe impl JavaObject for JavaString {
-    const CLASS_NAME: &'static str = "java/lang/String";
-}
+unsafe impl JavaObject for JavaString {}
 
 pub trait ToJavaStringOp: JvmOp + Sized {
     fn to_java_string(self) -> JavaStringOp<Self>;

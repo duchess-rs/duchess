@@ -10,13 +10,9 @@ pub struct JavaArray<T> {
     _element: PhantomData<T>,
 }
 
-pub unsafe trait ArrayElement {
-    const ARRAY_CLASS_NAME: &'static str;
-}
+pub unsafe trait ArrayElement {}
 
-unsafe impl<T: ArrayElement> JavaObject for JavaArray<T> {
-    const CLASS_NAME: &'static str = T::ARRAY_CLASS_NAME;
-}
+unsafe impl<T: ArrayElement> JavaObject for JavaArray<T> {}
 
 pub trait IntoJavaArray<T>: IntoJava<JavaArray<T>> {}
 
@@ -29,11 +25,9 @@ pub struct IntoRustVec<J, T> {
 }
 
 macro_rules! primivite_array {
-    ($([$rust:ty]: $class_name:literal $new_fn:ident $get_fn:ident $set_fn:ident,)*) => {
+    ($([$rust:ty]: $new_fn:ident $get_fn:ident $set_fn:ident,)*) => {
         $(
-            unsafe impl ArrayElement for $rust {
-                const ARRAY_CLASS_NAME: &'static str = $class_name;
-            }
+            unsafe impl ArrayElement for $rust { }
 
             impl IntoJava<JavaArray<$rust>> for &[$rust] {
                 type Output<'jvm> = Local<'jvm, JavaArray<$rust>>;
@@ -96,20 +90,18 @@ macro_rules! primivite_array {
 
 primivite_array! {
     // [bool]: "[Z" new_boolean_array get_boolean_array_region get_boolean_array_region,
-    [i8]: "[B" new_byte_array get_byte_array_region set_byte_array_region,
-    [u16]: "[C" new_char_array get_char_array_region set_char_array_region,
-    [i16]: "[S" new_short_array get_short_array_region set_short_array_region,
-    [i32]: "[I" new_int_array get_int_array_region set_int_array_region,
-    [i64]: "[J" new_long_array get_long_array_region set_long_array_region,
-    [f32]: "[F" new_float_array get_float_array_region set_float_array_region,
-    [f64]: "[D" new_double_array get_double_array_region set_double_array_region,
+    [i8]: new_byte_array get_byte_array_region set_byte_array_region,
+    [u16]: new_char_array get_char_array_region set_char_array_region,
+    [i16]: new_short_array get_short_array_region set_short_array_region,
+    [i32]: new_int_array get_int_array_region set_int_array_region,
+    [i64]: new_long_array get_long_array_region set_long_array_region,
+    [f32]: new_float_array get_float_array_region set_float_array_region,
+    [f64]: new_double_array get_double_array_region set_double_array_region,
 }
 
 // Bool is represented as u8 in JNI
 
-unsafe impl ArrayElement for bool {
-    const ARRAY_CLASS_NAME: &'static str = "[Z";
-}
+unsafe impl ArrayElement for bool {}
 
 impl IntoJava<JavaArray<bool>> for &[bool] {
     type Output<'jvm> = Local<'jvm, JavaArray<bool>>;

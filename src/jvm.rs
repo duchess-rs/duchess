@@ -134,13 +134,7 @@ impl<'jvm> Jvm<'jvm> {
 /// }
 /// unsafe impl JavaObject for BigDecimal {}
 /// ```
-pub unsafe trait JavaObject: Sized {
-    /// XX: this is convenient, but putting it here makes it a part of the public API. Is this something we want to
-    /// expose?
-    ///
-    /// XX: Safety?
-    const CLASS_NAME: &'static str;
-}
+pub unsafe trait JavaObject: Sized {}
 
 /// Extension trait for [JavaObject].
 pub trait JavaObjectExt: Sized {
@@ -149,7 +143,6 @@ pub trait JavaObjectExt: Sized {
 
     fn from_jobject<'a>(obj: &'a JObject<'a>) -> Option<&'a Self>;
     fn as_jobject(&self) -> BorrowedJObject<'_>;
-    fn resolve_class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::Result<Local<'jvm, JavaClass<Self>>>;
 }
 impl<T: JavaObject> JavaObjectExt for T {
     fn from_jobject<'a>(obj: &'a JObject<'a>) -> Option<&'a Self> {
@@ -176,13 +169,6 @@ impl<T: JavaObject> JavaObjectExt for T {
         // We must wrap the JObject to prevent anyone from calling `delete_local_ref` on it;
         // otherwise, `self` could become dangling
         BorrowedJObject::new(obj)
-    }
-
-    fn resolve_class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::Result<Local<'jvm, JavaClass<Self>>> {
-        let env = jvm.to_env();
-        let class = env.find_class(T::CLASS_NAME)?;
-        // XX: relies on CLASS_NAME from unsafe impl JavaObject
-        Ok(unsafe { Local::from_jni(AutoLocal::new(class.into(), &env)) })
     }
 }
 
@@ -340,13 +326,4 @@ where
     fn clone_in(&self, jvm: &mut Jvm<'jvm>) -> Self {
         jvm.global(self)
     }
-}
-
-/// Represents an instance of the Java class Class which is is used to resolve methods and fields.
-pub struct JavaClass<T> {
-    _instance: PhantomData<T>,
-}
-
-unsafe impl<T: JavaObject> JavaObject for JavaClass<T> {
-    const CLASS_NAME: &'static str = "java/lang/Class";
 }

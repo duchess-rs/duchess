@@ -11,9 +11,7 @@ use once_cell::sync::OnceCell;
 
 pub struct HttpRequest(());
 
-unsafe impl JavaObject for HttpRequest {
-    const CLASS_NAME: &'static str = "me/ferris/HttpRequest";
-}
+unsafe impl JavaObject for HttpRequest {}
 
 impl HttpRequest {
     pub fn new(
@@ -85,10 +83,12 @@ impl HttpRequest {
     }
 
     fn cached_class(jvm: &mut Jvm<'_>) -> duchess::Result<&'static GlobalRef> {
+        let env = jvm.to_env();
+
         static CLASS: OnceCell<GlobalRef> = OnceCell::new();
         CLASS.get_or_try_init(|| {
-            let class = Self::resolve_class(jvm)?;
-            jvm.to_env().new_global_ref(class.as_jobject())
+            let class = env.find_class("me/ferris/HttpRequest")?;
+            env.new_global_ref(class)
         })
     }
 }
