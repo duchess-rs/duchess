@@ -1,6 +1,9 @@
 use duchess::{
-    plumbing::{IntoJavaArray, IntoJavaString, JavaObjectExt, JavaString},
-    IntoRust, JavaObject, Jvm, JvmOp, Local,
+    plumbing::{
+        ArrayList, HashMap, IntoJavaArray, IntoJavaString, JavaObjectExt, JavaString, List,
+        ListExt, Map, MapExt, Upcast,
+    },
+    IntoJava, IntoRust, JavaObject, Jvm, JvmOp, Local,
 };
 use jni::{
     objects::{AutoLocal, GlobalRef, JMethodID, JValueGen},
@@ -13,25 +16,31 @@ pub struct HttpRequest(());
 
 unsafe impl JavaObject for HttpRequest {}
 
+unsafe impl Upcast<HttpRequest> for HttpRequest {}
+// unsafe impl Upcast<Object> for HttpRequest { }
+
 impl HttpRequest {
     pub fn new(
         verb: impl IntoJavaString,
         path: impl IntoJavaString,
         hashed_payload: impl IntoJavaArray<i8>,
+        parameters: impl IntoJava<Map<JavaString, List<JavaString>>>,
     ) -> impl for<'jvm> duchess::JvmOp<Input<'jvm> = (), Output<'jvm> = Local<'jvm, HttpRequest>>
     {
         #[derive(Clone)]
-        struct Impl<Verb, Path, HashedPayload> {
+        struct Impl<Verb, Path, HashedPayload, Parameters> {
             verb: Verb,
             path: Path,
             hashed_payload: HashedPayload,
+            parameters: Parameters,
         }
 
-        impl<Verb, Path, HashedPayload> JvmOp for Impl<Verb, Path, HashedPayload>
+        impl<Verb, Path, HashedPayload, Parameters> JvmOp for Impl<Verb, Path, HashedPayload, Parameters>
         where
             Verb: IntoJavaString,
             Path: IntoJavaString,
             HashedPayload: IntoJavaArray<i8>,
+            Parameters: IntoJava<Map<JavaString, List<JavaString>>>,
         {
             type Input<'jvm> = ();
             type Output<'jvm> = Local<'jvm, HttpRequest>;
@@ -44,13 +53,18 @@ impl HttpRequest {
                 let verb = self.verb.into_java(jvm)?;
                 let path = self.path.into_java(jvm)?;
                 let hashed_payload = self.hashed_payload.into_java(jvm)?;
+                let parameters = self.parameters.into_java(jvm)?;
 
                 let class = HttpRequest::cached_class(jvm)?;
 
                 let env = jvm.to_env();
                 static CONSTRUCTOR: OnceCell<JMethodID> = OnceCell::new();
                 let constructor = CONSTRUCTOR.get_or_try_init(|| {
-                    env.get_method_id(class, "<init>", "(Ljava/lang/String;Ljava/lang/String;[B)V")
+                    env.get_method_id(
+                        class,
+                        "<init>",
+                        "(Ljava/lang/String;Ljava/lang/String;[BLjava/util/Map;)V",
+                    )
                 })?;
 
                 let object = unsafe {
@@ -67,6 +81,9 @@ impl HttpRequest {
                             jvalue {
                                 l: hashed_payload.as_ref().as_jobject().as_raw(),
                             },
+                            jvalue {
+                                l: parameters.as_ref().as_jobject().as_raw(),
+                            },
                         ],
                     )?
                 };
@@ -79,6 +96,7 @@ impl HttpRequest {
             verb,
             path,
             hashed_payload,
+            parameters,
         }
     }
 
@@ -140,7 +158,14 @@ where
 
 fn main() -> jni::errors::Result<()> {
     Jvm::with(|jvm| {
-        let http_request = HttpRequest::new("POST", "/", [1i8, 2, 3].as_slice()).execute(jvm)?;
+        let params = HashMap::new().execute(jvm)?;
+        let values = ArrayList::new().execute(jvm)?;
+        values.add("first-value").execute(jvm)?;
+        values.add("second-value").execute(jvm)?;
+        params.put("first-param", &values).execute(jvm)?;
+
+        let http_request =
+            HttpRequest::new("POST", "/", [1i8, 2, 3].as_slice(), &params).execute(jvm)?;
 
         let as_str = http_request.to_string().into_rust().execute(jvm)?;
         println!("{}", as_str);

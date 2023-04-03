@@ -1,4 +1,4 @@
-use duchess::{JavaObject, Jvm, JvmOp, Local};
+use duchess::{plumbing::Upcast, JavaObject, Jvm, JvmOp, Local};
 use jni::{
     objects::{AutoLocal, JValue, JValueGen},
     strings::JNIString,
@@ -9,6 +9,9 @@ pub struct Logger {
 }
 
 unsafe impl JavaObject for Logger {}
+
+// Upcasts
+unsafe impl Upcast<Logger> for Logger {}
 
 // class Logger {
 //    public Logger();

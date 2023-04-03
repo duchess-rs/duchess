@@ -224,6 +224,7 @@ pub type Global<T> = OwnedRef<'static, GlobalRef, T>;
 ///
 /// Typically, instead of using `OwnedRef` directly, you would use one of the type aliases, [Local]
 /// or [Global]. If you need a borrowed reference instead of an owned one, just use `&T`.
+#[repr(transparent)]
 pub struct OwnedRef<'a, J, T> {
     inner: J,
     phantom: PhantomData<&'a T>,
@@ -279,21 +280,63 @@ where
 //     }
 // }
 
-impl<R> AsRef<R> for Local<'_, R>
+/// A trait to represent safe upcast operations for a [`JavaObject`].
+///
+/// # Safety
+///
+/// Inherits the rules of [`JavaObject`], but also `S` must be a valid superclass or implemented interface of `Self`.
+/// XX: would this actually allow unsafe behavior in a JNI call? or is it already checked/enforced?
+///
+/// XX: having to impl Upcast<T> for T on each struct is pretty annoying to get AsRef<T> to work without conflicts
+pub unsafe trait Upcast<S: JavaObject>: JavaObject {}
+
+impl<'a, R, S> AsRef<S> for Local<'a, R>
 where
-    R: JavaObject,
+    R: Upcast<S>,
+    S: JavaObject + 'a,
 {
-    fn as_ref(&self) -> &R {
-        self
+    fn as_ref(&self) -> &S {
+        // XX: Safety: repr(transparent) so OwnedRef<J, X> and OwnedRef<J, Y> have the same repr
+        let upcast: &Local<'a, S> = unsafe { std::mem::transmute(self) };
+        upcast
     }
 }
 
-impl<R> AsRef<R> for Global<R>
+impl<'a, R> Local<'a, R> {
+    /// XX: Trying to map onto Into causes impl conflits
+    pub fn upcast<S>(self) -> Local<'a, S>
+    where
+        R: Upcast<S>,
+        S: JavaObject + 'a,
+    {
+        // XX: Safety: repr(transparent) so OwnedRef<J, X> and OwnedRef<J, Y> have the same repr
+        let upcast: Local<'a, S> = unsafe { std::mem::transmute(self) };
+        upcast
+    }
+}
+
+impl<R, S> AsRef<S> for Global<R>
 where
-    R: JavaObject,
+    R: Upcast<S>,
+    S: JavaObject + 'static,
 {
-    fn as_ref(&self) -> &R {
-        self
+    fn as_ref(&self) -> &S {
+        // XX: Safety: repr(transparent) so OwnedRef<J, X> and OwnedRef<J, Y> have the same repr
+        let upcast: &Global<S> = unsafe { std::mem::transmute(self) };
+        upcast
+    }
+}
+
+impl<R> Global<R> {
+    /// XX: Trying to map onto Into causes impl conflits
+    pub fn upcast<S>(self) -> Global<S>
+    where
+        R: Upcast<S>,
+        S: JavaObject + 'static,
+    {
+        // XX: Safety: repr(transparent) so OwnedRef<J, X> and OwnedRef<J, Y> have the same repr
+        let upcast: Global<S> = unsafe { std::mem::transmute(self) };
+        upcast
     }
 }
 

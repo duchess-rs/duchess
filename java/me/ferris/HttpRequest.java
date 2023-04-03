@@ -6,7 +6,7 @@ import java.util.Map;
 public record HttpRequest(
     String verb,
     String path,
-    byte[] hashedPayload
-    // Map<String, ? extends List<String>> parameters,
+    byte[] hashedPayload,
+    Map<String, List<String>> parameters
     // Map<String, ? extends List<String>> headers
 ) { }

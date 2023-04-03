@@ -3,6 +3,7 @@
 pub use duchess_macro::duchess;
 
 mod array;
+mod collections;
 mod inspect;
 mod jvm;
 mod ops;
@@ -21,6 +22,8 @@ pub use ops::{IntoJava, IntoRust};
 /// names used by generated code.
 pub mod plumbing {
     pub use crate::array::IntoJavaArray;
-    pub use crate::jvm::JavaObjectExt;
+    pub use crate::collections::list::{ArrayList, List, ListExt};
+    pub use crate::collections::map::{HashMap, Map, MapExt};
+    pub use crate::jvm::{JavaObjectExt, Upcast};
     pub use crate::str::{IntoJavaString, JavaString, ToJavaStringOp};
 }

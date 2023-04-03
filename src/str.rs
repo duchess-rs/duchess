@@ -4,7 +4,7 @@ use jni::{
 };
 
 use crate::{
-    jvm::JavaObjectExt,
+    jvm::{JavaObjectExt, Upcast},
     ops::{IntoJava, IntoRust},
     JavaObject, Jvm, JvmOp, Local,
 };
@@ -14,6 +14,9 @@ pub struct JavaString {
 }
 
 unsafe impl JavaObject for JavaString {}
+
+// Upcasts
+unsafe impl Upcast<JavaString> for JavaString {}
 
 pub trait ToJavaStringOp: JvmOp + Sized {
     fn to_java_string(self) -> JavaStringOp<Self>;

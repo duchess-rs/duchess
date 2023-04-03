@@ -1,6 +1,8 @@
 use std::marker::PhantomData;
 
-use crate::{ops::IntoJava, plumbing::JavaObjectExt, IntoRust, JavaObject, Jvm, JvmOp, Local};
+use crate::{
+    jvm::Upcast, ops::IntoJava, plumbing::JavaObjectExt, IntoRust, JavaObject, Jvm, JvmOp, Local,
+};
 use jni::{
     errors::{Error, JniError},
     objects::{AutoLocal, JObject, JPrimitiveArray},
@@ -13,6 +15,10 @@ pub struct JavaArray<T> {
 pub unsafe trait ArrayElement {}
 
 unsafe impl<T: ArrayElement> JavaObject for JavaArray<T> {}
+
+// Upcasts
+
+unsafe impl<T: ArrayElement> Upcast<JavaArray<T>> for JavaArray<T> {}
 
 pub trait IntoJavaArray<T>: IntoJava<JavaArray<T>> {}
 
