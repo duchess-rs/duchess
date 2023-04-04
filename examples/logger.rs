@@ -1,5 +1,4 @@
-use duchess::{java, prelude::*, Jvm, JvmOp};
-use jni::objects::JValue;
+use duchess::prelude::*;
 
 duchess::plumbing::duchess_javap! {
     r#"
@@ -18,12 +17,13 @@ duchess::plumbing::duchess_javap! {
 }
 
 fn main() -> jni::errors::Result<()> {
-    Jvm::with(|jvm| {
-        let l = Logger::new().execute(jvm)?;
+    use crate::me::ferris::LoggerExt;
+    duchess::Jvm::with(|jvm| {
+        let l = me::ferris::Logger::new().execute(jvm)?;
         l.log_int(22).execute(jvm)?;
         l.log_string("Hello, Duchess!").execute(jvm)?;
 
-        Logger::new()
+        me::ferris::Logger::new()
             .inspect(|l| l.log_int(23))
             .inspect(|l| l.log_string("Hello again, Duchess!"))
             .execute(jvm)?;

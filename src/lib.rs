@@ -12,12 +12,12 @@ pub use jni::errors::Result;
 pub use jvm::Global;
 pub use jvm::JavaObject;
 pub use jvm::Jvm;
-pub use jvm::JvmOp;
 pub use jvm::Local;
 
 pub use prelude::*;
 
 pub mod prelude {
+    pub use crate::jvm::JvmOp;
     pub use crate::ops::{IntoJava, IntoLocal, IntoOptLocal, IntoRust, IntoScalar, IntoVoid};
 }
 

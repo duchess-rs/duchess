@@ -74,7 +74,7 @@ impl SpannedClassInfo {
                     prelude::*,
                 };
                 use jni::{
-                    objects::{AutoLocal, GlobalRef, JMethodID, JValueGen},
+                    objects::{AutoLocal, GlobalRef, JMethodID, JValue, JValueGen},
                     signature::ReturnType,
                     sys::jvalue,
                 };
@@ -103,6 +103,9 @@ impl SpannedClassInfo {
             };
         };
 
+        let package = self.package_name();
+        let output = self.in_modules(&package, output);
+
         if std::env::var("DUCHESS_DEBUG").is_ok() {
             eprintln!(
                 "{:?}",
@@ -112,6 +115,18 @@ impl SpannedClassInfo {
         }
 
         output
+    }
+
+    fn in_modules(&self, package: &[Ident], output: TokenStream) -> TokenStream {
+        if let Some((first, rest)) = package.split_first() {
+            let inner = self.in_modules(rest, output);
+            quote_spanned!(self.span =>
+                #[allow(unused_imports)]
+                pub mod #first { use duchess::java; #inner }
+            )
+        } else {
+            output
+        }
     }
 
     fn cached_class(&self) -> TokenStream {
@@ -332,6 +347,12 @@ impl SpannedClassInfo {
         })
     }
 
+    fn package_name(&self) -> Vec<Ident> {
+        let mut modules: Vec<_> = self.info.name.split('.').collect();
+        modules.pop().unwrap();
+        modules.iter().map(|m| Ident::new(m, self.span)).collect()
+    }
+
     fn struct_name(&self) -> Ident {
         let tail = self.info.name.split('.').last().unwrap();
         Ident::new(&tail, self.span)
@@ -460,11 +481,11 @@ impl Signature {
         match ty {
             Type::Ref(ty) => {
                 let t = self.java_ref_ty(ty)?;
-                Ok(quote_spanned!(self.span => IntoJava<#t>))
+                Ok(quote_spanned!(self.span => duchess::IntoJava<#t>))
             }
             Type::Scalar(ty) => {
                 let t = self.java_scalar_ty(ty);
-                Ok(quote_spanned!(self.span => IntoScalar<#t>))
+                Ok(quote_spanned!(self.span => duchess::IntoScalar<#t>))
             }
         }
     }
@@ -491,13 +512,13 @@ impl Signature {
         self.forbid_capture(|this| match ty {
             Some(Type::Ref(ty)) => {
                 let t = this.java_ref_ty(ty)?;
-                Ok(quote_spanned!(this.span => IntoOptLocal<#t>))
+                Ok(quote_spanned!(this.span => duchess::IntoOptLocal<#t>))
             }
             Some(Type::Scalar(ty)) => {
                 let t = this.java_scalar_ty(ty);
-                Ok(quote_spanned!(this.span => IntoScalar<#t>))
+                Ok(quote_spanned!(this.span => duchess::IntoScalar<#t>))
             }
-            None => Ok(quote_spanned!(this.span => IntoVoid)),
+            None => Ok(quote_spanned!(this.span => duchess::IntoVoid)),
         })
     }
 
