@@ -26,7 +26,7 @@ pub mod prelude {
 pub mod plumbing {
     pub use crate::collections::list::{ArrayList, List, ListExt};
     pub use crate::collections::map::{HashMap, Map, MapExt};
-    pub use crate::jvm::{JavaObjectExt, Upcast};
+    pub use crate::jvm::{FromJValue, JavaObjectExt, Upcast};
     pub use crate::str::{JavaString, ToJavaStringOp};
     pub use duchess_macro::duchess_javap;
 }

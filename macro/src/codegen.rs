@@ -65,6 +65,8 @@ impl SpannedClassInfo {
                 #cached_class
 
                 #(#constructors)*
+
+                #(#methods)*
             };
         }
     }
@@ -191,6 +193,7 @@ impl SpannedClassInfo {
         let prepare_inputs = self.prepare_inputs(&input_names, &method.argument_tys);
 
         let method_name = Ident::new(&method.name, self.span);
+        let method_str = Literal::string(&method.name);
 
         let output = quote_spanned!(self.span =>
             #[derive(Clone)]
@@ -203,7 +206,8 @@ impl SpannedClassInfo {
             #[allow(non_camel_case_types)]
             impl<This, #(#input_names),*> JvmOp for #method_name<This, #(#input_names),*>
             where
-                This: IntoJava<#this_ty>,
+                This: JvmOp,
+                for<'jvm> This::Output<'jvm>: AsRef<#this_ty>,
                 #(#input_names: #input_traits,)*
             {
                 type Input<'jvm> = This::Input<'jvm>;
@@ -212,20 +216,20 @@ impl SpannedClassInfo {
                 fn execute_with<'jvm>(
                     self,
                     jvm: &mut Jvm<'jvm>,
-                    input: J::Input<'jvm>,
+                    input: This::Input<'jvm>,
                 ) -> duchess::Result<Self::Output<'jvm>> {
                     let this = self.this.execute_with(jvm, input)?;
-                    let this: &Logger = this.as_ref();
+                    let this: & #this_ty = this.as_ref();
                     let this = this.as_jobject();
 
                     #(#prepare_inputs)*
 
                     let env = jvm.to_env();
-                    let result = env.call_method(this, #method_name, #descriptor, &[
+                    let result = env.call_method(this, #method_str, #descriptor, &[
                         #(JValue::from(#input_names),)*
                     ])?;
 
-                    Ok(result.assert_into())
+                    Ok(FromJValue::from_jvalue(jvm, result))
                 }
             }
         );
@@ -275,7 +279,7 @@ impl SpannedClassInfo {
                 Type::Ref(_) => quote_spanned!(self.span =>
                     let #input_name = self.#input_name.into_java(jvm)?;
                     let #input_name = #input_name.as_ref();
-                    let #input_name = #input_name.as_jobject();
+                    let #input_name = &#input_name.as_jobject();
                 ),
             })
             .collect()
@@ -359,28 +363,13 @@ impl Signature {
         match ty {
             Type::Ref(ty) => {
                 let t = self.java_ref_ty(ty)?;
-                Ok(quote_spanned!(self.span => IntoJava<$t>))
+                Ok(quote_spanned!(self.span => IntoJava<#t>))
             }
             Type::Scalar(ty) => {
                 let t = self.java_scalar_ty(ty);
-                Ok(quote_spanned!(self.span => IntoScalar<$t>))
+                Ok(quote_spanned!(self.span => IntoScalar<#t>))
             }
         }
-    }
-
-    /// Returnss an appropriate `impl type` for a funtion that
-    /// returns `ty`. Assumes objects are nullable.
-    fn output_trait(&mut self, ty: &Type) -> Result<TokenStream, UnsupportedWildcard> {
-        self.forbid_capture(|this| match ty {
-            Type::Ref(ty) => {
-                let t = this.java_ref_ty(ty)?;
-                Ok(quote_spanned!(this.span => IntoOptLocal<$t>))
-            }
-            Type::Scalar(ty) => {
-                let t = this.java_scalar_ty(ty);
-                Ok(quote_spanned!(this.span => IntoScalar<$t>))
-            }
-        })
     }
 
     /// Returnss an appropriate `impl type` for a funtion that
@@ -389,13 +378,13 @@ impl Signature {
         self.forbid_capture(|this| match ty {
             Some(Type::Ref(ty)) => {
                 let t = this.java_ref_ty(ty)?;
-                Ok(quote_spanned!(this.span => Option<Local<'jvm, $t>>))
+                Ok(quote_spanned!(this.span => Option<Local<'jvm, #t>>))
             }
             Some(Type::Scalar(ty)) => {
                 let t = this.java_scalar_ty(ty);
-                Ok(quote_spanned!(this.span => IntoScalar<$t>))
+                Ok(quote_spanned!(this.span => #t))
             }
-            None => Ok(quote_spanned!(this.span => IntoVoid)),
+            None => Ok(quote_spanned!(this.span => ())),
         })
     }
 
@@ -409,7 +398,6 @@ impl Signature {
     }
 
     fn java_ref_ty(&mut self, ty: &RefType) -> Result<TokenStream, UnsupportedWildcard> {
-        eprintln!("{ty:?}");
         match ty {
             RefType::Class(ty) => Ok(self.class_ref_ty(ty)?),
             RefType::Array(e) => {
