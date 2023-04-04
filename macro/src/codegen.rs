@@ -18,11 +18,13 @@ impl SpannedClassInfo {
     pub fn into_tokens(mut self) -> TokenStream {
         let struct_name = self.struct_name();
         let cached_class = self.cached_class();
+
+        // Ignore constructors with unsupported wildcards.
         let constructors: Vec<_> = self
             .info
             .constructors
             .iter()
-            .map(|c| self.constructor(c))
+            .flat_map(|c| self.constructor(c).ok())
             .collect();
 
         quote_spanned! {
@@ -74,19 +76,94 @@ impl SpannedClassInfo {
         }
     }
 
-    fn constructor(&self, constructor: &Constructor) -> TokenStream {
-        let mut sig = Signature::new(self.span, &[]);
-        let args: Vec<_> = constructor
+    fn constructor(&self, constructor: &Constructor) -> Result<TokenStream, UnsupportedWildcard> {
+        let mut sig = Signature::new(self.span, &self.info.generics);
+
+        let input_traits: Vec<_> = constructor
             .args
             .iter()
-            .map(|ty| sig.java_type(ty))
+            .map(|ty| sig.input_trait(ty))
+            .collect::<Result<_, _>>()?;
+
+        let input_names: Vec<_> = (0..input_traits.len())
+            .map(|i| Ident::new(&format!("a{i}"), self.span))
             .collect();
 
-        todo!()
+        let ty = self.this_type();
+        let output_trait = quote_spanned!(self.span => impl Local<#ty>);
+
+        let generics = self.generic_names();
+
+        let descriptor = Literal::string(&constructor.descriptor.string);
+
+        Ok(quote_spanned!(self.span =>
+            impl< #(#generics),* > #ty {
+                pub fn new(
+                    #(#input_names : impl #input_traits,)*
+                ) -> impl #output_trait {
+                    #[derive(Clone)]
+                    #[allow(non_camel_case_types)]
+                    struct Impl< #(#input_names),* > {
+                        #(#input_names: #input_names),*
+                    }
+
+                    #[allow(non_camel_case_types)]
+                    impl<#(#input_names),*> JvmOp for Impl<#(#input_names),*>
+                    where
+                        #(#input_names : #input_traits,)*
+                    {
+                        type Input<'jvm> = ();
+                        type Output<'jvm> = Local<'jvm, #ty>;
+
+                        fn execute_with<'jvm>(
+                            self,
+                            jvm: &mut Jvm<'jvm>,
+                            (): (),
+                        ) -> duchess::Result<Self::Output<'jvm>> {
+                            #(let #input_names = self.#input_names.execute(jvm)?;)*
+
+                            let cached_class = cached_class(jvm)?;
+
+                            let env = jvm.to_env();
+
+                            let o = env.new_object(
+                                class,
+                                #descriptor,
+                                &[
+                                    #(JValue::from(#input_names),)*
+                                ]
+                            )?;
+
+                            Ok(unsafe {
+                                Local::from_jni(AutoLocal::new(o, &env))
+                            })
+                        }
+                    }
+                }
+            }
+        ))
     }
 
     fn struct_name(&self) -> Ident {
         Ident::new(&self.info.name, self.span)
+    }
+
+    fn generic_names(&self) -> Vec<Ident> {
+        self.info
+            .generics
+            .iter()
+            .map(|g| java_type_parameter_ident(self.span, g))
+            .collect()
+    }
+
+    fn this_type(&self) -> TokenStream {
+        let s = self.struct_name();
+        if self.info.generics.is_empty() {
+            quote_spanned!(self.span => #s)
+        } else {
+            let g: Vec<Ident> = self.generic_names();
+            quote_spanned!(self.span => #s < #(#g),* >)
+        }
     }
 
     /// Returns a class name with `/`, like `java/lang/Object`.
@@ -116,7 +193,7 @@ struct Signature {
 struct UnsupportedWildcard;
 
 impl Signature {
-    pub fn new(span: Span, generics: &[Id]) -> Self {
+    pub fn new<'i>(span: Span, generics: impl IntoIterator<Item = &'i Id>) -> Self {
         let mut this = Signature {
             span,
             generics: vec![],
@@ -168,30 +245,30 @@ impl Signature {
 
     /// Returnss an appropriate `impl type` for a funtion that
     /// takes `ty` as input. Assumes objects are nullable.
-    fn impl_input(&mut self, ty: &Type) -> Result<TokenStream, UnsupportedWildcard> {
+    fn input_trait(&mut self, ty: &Type) -> Result<TokenStream, UnsupportedWildcard> {
         match ty {
             Type::Ref(ty) => {
                 let t = self.java_ref_ty(ty)?;
-                Ok(quote_spanned!(self.span => impl IntoJava<$t>))
+                Ok(quote_spanned!(self.span => IntoJava<$t>))
             }
             Type::Scalar(ty) => {
                 let t = self.java_scalar_ty(ty);
-                Ok(quote_spanned!(self.span => impl IntoScalar<$t>))
+                Ok(quote_spanned!(self.span => IntoScalar<$t>))
             }
         }
     }
 
     /// Returnss an appropriate `impl type` for a funtion that
     /// returns `ty`. Assumes objects are nullable.
-    fn impl_output(&mut self, ty: &Type) -> Result<TokenStream, UnsupportedWildcard> {
+    fn output_trait(&mut self, ty: &Type) -> Result<TokenStream, UnsupportedWildcard> {
         self.forbid_capture(|this| match ty {
             Type::Ref(ty) => {
                 let t = this.java_ref_ty(ty)?;
-                Ok(quote_spanned!(this.span => impl IntoOptLocal<$t>))
+                Ok(quote_spanned!(this.span => IntoOptLocal<$t>))
             }
             Type::Scalar(ty) => {
                 let t = this.java_scalar_ty(ty);
-                Ok(quote_spanned!(this.span => impl IntoScalar<$t>))
+                Ok(quote_spanned!(this.span => IntoScalar<$t>))
             }
         })
     }
@@ -214,6 +291,7 @@ impl Signature {
             }
             RefType::TypeParameter(t) => {
                 let ident = self.java_type_parameter_ident(t);
+                assert!(self.generics.contains(&ident));
                 Ok(quote_spanned!(self.span => #ident))
             }
             RefType::Extends(ty) => {
@@ -249,7 +327,7 @@ impl Signature {
     }
 
     fn java_type_parameter_ident(&self, t: &Id) -> Ident {
-        Ident::new(&format!("J{}", t), self.span)
+        java_type_parameter_ident(self.span, t)
     }
 
     fn java_scalar_ty(&self, ty: &ScalarType) -> TokenStream {
@@ -263,6 +341,10 @@ impl Signature {
             ScalarType::Boolean => quote_spanned!(self.span => bool),
         }
     }
+}
+
+fn java_type_parameter_ident(span: Span, t: &Id) -> Ident {
+    Ident::new(&format!("J{}", t), span)
 }
 
 trait IdExt {
