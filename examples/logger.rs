@@ -1,27 +1,28 @@
-use duchess::{plumbing::Upcast, prelude::*, JavaObject, Jvm, JvmOp, Local};
+use duchess::{prelude::*, Jvm, JvmOp};
 use jni::{
-    objects::{AutoLocal, JValue, JValueGen},
+    objects::{JValue, JValueGen},
     strings::JNIString,
 };
 
-pub struct Logger {
-    _dummy: (),
+duchess::plumbing::duchess_javap! {
+    r#"
+        Compiled from "Logger.java"
+        class me.ferris.Logger {
+        me.ferris.Logger();
+            descriptor: ()V
+
+        void logInt(int);
+            descriptor: (I)V
+
+        void logString(java.lang.String);
+            descriptor: (Ljava/lang/String;)V
+        }
+    "#
 }
-
-unsafe impl JavaObject for Logger {}
-
-// Upcasts
-unsafe impl Upcast<Logger> for Logger {}
 
 // class Logger {
 //    public Logger();
 // }
-
-impl Logger {
-    pub fn new() -> LoggerConstructor {
-        LoggerConstructor { _private: () }
-    }
-}
 
 pub trait LoggerExt: JvmOp + Sized {
     fn log_int<D>(self, data: D) -> LoggerLogInt<Self, D>
@@ -57,30 +58,6 @@ where
     }
 }
 
-#[derive(Clone)]
-pub struct LoggerConstructor {
-    _private: (),
-}
-
-impl JvmOp for LoggerConstructor {
-    type Input<'jvm> = ();
-    type Output<'jvm> = Local<'jvm, Logger>;
-
-    fn execute_with<'jvm>(
-        self,
-        jvm: &mut Jvm<'jvm>,
-        (): (),
-    ) -> jni::errors::Result<Self::Output<'jvm>> {
-        let env = jvm.to_env();
-
-        // FIXME: how do we cache this
-        let class = env.find_class("me/ferris/Logger")?;
-
-        env.new_object(class, "()V", &[])
-            .map(|o| unsafe { Local::from_jni(AutoLocal::new(o, &env)) })
-    }
-}
-
 // class Logger {
 //     public void logInt(int data);
 // }
@@ -95,9 +72,7 @@ impl<J, S> JvmOp for LoggerLogInt<J, S>
 where
     J: JvmOp,
     for<'jvm> J::Output<'jvm>: AsRef<Logger>,
-    S: JvmOp,
-    for<'jvm> S: JvmOp<Input<'jvm> = ()>,
-    for<'jvm> S::Output<'jvm>: Into<i32>,
+    S: IntoScalar<i32>,
 {
     type Input<'jvm> = J::Input<'jvm>;
     type Output<'jvm> = ();
@@ -111,12 +86,12 @@ where
 
         let this = self.this.execute_with(jvm, input)?;
         let this: &Logger = this.as_ref();
+        let this = this.as_jobject();
 
-        let data = self.data.execute_with(jvm, ())?;
-        let data: i32 = data.into();
+        let data = self.data.execute(jvm)?;
 
         let env = jvm.to_env();
-        match env.call_method(this.as_jobject(), "logInt", "(I)V", &[JValue::from(data)])? {
+        match env.call_method(this, "logInt", "(I)V", &[JValue::from(data)])? {
             JValueGen::Void => Ok(()),
             _ => panic!("class file out of sync"),
         }

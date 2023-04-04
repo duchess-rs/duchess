@@ -28,6 +28,7 @@ pub mod plumbing {
     pub use crate::collections::map::{HashMap, Map, MapExt};
     pub use crate::jvm::{JavaObjectExt, Upcast};
     pub use crate::str::{JavaString, ToJavaStringOp};
+    pub use duchess_macro::duchess_javap;
 }
 
 pub mod java {

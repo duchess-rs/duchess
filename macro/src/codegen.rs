@@ -35,11 +35,12 @@ impl SpannedClassInfo {
             }
 
             // Hide other generated items
+            #[allow(unused_imports)]
             const _: () = {
                 use duchess::{
-                    java,
-                    plumbing,
-                    IntoJava, IntoRust, JavaObject, Jvm, JvmOp, Local,
+                    *,
+                    plumbing::*,
+                    prelude::*,
                 };
                 use jni::{
                     objects::{AutoLocal, GlobalRef, JMethodID, JValueGen},
@@ -54,7 +55,7 @@ impl SpannedClassInfo {
 
                 #cached_class
 
-
+                #(#constructors)*
             };
         }
     }
@@ -90,13 +91,29 @@ impl SpannedClassInfo {
             .collect();
 
         let ty = self.this_type();
-        let output_trait = quote_spanned!(self.span => impl Local<#ty>);
+        let output_trait = quote_spanned!(self.span => IntoLocal<#ty>);
 
         let generics = self.generic_names();
 
         let descriptor = Literal::string(&constructor.descriptor.string);
 
-        Ok(quote_spanned!(self.span =>
+        // Code to convert each input appropriately
+        let prepare_inputs: Vec<TokenStream> = input_names
+            .iter()
+            .zip(&constructor.args)
+            .map(|(input_name, input_ty)| match input_ty {
+                Type::Scalar(_) => quote_spanned!(self.span =>
+                    let #input_name = self.#input_name.execute(jvm)?;
+                ),
+                Type::Ref(_) => quote_spanned!(self.span =>
+                    let #input_name = self.#input_name.into_java(jvm)?;
+                    let #input_name = #input_name.as_ref();
+                    let #input_name = #input_name.as_jobject();
+                ),
+            })
+            .collect();
+
+        let output = quote_spanned!(self.span =>
             impl< #(#generics),* > #ty {
                 pub fn new(
                     #(#input_names : impl #input_traits,)*
@@ -120,9 +137,9 @@ impl SpannedClassInfo {
                             jvm: &mut Jvm<'jvm>,
                             (): (),
                         ) -> duchess::Result<Self::Output<'jvm>> {
-                            #(let #input_names = self.#input_names.execute(jvm)?;)*
+                            #(#prepare_inputs)*
 
-                            let cached_class = cached_class(jvm)?;
+                            let class = cached_class(jvm)?;
 
                             let env = jvm.to_env();
 
@@ -139,13 +156,22 @@ impl SpannedClassInfo {
                             })
                         }
                     }
+
+                    Impl {
+                        #(#input_names: #input_names,)*
+                    }
                 }
             }
-        ))
+        );
+
+        eprintln!("{output}");
+
+        Ok(output)
     }
 
     fn struct_name(&self) -> Ident {
-        Ident::new(&self.info.name, self.span)
+        let tail = self.info.name.split('.').last().unwrap();
+        Ident::new(&tail, self.span)
     }
 
     fn generic_names(&self) -> Vec<Ident> {
