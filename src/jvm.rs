@@ -165,6 +165,14 @@ impl<T: JavaObject> JavaObjectExt for T {
     }
 }
 
+pub trait JavaScalar {}
+
+impl JavaScalar for i8 {}
+impl JavaScalar for i16 {}
+impl JavaScalar for i32 {}
+impl JavaScalar for i64 {}
+impl JavaScalar for bool {}
+
 /// A wrapper for a [JObject] that only allows access by reference. This prevents passing the
 /// wrapped `JObject` to `JNIEnv::delete_local_ref`.
 pub type BorrowedJObject<'a> = Jail<JObject<'a>>;

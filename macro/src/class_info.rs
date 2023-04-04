@@ -87,7 +87,7 @@ pub struct Method {
     pub name: Id,
     pub generics: Vec<Id>,
     pub argument_tys: Vec<Type>,
-    pub return_ty: Type,
+    pub return_ty: Option<Type>,
     pub throws: Vec<ClassRef>,
     pub descriptor: Descriptor,
 }

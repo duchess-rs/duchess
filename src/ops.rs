@@ -1,5 +1,6 @@
 use std::process::Output;
 
+use crate::jvm::JavaScalar;
 use crate::jvm::Jvm;
 use crate::jvm::JvmOp;
 use crate::Global;
@@ -128,15 +129,30 @@ where
 }
 
 /// A [`JvmOp`] that produces a scalar value, like `i8` or `i32`.
-pub trait IntoScalar<T>: for<'jvm> JvmOp<Input<'jvm> = (), Output<'jvm> = T> {
+pub trait IntoScalar<T: JavaScalar>: for<'jvm> JvmOp<Input<'jvm> = (), Output<'jvm> = T> {
     fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<T>;
 }
 
 impl<J, T> IntoScalar<T> for J
 where
+    T: JavaScalar,
     J: for<'jvm> JvmOp<Input<'jvm> = (), Output<'jvm> = T>,
 {
     fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<T> {
+        self.execute_with(jvm, ())
+    }
+}
+
+/// A [`JvmOp`] that produces a void (`()`)
+pub trait IntoVoid: for<'jvm> JvmOp<Input<'jvm> = (), Output<'jvm> = ()> {
+    fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<()>;
+}
+
+impl<J> IntoVoid for J
+where
+    J: for<'jvm> JvmOp<Input<'jvm> = (), Output<'jvm> = ()>,
+{
+    fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<()> {
         self.execute_with(jvm, ())
     }
 }

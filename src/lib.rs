@@ -18,7 +18,7 @@ pub use jvm::Local;
 pub use prelude::*;
 
 pub mod prelude {
-    pub use crate::ops::{IntoJava, IntoLocal, IntoOptLocal, IntoRust, IntoScalar};
+    pub use crate::ops::{IntoJava, IntoLocal, IntoOptLocal, IntoRust, IntoScalar, IntoVoid};
 }
 
 /// Internal module containing non-semver protected

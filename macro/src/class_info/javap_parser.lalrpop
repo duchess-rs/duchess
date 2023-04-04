@@ -14,7 +14,6 @@ pub ClassInfo: ClassInfo = {
         <m:Method*>
     "}" => {
         ClassInfo {
-            span: span.clone(),
             flags: l,
             name: n,
             generics: g,
@@ -55,7 +54,7 @@ Constructor: Constructor = {
 };
 
 Method: Method = {
-    <f:Flags> <g:Generics> <r:Type> <n:Id> "(" <a:Comma<Type>> ")" <t:Throws> ";" <d:Descriptor> => {
+    <f:Flags> <g:Generics> <r:ReturnType> <n:Id> "(" <a:Comma<Type>> ")" <t:Throws> ";" <d:Descriptor> => {
         Method { flags: f, name: n, argument_tys: a, return_ty: r, throws: t, descriptor: d, generics: g }
     }
 };
@@ -89,6 +88,12 @@ Throws: Vec<ClassRef> = {
     () => vec![],
     "throws" <Comma1<ClassRef>>,
 }
+
+#[inline]
+ReturnType: Option<Type> = {
+    "void" => None,
+    Type => Some(<>),
+};
 
 Type: Type = {
     <ScalarType> => Type::Scalar(<>),

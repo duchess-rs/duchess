@@ -1,10 +1,11 @@
 use crate::{
     argument::DuchessDeclaration,
     class_info::{
-        ClassInfo, ClassRef, Constructor, Id, RefType, ScalarType, SpannedClassInfo, Type,
+        ClassInfo, ClassRef, Constructor, Id, Method, RefType, ScalarType, SpannedClassInfo, Type,
     },
     span_error::SpanError,
 };
+use inflector::Inflector;
 use proc_macro2::{Ident, Literal, Span, TokenStream};
 use quote::quote_spanned;
 
@@ -25,6 +26,14 @@ impl SpannedClassInfo {
             .constructors
             .iter()
             .flat_map(|c| self.constructor(c).ok())
+            .collect();
+
+        // Ignore constructors with unsupported wildcards.
+        let methods: Vec<_> = self
+            .info
+            .methods
+            .iter()
+            .flat_map(|m| self.method(m).ok())
             .collect();
 
         quote_spanned! {
@@ -98,20 +107,7 @@ impl SpannedClassInfo {
         let descriptor = Literal::string(&constructor.descriptor.string);
 
         // Code to convert each input appropriately
-        let prepare_inputs: Vec<TokenStream> = input_names
-            .iter()
-            .zip(&constructor.args)
-            .map(|(input_name, input_ty)| match input_ty {
-                Type::Scalar(_) => quote_spanned!(self.span =>
-                    let #input_name = self.#input_name.execute(jvm)?;
-                ),
-                Type::Ref(_) => quote_spanned!(self.span =>
-                    let #input_name = self.#input_name.into_java(jvm)?;
-                    let #input_name = #input_name.as_ref();
-                    let #input_name = #input_name.as_jobject();
-                ),
-            })
-            .collect();
+        let prepare_inputs = self.prepare_inputs(&input_names, &constructor.args);
 
         let output = quote_spanned!(self.span =>
             impl< #(#generics),* > #ty {
@@ -164,7 +160,78 @@ impl SpannedClassInfo {
             }
         );
 
-        eprintln!("{output}");
+        // useful for debugging
+        // eprintln!("{output}");
+
+        Ok(output)
+    }
+
+    fn method(&self, method: &Method) -> Result<TokenStream, UnsupportedWildcard> {
+        let mut sig = Signature::new(self.span, self.info.generics.iter().chain(&method.generics));
+
+        let this_ty = self.this_type();
+
+        let input_traits: Vec<_> = method
+            .argument_tys
+            .iter()
+            .map(|ty| sig.input_trait(ty))
+            .collect::<Result<_, _>>()?;
+
+        let input_names: Vec<_> = (0..input_traits.len())
+            .map(|i| Ident::new(&format!("a{i}"), self.span))
+            .collect();
+
+        let output_ty = sig.output_type(&method.return_ty)?;
+
+        let generics = self.generic_names();
+
+        let descriptor = Literal::string(&method.descriptor.string);
+
+        // Code to convert each input appropriately
+        let prepare_inputs = self.prepare_inputs(&input_names, &method.argument_tys);
+
+        let method_name = Ident::new(&method.name, self.span);
+
+        let output = quote_spanned!(self.span =>
+            #[derive(Clone)]
+            #[allow(non_camel_case_types)]
+            pub struct #method_name<This, #(#input_names),*> {
+                this: This,
+                #(#input_names : #input_names,)*
+            }
+
+            #[allow(non_camel_case_types)]
+            impl<This, #(#input_names),*> JvmOp for #method_name<This, #(#input_names),*>
+            where
+                This: IntoJava<#this_ty>,
+                #(#input_names: #input_traits,)*
+            {
+                type Input<'jvm> = This::Input<'jvm>;
+                type Output<'jvm> = #output_ty;
+
+                fn execute_with<'jvm>(
+                    self,
+                    jvm: &mut Jvm<'jvm>,
+                    input: J::Input<'jvm>,
+                ) -> duchess::Result<Self::Output<'jvm>> {
+                    let this = self.this.execute_with(jvm, input)?;
+                    let this: &Logger = this.as_ref();
+                    let this = this.as_jobject();
+
+                    #(#prepare_inputs)*
+
+                    let env = jvm.to_env();
+                    let result = env.call_method(this, #method_name, #descriptor, &[
+                        #(JValue::from(#input_names),)*
+                    ])?;
+
+                    Ok(result.assert_into())
+                }
+            }
+        );
+
+        // useful for debugging
+        // eprintln!("{output}");
 
         Ok(output)
     }
@@ -195,6 +262,23 @@ impl SpannedClassInfo {
     /// Returns a class name with `/`, like `java/lang/Object`.
     fn jni_class_name(&self) -> Literal {
         self.info.name.to_jni_name(self.span)
+    }
+
+    fn prepare_inputs(&self, input_names: &[Ident], input_types: &[Type]) -> Vec<TokenStream> {
+        input_names
+            .iter()
+            .zip(input_types)
+            .map(|(input_name, input_ty)| match input_ty {
+                Type::Scalar(_) => quote_spanned!(self.span =>
+                    let #input_name = self.#input_name.execute(jvm)?;
+                ),
+                Type::Ref(_) => quote_spanned!(self.span =>
+                    let #input_name = self.#input_name.into_java(jvm)?;
+                    let #input_name = #input_name.as_ref();
+                    let #input_name = #input_name.as_jobject();
+                ),
+            })
+            .collect()
     }
 }
 
@@ -299,6 +383,22 @@ impl Signature {
         })
     }
 
+    /// Returnss an appropriate `impl type` for a funtion that
+    /// returns `ty`. Assumes objects are nullable.
+    fn output_type(&mut self, ty: &Option<Type>) -> Result<TokenStream, UnsupportedWildcard> {
+        self.forbid_capture(|this| match ty {
+            Some(Type::Ref(ty)) => {
+                let t = this.java_ref_ty(ty)?;
+                Ok(quote_spanned!(this.span => Option<Local<'jvm, $t>>))
+            }
+            Some(Type::Scalar(ty)) => {
+                let t = this.java_scalar_ty(ty);
+                Ok(quote_spanned!(this.span => IntoScalar<$t>))
+            }
+            None => Ok(quote_spanned!(this.span => IntoVoid)),
+        })
+    }
+
     /// For a Java type
     fn java_type(&mut self, ty: &Type) -> Result<TokenStream, UnsupportedWildcard> {
         match ty {
@@ -309,6 +409,7 @@ impl Signature {
     }
 
     fn java_ref_ty(&mut self, ty: &RefType) -> Result<TokenStream, UnsupportedWildcard> {
+        eprintln!("{ty:?}");
         match ty {
             RefType::Class(ty) => Ok(self.class_ref_ty(ty)?),
             RefType::Array(e) => {
