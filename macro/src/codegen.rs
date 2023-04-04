@@ -8,6 +8,7 @@ use crate::{
 use inflector::Inflector;
 use proc_macro2::{Ident, Literal, Span, TokenStream};
 use quote::quote_spanned;
+use rust_format::Formatter;
 
 impl DuchessDeclaration {
     pub fn into_tokens(mut self) -> Result<TokenStream, SpanError> {
@@ -15,10 +16,20 @@ impl DuchessDeclaration {
     }
 }
 
+struct MethodOutput {
+    method_struct: TokenStream,
+    trait_method: TokenStream,
+    trait_impl_method: TokenStream,
+    jvm_op_impl: TokenStream,
+}
+
 impl SpannedClassInfo {
     pub fn into_tokens(mut self) -> TokenStream {
         let struct_name = self.struct_name();
+        let ext_trait_name = self.ext_trait_name();
         let cached_class = self.cached_class();
+        let this_ty = self.this_type();
+        let generics = self.generic_names();
 
         // Ignore constructors with unsupported wildcards.
         let constructors: Vec<_> = self
@@ -36,11 +47,22 @@ impl SpannedClassInfo {
             .flat_map(|m| self.method(m).ok())
             .collect();
 
-        quote_spanned! {
+        let method_structs: Vec<_> = methods.iter().map(|m| &m.method_struct).collect();
+        let trait_methods: Vec<_> = methods.iter().map(|m| &m.trait_method).collect();
+        let trait_impl_methods: Vec<_> = methods.iter().map(|m| &m.trait_impl_method).collect();
+        let jvm_op_impls: Vec<_> = methods.iter().map(|m| &m.jvm_op_impl).collect();
+
+        let output = quote_spanned! {
             self.span =>
 
-            pub struct #struct_name {
-                _dummy: ()
+            #[allow(non_camel_case_types)]
+            pub struct #struct_name<#(#generics,)*> {
+                _dummy: std::marker::PhantomData<(#(#generics,)*)>
+            }
+
+            #[allow(non_camel_case_types)]
+            pub trait #ext_trait_name {
+                #(#trait_methods)*
             }
 
             // Hide other generated items
@@ -66,9 +88,30 @@ impl SpannedClassInfo {
 
                 #(#constructors)*
 
-                #(#methods)*
+                #(#method_structs)*
+
+                #(#jvm_op_impls)*
+
+                #[allow(non_camel_case_types)]
+                impl<This, #(#generics,)*> #ext_trait_name for This
+                where
+                    This: JvmOp,
+                    for<'jvm> This::Output<'jvm>: AsRef<#this_ty>,
+                {
+                    #(#trait_impl_methods)*
+                }
             };
+        };
+
+        if std::env::var("DUCHESS_DEBUG").is_ok() {
+            eprintln!(
+                "{:?}",
+                // output,
+                rust_format::RustFmt::default().format_tokens(output.clone())
+            );
         }
+
+        output
     }
 
     fn cached_class(&self) -> TokenStream {
@@ -168,7 +211,7 @@ impl SpannedClassInfo {
         Ok(output)
     }
 
-    fn method(&self, method: &Method) -> Result<TokenStream, UnsupportedWildcard> {
+    fn method(&self, method: &Method) -> Result<MethodOutput, UnsupportedWildcard> {
         let mut sig = Signature::new(self.span, self.info.generics.iter().chain(&method.generics));
 
         let this_ty = self.this_type();
@@ -184,6 +227,7 @@ impl SpannedClassInfo {
             .collect();
 
         let output_ty = sig.output_type(&method.return_ty)?;
+        let output_trait = sig.output_trait(&method.return_ty)?;
 
         let generics = self.generic_names();
 
@@ -192,19 +236,61 @@ impl SpannedClassInfo {
         // Code to convert each input appropriately
         let prepare_inputs = self.prepare_inputs(&input_names, &method.argument_tys);
 
-        let method_name = Ident::new(&method.name, self.span);
         let method_str = Literal::string(&method.name);
 
-        let output = quote_spanned!(self.span =>
+        let rust_method_name = Ident::new(&method.name.to_snake_case(), self.span);
+        let rust_method_type_name = Ident::new(&method.name.to_camel_case(), self.span);
+
+        // For each method `m` in the Java type, we create a struct (named `m`)
+        // that will implement the `JvmOp`.
+        let struct_output = quote_spanned!(self.span =>
             #[derive(Clone)]
             #[allow(non_camel_case_types)]
-            pub struct #method_name<This, #(#input_names),*> {
+            pub struct #rust_method_type_name<This, #(#input_names),*> {
                 this: This,
                 #(#input_names : #input_names,)*
             }
+        );
 
+        // The method signature for the extension trait.
+        let trait_method = quote_spanned!(self.span =>
+            type #rust_method_type_name<#(#input_names),*>: #output_trait
+            where
+                #(#input_names: #input_traits,)*;
+
+            fn #rust_method_name<#(#input_names),*>(
+                self,
+                #(#input_names: #input_names),*
+            ) -> Self::#rust_method_type_name<#(#input_names),*>
+            where
+                #(#input_names: #input_traits,)*;
+        );
+
+        // The method signature for the extension trait.
+        let trait_impl_method = quote_spanned!(self.span =>
+            type #rust_method_type_name<#(#input_names),*> = #rust_method_type_name<Self, #(#input_names,)*>
+            where
+                #(#input_names: #input_traits,)*;
+
+            fn #rust_method_name<#(#input_names),*>(
+                self,
+                #(#input_names: #input_names),*
+            ) -> #rust_method_type_name<Self, #(#input_names),*>
+            where
+                #(#input_names: #input_traits,)*
+            {
+                #rust_method_type_name {
+                    this: self,
+                    #(#input_names: #input_names,)*
+                }
+            }
+        );
+
+        // Implementation of `JvmOp` for `m` -- when executed, call the method
+        // via JNI, after converting its arguments appropriately.
+        let impl_output = quote_spanned!(self.span =>
             #[allow(non_camel_case_types)]
-            impl<This, #(#input_names),*> JvmOp for #method_name<This, #(#input_names),*>
+            impl<This, #(#input_names),*> JvmOp for #rust_method_type_name<This, #(#input_names),*>
             where
                 This: JvmOp,
                 for<'jvm> This::Output<'jvm>: AsRef<#this_ty>,
@@ -235,14 +321,25 @@ impl SpannedClassInfo {
         );
 
         // useful for debugging
-        // eprintln!("{output}");
+        // eprintln!("{trait_method}");
+        // eprintln!("{trait_impl_method}");
 
-        Ok(output)
+        Ok(MethodOutput {
+            method_struct: struct_output,
+            trait_method,
+            trait_impl_method,
+            jvm_op_impl: impl_output,
+        })
     }
 
     fn struct_name(&self) -> Ident {
         let tail = self.info.name.split('.').last().unwrap();
         Ident::new(&tail, self.span)
+    }
+
+    fn ext_trait_name(&self) -> Ident {
+        let tail = self.info.name.split('.').last().unwrap();
+        Ident::new(&format!("{tail}Ext"), self.span)
     }
 
     fn generic_names(&self) -> Vec<Ident> {
@@ -385,6 +482,22 @@ impl Signature {
                 Ok(quote_spanned!(this.span => #t))
             }
             None => Ok(quote_spanned!(this.span => ())),
+        })
+    }
+
+    /// Returns an appropriate `impl type` for a funtion that
+    /// returns `ty`. Assumes objects are nullable.
+    fn output_trait(&mut self, ty: &Option<Type>) -> Result<TokenStream, UnsupportedWildcard> {
+        self.forbid_capture(|this| match ty {
+            Some(Type::Ref(ty)) => {
+                let t = this.java_ref_ty(ty)?;
+                Ok(quote_spanned!(this.span => IntoOptLocal<#t>))
+            }
+            Some(Type::Scalar(ty)) => {
+                let t = this.java_scalar_ty(ty);
+                Ok(quote_spanned!(this.span => IntoScalar<#t>))
+            }
+            None => Ok(quote_spanned!(this.span => IntoVoid)),
         })
     }
 

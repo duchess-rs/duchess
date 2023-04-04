@@ -144,15 +144,20 @@ where
 }
 
 /// A [`JvmOp`] that produces a void (`()`)
-pub trait IntoVoid: for<'jvm> JvmOp<Input<'jvm> = (), Output<'jvm> = ()> {
-    fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<()>;
+pub trait IntoVoid: for<'jvm> JvmOp<Output<'jvm> = ()> {
+    fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<()>
+    where
+        Self: JvmOp<Input<'jvm> = ()>;
 }
 
 impl<J> IntoVoid for J
 where
-    J: for<'jvm> JvmOp<Input<'jvm> = (), Output<'jvm> = ()>,
+    J: for<'jvm> JvmOp<Output<'jvm> = ()>,
 {
-    fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<()> {
+    fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<()>
+    where
+        Self: JvmOp<Input<'jvm> = ()>,
+    {
         self.execute_with(jvm, ())
     }
 }

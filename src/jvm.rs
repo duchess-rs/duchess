@@ -396,7 +396,7 @@ where
 }
 
 impl<'jvm> FromJValue<'jvm> for () {
-    fn from_jvalue(jvm: &mut Jvm<'jvm>, value: JValueOwned<'jvm>) -> Self {
+    fn from_jvalue(_jvm: &mut Jvm<'jvm>, value: JValueOwned<'jvm>) -> Self {
         match value {
             jni::objects::JValueGen::Void => (),
             _ => panic!("expected void, found {value:?})"),
@@ -405,7 +405,7 @@ impl<'jvm> FromJValue<'jvm> for () {
 }
 
 impl<'jvm> FromJValue<'jvm> for i32 {
-    fn from_jvalue(jvm: &mut Jvm<'jvm>, value: JValueOwned<'jvm>) -> Self {
+    fn from_jvalue(_jvm: &mut Jvm<'jvm>, value: JValueOwned<'jvm>) -> Self {
         match value {
             jni::objects::JValueGen::Int(i) => i,
             _ => panic!("expected void, found {value:?})"),
@@ -414,7 +414,7 @@ impl<'jvm> FromJValue<'jvm> for i32 {
 }
 
 impl<'jvm> FromJValue<'jvm> for i64 {
-    fn from_jvalue(jvm: &mut Jvm<'jvm>, value: JValueOwned<'jvm>) -> Self {
+    fn from_jvalue(_jvm: &mut Jvm<'jvm>, value: JValueOwned<'jvm>) -> Self {
         match value {
             jni::objects::JValueGen::Long(i) => i,
             _ => panic!("expected void, found {value:?})"),
@@ -423,7 +423,7 @@ impl<'jvm> FromJValue<'jvm> for i64 {
 }
 
 impl<'jvm> FromJValue<'jvm> for i8 {
-    fn from_jvalue(jvm: &mut Jvm<'jvm>, value: JValueOwned<'jvm>) -> Self {
+    fn from_jvalue(_jvm: &mut Jvm<'jvm>, value: JValueOwned<'jvm>) -> Self {
         match value {
             jni::objects::JValueGen::Byte(i) => i,
             _ => panic!("expected void, found {value:?})"),
@@ -432,7 +432,7 @@ impl<'jvm> FromJValue<'jvm> for i8 {
 }
 
 impl<'jvm> FromJValue<'jvm> for i16 {
-    fn from_jvalue(jvm: &mut Jvm<'jvm>, value: JValueOwned<'jvm>) -> Self {
+    fn from_jvalue(_jvm: &mut Jvm<'jvm>, value: JValueOwned<'jvm>) -> Self {
         match value {
             jni::objects::JValueGen::Short(i) => i,
             _ => panic!("expected void, found {value:?})"),
@@ -441,7 +441,7 @@ impl<'jvm> FromJValue<'jvm> for i16 {
 }
 
 impl<'jvm> FromJValue<'jvm> for bool {
-    fn from_jvalue(jvm: &mut Jvm<'jvm>, value: JValueOwned<'jvm>) -> Self {
+    fn from_jvalue(_jvm: &mut Jvm<'jvm>, value: JValueOwned<'jvm>) -> Self {
         match value {
             jni::objects::JValueGen::Bool(i) => i != 0,
             _ => panic!("expected void, found {value:?})"),
@@ -450,7 +450,7 @@ impl<'jvm> FromJValue<'jvm> for bool {
 }
 
 impl<'jvm> FromJValue<'jvm> for f32 {
-    fn from_jvalue(jvm: &mut Jvm<'jvm>, value: JValueOwned<'jvm>) -> Self {
+    fn from_jvalue(_jvm: &mut Jvm<'jvm>, value: JValueOwned<'jvm>) -> Self {
         match value {
             jni::objects::JValueGen::Float(i) => i,
             _ => panic!("expected void, found {value:?})"),
@@ -459,7 +459,7 @@ impl<'jvm> FromJValue<'jvm> for f32 {
 }
 
 impl<'jvm> FromJValue<'jvm> for f64 {
-    fn from_jvalue(jvm: &mut Jvm<'jvm>, value: JValueOwned<'jvm>) -> Self {
+    fn from_jvalue(_jvm: &mut Jvm<'jvm>, value: JValueOwned<'jvm>) -> Self {
         match value {
             jni::objects::JValueGen::Double(i) => i,
             _ => panic!("expected void, found {value:?})"),
