@@ -1,6 +1,8 @@
 use crate::{
     argument::DuchessDeclaration,
-    class_info::{ClassInfo, ClassRef, Id, RefType, ScalarType, SpannedClassInfo, Type},
+    class_info::{
+        ClassInfo, ClassRef, Constructor, Id, RefType, ScalarType, SpannedClassInfo, Type,
+    },
     span_error::SpanError,
 };
 use proc_macro2::{Ident, Literal, Span, TokenStream};
@@ -16,6 +18,12 @@ impl SpannedClassInfo {
     pub fn into_tokens(mut self) -> TokenStream {
         let struct_name = self.struct_name();
         let cached_class = self.cached_class();
+        let constructors: Vec<_> = self
+            .info
+            .constructors
+            .iter()
+            .map(|c| self.constructor(c))
+            .collect();
 
         quote_spanned! {
             self.span =>
@@ -43,6 +51,8 @@ impl SpannedClassInfo {
                 unsafe impl plumbing::Upcast<#struct_name> for #struct_name {}
 
                 #cached_class
+
+
             };
         }
     }
@@ -64,6 +74,17 @@ impl SpannedClassInfo {
         }
     }
 
+    fn constructor(&self, constructor: &Constructor) -> TokenStream {
+        let mut sig = Signature::new(self.span, &[]);
+        let args: Vec<_> = constructor
+            .args
+            .iter()
+            .map(|ty| sig.java_type(ty))
+            .collect();
+
+        todo!()
+    }
+
     fn struct_name(&self) -> Ident {
         Ident::new(&self.info.name, self.span)
     }
@@ -81,6 +102,19 @@ struct Signature {
 }
 
 impl Signature {
+    pub fn new(span: Span, generics: &[Id]) -> Self {
+        let mut this = Signature {
+            span,
+            generics: vec![],
+            where_bounds: vec![],
+        };
+        for generic in generics {
+            let ident = this.java_type_parameter_ident(generic);
+            this.generics.push(ident);
+        }
+        this
+    }
+
     fn fresh_generic(&mut self) -> Ident {
         let mut i = self.generics.len();
         let ident = Ident::new(&format!("P{}", i), self.span);
