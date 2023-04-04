@@ -88,6 +88,9 @@ pub trait IntoRust<T> {
     fn into_rust(self) -> Self::Op;
 }
 
+/// A [`JvmOp`] that produces a [`Local`] reference to a `T` object.
+/// Local references are values that are only valid in this JNI call.
+/// They can be converted to [`Global`] references.
 pub trait IntoLocal<T: JavaObject>:
     for<'jvm> JvmOp<Input<'jvm> = (), Output<'jvm> = Local<'jvm, T>>
 {
@@ -104,6 +107,10 @@ where
     }
 }
 
+/// A [`JvmOp`] that produces an optional [`Local`] reference to a `T`;
+/// None will be used if the result is `null`.
+/// Local references are values that are only valid in this JNI call.
+/// They can be converted to [`Global`] references.
 pub trait IntoOptLocal<T: JavaObject>:
     for<'jvm> JvmOp<Input<'jvm> = (), Output<'jvm> = Option<Local<'jvm, T>>>
 {
@@ -120,6 +127,7 @@ where
     }
 }
 
+/// A [`JvmOp`] that produces a scalar value, like `i8` or `i32`.
 pub trait IntoScalar<T>: for<'jvm> JvmOp<Input<'jvm> = (), Output<'jvm> = T> {
     fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<T>;
 }
