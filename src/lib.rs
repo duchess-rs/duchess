@@ -20,16 +20,18 @@ pub use ops::{IntoJava, IntoRust};
 /// Internal module containing non-semver protected
 /// names used by generated code.
 pub mod plumbing {
-    pub use crate::array::IntoJavaArray;
     pub use crate::collections::list::{ArrayList, List, ListExt};
     pub use crate::collections::map::{HashMap, Map, MapExt};
     pub use crate::jvm::{JavaObjectExt, Upcast};
-    pub use crate::str::{IntoJavaString, JavaString, ToJavaStringOp};
+    pub use crate::str::{JavaString, ToJavaStringOp};
 }
 
-pub use crate::array::JavaArray;
-
 pub mod java {
+    pub use crate::array::JavaArray as Array;
+
+    pub mod lang {
+        pub use crate::str::JavaString as String;
+    }
     pub mod util {
         pub use crate::collections::list::ArrayList;
         pub use crate::collections::list::List;

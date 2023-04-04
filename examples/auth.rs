@@ -1,8 +1,6 @@
 use duchess::{
-    plumbing::{
-        ArrayList, HashMap, IntoJavaArray, IntoJavaString, JavaObjectExt, JavaString, List,
-        ListExt, Map, MapExt, Upcast,
-    },
+    java,
+    plumbing::{ArrayList, HashMap, JavaObjectExt, JavaString, List, ListExt, Map, MapExt, Upcast},
     IntoJava, IntoRust, JavaObject, Jvm, JvmOp, Local,
 };
 use jni::{
@@ -21,9 +19,9 @@ unsafe impl Upcast<HttpRequest> for HttpRequest {}
 
 impl HttpRequest {
     pub fn new(
-        verb: impl IntoJavaString,
-        path: impl IntoJavaString,
-        hashed_payload: impl IntoJavaArray<i8>,
+        verb: impl IntoJava<java::lang::String>,
+        path: impl IntoJava<java::lang::String>,
+        hashed_payload: impl IntoJava<java::Array<i8>>,
         parameters: impl IntoJava<Map<JavaString, List<JavaString>>>,
     ) -> impl for<'jvm> duchess::JvmOp<Input<'jvm> = (), Output<'jvm> = Local<'jvm, HttpRequest>>
     {
@@ -37,9 +35,9 @@ impl HttpRequest {
 
         impl<Verb, Path, HashedPayload, Parameters> JvmOp for Impl<Verb, Path, HashedPayload, Parameters>
         where
-            Verb: IntoJavaString,
-            Path: IntoJavaString,
-            HashedPayload: IntoJavaArray<i8>,
+            Verb: IntoJava<java::lang::String>,
+            Path: IntoJava<java::lang::String>,
+            HashedPayload: IntoJava<java::Array<i8>>,
             Parameters: IntoJava<Map<JavaString, List<JavaString>>>,
         {
             type Input<'jvm> = ();

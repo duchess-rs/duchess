@@ -56,12 +56,6 @@ where
     }
 }
 
-/// Types that are able to be used as Java strings, either because they already are (e.g. [`JvmOp`]s that produce a
-/// [`JavaString`]) or because we can convert into them via a JNI call (e.g. a Rust `&str`).
-pub trait IntoJavaString: IntoJava<JavaString> {}
-
-impl<I> IntoJavaString for I where I: IntoJava<JavaString> {}
-
 impl IntoJava<JavaString> for &str {
     type Output<'jvm> = Local<'jvm, JavaString>;
 

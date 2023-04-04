@@ -20,15 +20,6 @@ unsafe impl<T: ArrayElement> JavaObject for JavaArray<T> {}
 
 unsafe impl<T: ArrayElement> Upcast<JavaArray<T>> for JavaArray<T> {}
 
-pub trait IntoJavaArray<T: ArrayElement>: IntoJava<JavaArray<T>> {}
-
-impl<I, T> IntoJavaArray<T> for I
-where
-    T: ArrayElement,
-    I: IntoJava<JavaArray<T>>,
-{
-}
-
 #[derive(Clone)]
 pub struct IntoRustVec<J, T> {
     op: J,
