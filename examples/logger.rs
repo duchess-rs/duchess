@@ -1,4 +1,4 @@
-use duchess::{plumbing::Upcast, JavaObject, Jvm, JvmOp, Local};
+use duchess::{plumbing::Upcast, prelude::*, JavaObject, Jvm, JvmOp, Local};
 use jni::{
     objects::{AutoLocal, JValue, JValueGen},
     strings::JNIString,

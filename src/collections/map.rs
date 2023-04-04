@@ -9,7 +9,7 @@ use once_cell::sync::OnceCell;
 
 use crate::{
     plumbing::{JavaObjectExt, Upcast},
-    IntoJava, JavaObject, Jvm, JvmOp, Local,
+    IntoJava, IntoLocal, JavaObject, Jvm, JvmOp, Local,
 };
 
 // Ideally, we'd use duchess to derive these classes, but (a) we want to slap some nice interfaces to produce them from
@@ -43,8 +43,7 @@ where
     K: JavaObject + 'static,
     V: JavaObject + 'static,
 {
-    pub fn new() -> impl for<'jvm> JvmOp<Input<'jvm> = (), Output<'jvm> = Local<'jvm, HashMap<K, V>>>
-    {
+    pub fn new() -> impl IntoLocal<HashMap<K, V>> {
         struct Impl<K, V> {
             _markers: PhantomData<(K, V)>,
         }

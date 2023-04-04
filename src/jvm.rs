@@ -24,13 +24,6 @@ pub trait JvmOp: Clone {
     type Input<'jvm>;
     type Output<'jvm>;
 
-    fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<Self::Output<'jvm>>
-    where
-        Self::Input<'jvm>: IsVoid,
-    {
-        Self::execute_with(self, jvm, Default::default())
-    }
-
     /// "Inspect" executes an operation on this value that results in unit
     /// and then yields up this value again for further use. If the result
     /// of `self` is the java value `x`, then `self.inspect(|x| x.foo()).bar()`

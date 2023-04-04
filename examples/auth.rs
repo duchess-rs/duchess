@@ -1,7 +1,8 @@
 use duchess::{
     java,
     plumbing::{ArrayList, HashMap, JavaObjectExt, JavaString, List, ListExt, Map, MapExt, Upcast},
-    IntoJava, IntoRust, JavaObject, Jvm, JvmOp, Local,
+    prelude::*,
+    JavaObject, Jvm, JvmOp, Local,
 };
 use jni::{
     objects::{AutoLocal, GlobalRef, JMethodID, JValueGen},

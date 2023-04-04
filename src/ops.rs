@@ -1,3 +1,5 @@
+use std::process::Output;
+
 use crate::jvm::Jvm;
 use crate::jvm::JvmOp;
 use crate::Global;
@@ -72,7 +74,7 @@ where
     type Output<'jvm> = <J as JvmOp>::Output<'jvm>;
 
     fn into_java<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<Self::Output<'jvm>> {
-        self.execute(jvm)
+        self.execute_with(jvm, ())
     }
 }
 
@@ -84,4 +86,49 @@ pub trait IntoRust<T> {
     type Op: for<'jvm> JvmOp<Output<'jvm> = T>;
 
     fn into_rust(self) -> Self::Op;
+}
+
+pub trait IntoLocal<T: JavaObject>:
+    for<'jvm> JvmOp<Input<'jvm> = (), Output<'jvm> = Local<'jvm, T>>
+{
+    fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<Local<'jvm, T>>;
+}
+
+impl<J, T> IntoLocal<T> for J
+where
+    T: JavaObject,
+    J: for<'jvm> JvmOp<Input<'jvm> = (), Output<'jvm> = Local<'jvm, T>>,
+{
+    fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<Local<'jvm, T>> {
+        self.execute_with(jvm, ())
+    }
+}
+
+pub trait IntoOptLocal<T: JavaObject>:
+    for<'jvm> JvmOp<Input<'jvm> = (), Output<'jvm> = Option<Local<'jvm, T>>>
+{
+    fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<Option<Local<'jvm, T>>>;
+}
+
+impl<J, T> IntoOptLocal<T> for J
+where
+    T: JavaObject,
+    J: for<'jvm> JvmOp<Input<'jvm> = (), Output<'jvm> = Option<Local<'jvm, T>>>,
+{
+    fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<Option<Local<'jvm, T>>> {
+        self.execute_with(jvm, ())
+    }
+}
+
+pub trait IntoScalar<T>: for<'jvm> JvmOp<Input<'jvm> = (), Output<'jvm> = T> {
+    fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<T>;
+}
+
+impl<J, T> IntoScalar<T> for J
+where
+    J: for<'jvm> JvmOp<Input<'jvm> = (), Output<'jvm> = T>,
+{
+    fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<T> {
+        self.execute_with(jvm, ())
+    }
 }
