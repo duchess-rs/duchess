@@ -1,4 +1,4 @@
-use proc_macro2::Span;
+use proc_macro2::{Delimiter, Span};
 
 use crate::{
     parse::{Parse, Parser},
@@ -53,8 +53,9 @@ impl Parse for JavaPackage {
 }
 
 pub struct JavaClass {
+    pub class_span: Span,
     pub class_name: String,
-    pub members: Option<Vec<String>>,
+    pub members: MemberListing,
 }
 
 impl Parse for JavaClass {
@@ -67,28 +68,41 @@ impl Parse for JavaClass {
             return Err(p.error("expected class name"));
         };
 
-        let Some(()) = p.eat_punct('{') else {
+        let class_span = p.last_span().unwrap();
+
+        let Some(body) = p.eat_delimited(Delimiter::Brace) else {
             return Err(p.error("expected '{' after class name"));
         };
 
-        // FIXME: support a list of method names
-
-        let Some(()) = p.eat_punct('*') else {
-            return Err(p.error("expected '*'"));
-        };
-
-        let Some(()) = p.eat_punct('}') else {
-            return Err(p.error("expected '}' after class methods"));
-        };
+        let members = Parser::from(body).parse::<MemberListing>()?;
 
         Ok(Some(JavaClass {
+            class_span,
             class_name,
-            members: None,
+            members,
         }))
     }
 
     fn description() -> String {
         format!("java class to reflect (e.g., `class Foo {{ * }}`)")
+    }
+}
+
+pub enum MemberListing {
+    All,
+}
+
+impl Parse for MemberListing {
+    fn parse(p: &mut Parser) -> Result<Option<Self>, SpanError> {
+        if let Some(()) = p.eat_punct('*') {
+            return Ok(Some(MemberListing::All));
+        }
+
+        Ok(None)
+    }
+
+    fn description() -> String {
+        format!("list of methods to accept, or `*` for all")
     }
 }
 
@@ -109,6 +123,7 @@ impl Parse for JavaPath {
             let Some(next) = p.eat_ident() else {
                 return Err(SpanError { span: p.last_span().unwrap(), message: format!("expected identifier after `.`") });
             };
+            text.push_str(".");
             text.push_str(&next);
         }
 

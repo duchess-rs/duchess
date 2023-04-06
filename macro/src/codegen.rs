@@ -10,12 +10,6 @@ use proc_macro2::{Ident, Literal, Span, TokenStream};
 use quote::quote_spanned;
 use rust_format::Formatter;
 
-impl DuchessDeclaration {
-    pub fn into_tokens(mut self) -> Result<TokenStream, SpanError> {
-        todo!()
-    }
-}
-
 struct MethodOutput {
     method_struct: TokenStream,
     trait_method: TokenStream,

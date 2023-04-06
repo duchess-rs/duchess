@@ -9,18 +9,23 @@ pub struct SpannedClassInfo {
     pub info: ClassInfo,
 }
 
+impl SpannedClassInfo {
+    pub fn parse(t: &str, span: Span) -> Result<Self, SpanError> {
+        match javap::parse_class_info(&t) {
+            Ok(info) => Ok(SpannedClassInfo { span, info }),
+            Err(message) => Err(SpanError { span, message }),
+        }
+    }
+}
+
 impl Parse for SpannedClassInfo {
     fn parse(p: &mut crate::parse::Parser) -> Result<Option<Self>, SpanError> {
         let Some(t) = p.eat_string_literal() else {
             return Ok(None);
         };
-
         let span = p.last_span().unwrap();
-
-        match javap::parse_class_info(&t) {
-            Ok(info) => Ok(Some(SpannedClassInfo { span, info })),
-            Err(message) => Err(SpanError { span, message }),
-        }
+        let r = Self::parse(&t, span)?;
+        Ok(Some(r))
     }
 
     fn description() -> String {

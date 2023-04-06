@@ -1,19 +1,9 @@
 use duchess::prelude::*;
 
-duchess::plumbing::duchess_javap! {
-    r#"
-        Compiled from "Logger.java"
-        class me.ferris.Logger {
-        me.ferris.Logger();
-            descriptor: ()V
+duchess::java_package! {
+    package me.ferris;
 
-        void logInt(int);
-            descriptor: (I)V
-
-        void logString(java.lang.String);
-            descriptor: (Ljava/lang/String;)V
-        }
-    "#
+    class Logger { * }
 }
 
 fn main() -> jni::errors::Result<()> {
