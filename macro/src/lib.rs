@@ -12,15 +12,13 @@ mod span_error;
 /// The main duchess macro, used like so
 ///
 /// ```rust
-/// duchess! {
-///     java.lang.Object,
-///     java.util.ArrayList { new, foo, bar },
+/// java_package! {
+///     package some.pkg.name;
+///     class SomeClassName { * }
 /// }
 /// ```
-///
-/// The
 #[proc_macro]
-pub fn duchess(input: TokenStream) -> TokenStream {
+pub fn java_package(input: TokenStream) -> TokenStream {
     let input: proc_macro2::TokenStream = input.into();
     let decl = match Parser::from(input).parse::<DuchessDeclaration>() {
         Ok(decl) => decl,

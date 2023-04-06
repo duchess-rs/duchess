@@ -7,7 +7,7 @@ mod jvm;
 mod ops;
 mod str;
 
-pub use duchess_macro::duchess;
+pub use duchess_macro::java_package;
 pub use jni::errors::Result;
 pub use jvm::Global;
 pub use jvm::JavaObject;

@@ -46,6 +46,14 @@ impl Parser {
         }
     }
 
+    /// Returns an error struct located at the last consumed token.
+    pub fn error(&self, message: impl ToString) -> SpanError {
+        SpanError {
+            span: self.last_span().unwrap_or_else(|| Span::call_site()),
+            message: message.to_string(),
+        }
+    }
+
     pub fn peek_token(&mut self) -> Option<&TokenTree> {
         self.tokens.peek()
     }
@@ -71,9 +79,31 @@ impl Parser {
         Some(r)
     }
 
+    pub fn eat_keyword(&mut self, kw: &str) -> Option<()> {
+        assert!(KEYWORDS.contains(&kw));
+        self.eat_if(|t| match t {
+            TokenTree::Ident(i) => {
+                let s = i.to_string();
+                if s == kw {
+                    Some(())
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        })
+    }
+
     pub fn eat_ident(&mut self) -> Option<String> {
         self.eat_if(|t| match t {
-            TokenTree::Ident(i) => Some(i.to_string()),
+            TokenTree::Ident(i) => {
+                let s = i.to_string();
+                if KEYWORDS.iter().any(|k| k == &s) {
+                    None
+                } else {
+                    Some(i.to_string())
+                }
+            }
             _ => None,
         })
     }
@@ -103,36 +133,21 @@ pub trait Parse: Sized {
     /// Ok(Some(e)) -- successful parse of `Self`
     fn parse(p: &mut Parser) -> Result<Option<Self>, SpanError>;
 
+    /// parse any number of instances of self.
+    fn parse_many(p: &mut Parser) -> Result<Vec<Self>, SpanError> {
+        let mut result = vec![];
+
+        while let Some(e) = Self::parse(p)? {
+            result.push(e);
+        }
+
+        Ok(result)
+    }
+
     /// Describes the thing we are parsing, for use in error messages.
     /// e.g. "java path".
     fn description() -> String;
 }
 
-impl<T> Parse for Vec<T>
-where
-    T: Parse,
-{
-    fn parse(p: &mut Parser) -> Result<Option<Self>, SpanError> {
-        let mut result = vec![];
-
-        let Some(e0) = T::parse(p)? else {
-            return Ok(None);
-        };
-
-        while let Some(()) = p.eat_punct(',') {
-            let Some(e) = T::parse(p)? else {
-                return Err(SpanError { span: p.last_span().unwrap(), message: format!("expected {} after `,`", T::description()) });
-            };
-            result.push(e);
-        }
-
-        // Permit trailing punctuation.
-        let _ = p.eat_punct(',');
-
-        Ok(Some(result))
-    }
-
-    fn description() -> String {
-        format!("list of {}", T::description())
-    }
-}
+/// Keywords not considered valid identifiers; subset of java keywords.
+pub const KEYWORDS: &[&str] = &["package", "class"];
