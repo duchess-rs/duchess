@@ -4,11 +4,7 @@ Duchess is a crate that makes it easy to use Java code.
 
 <img src="duchess.svg"></img>
 
-## Basic usage
-
-### Example
-
-### TL;DR
+## TL;DR
 
 ```rust
 // Step 1: Reflect your java code into Rust
@@ -29,6 +25,8 @@ duchess::with_jvm(|jvm| {
         .execute(jvm);
 })
 ```
+
+## Tutorial
 
 ### The Java class we would like to use from Rust
 
