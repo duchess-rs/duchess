@@ -128,8 +128,8 @@ pub trait Parse: Sized {
     ///
     /// # Return value
     ///
-    /// Err -- parse error after recognizing the start of a `Self`
-    /// Ok(None) -- didn't recognize `Self` at this location
+    /// Err -- parse error after recognizing the start of a `Self`, may have consumed tokens
+    /// Ok(None) -- didn't recognize `Self` at this location, didn't consume any tokens
     /// Ok(Some(e)) -- successful parse of `Self`
     fn parse(p: &mut Parser) -> Result<Option<Self>, SpanError>;
 
