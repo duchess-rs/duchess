@@ -2,14 +2,33 @@
 
 Duchess is a crate that makes it easy to use Java code.
 
+<img src="duchess.svg"></img>
+
 ## Basic usage
+
+### Example
 
 ### TL;DR
 
-* Use the [`duchess::java_package!`](./java_package.md) macro to reflect the Java package in your Rust code.
-* Start a JVM with [`duchess::Jvm::with(|jvm| ...)`](./jvm.md); inside the closure, you'll be able to reference `jvm` to run things on the JVM.
-* Invoke constructors like `MyClass::new().execute(jvm)` and methods like `some_obj.some_method(...).execute(jvm)`.
-    * Note that you call `execute` to make them actually run, and you can (and should) chain them together before doing so.
+```rust
+// Step 1: Reflect your java code into Rust
+duchess::java_package! {
+    package com.myjava;
+    class MyClass { * }
+}
+
+// Step 2: Start the JVM
+duchess::with_jvm(|jvm| {
+    // Step 3: Create objects and call methods.
+    // Constructors and methods can be chained;
+    // use `execute` to run the whole chain on the JVM.
+    use com::myjava::{MyClass, MyClassExt};
+    MyClass::new()
+        .some_builder_method(44)
+        .some_other_method("Hello, world")
+        .execute(jvm);
+})
+```
 
 ### The Java class we would like to use from Rust
 
