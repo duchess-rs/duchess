@@ -45,6 +45,9 @@ impl JavaClass {
             }
         };
 
+        eprintln!("classpath={:?}", std::env::var("CLASSPATH"));
+        eprintln!("ndm={:?}", std::env::var("ndm"));
+
         if !output.status.success() {
             return Err(SpanError {
                 span: self.class_span,
