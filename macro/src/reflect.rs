@@ -30,7 +30,9 @@ impl JavaClass {
         command
             .arg("-public")
             .arg("-s")
-            .arg(format!("{}.{}", package_name, self.class_name));
+            .arg(format!("{}.{}", package_name, self.class_name))
+            .env("CLASSPATH", "java") // FIXME: HACK
+            ;
 
         let output_or_err = command.output();
 
@@ -43,9 +45,6 @@ impl JavaClass {
                 })
             }
         };
-
-        eprintln!("classpath={:?}", std::env::var("CLASSPATH"));
-        eprintln!("ndm={:?}", std::env::var("ndm"));
 
         if !output.status.success() {
             return Err(SpanError {
