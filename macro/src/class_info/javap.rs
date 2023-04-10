@@ -341,13 +341,7 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                             },
                             generics: [],
                             argument_tys: [],
-                            return_ty: Ref(
-                                TypeParameter(
-                                    Id {
-                                        data: "void",
-                                    },
-                                ),
-                            ),
+                            return_ty: None,
                             throws: [],
                             descriptor: Descriptor {
                                 string: "()V",
@@ -369,13 +363,7 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                     Int,
                                 ),
                             ],
-                            return_ty: Ref(
-                                TypeParameter(
-                                    Id {
-                                        data: "void",
-                                    },
-                                ),
-                            ),
+                            return_ty: None,
                             throws: [],
                             descriptor: Descriptor {
                                 string: "(I)V",
@@ -393,8 +381,10 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                             },
                             generics: [],
                             argument_tys: [],
-                            return_ty: Scalar(
-                                Int,
+                            return_ty: Some(
+                                Scalar(
+                                    Int,
+                                ),
                             ),
                             throws: [],
                             descriptor: Descriptor {
@@ -413,8 +403,10 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                             },
                             generics: [],
                             argument_tys: [],
-                            return_ty: Scalar(
-                                Boolean,
+                            return_ty: Some(
+                                Scalar(
+                                    Boolean,
+                                ),
                             ),
                             throws: [],
                             descriptor: Descriptor {
@@ -444,8 +436,10 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                     ),
                                 ),
                             ],
-                            return_ty: Scalar(
-                                Boolean,
+                            return_ty: Some(
+                                Scalar(
+                                    Boolean,
+                                ),
                             ),
                             throws: [],
                             descriptor: Descriptor {
@@ -475,8 +469,10 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                     ),
                                 ),
                             ],
-                            return_ty: Scalar(
-                                Int,
+                            return_ty: Some(
+                                Scalar(
+                                    Int,
+                                ),
                             ),
                             throws: [],
                             descriptor: Descriptor {
@@ -506,8 +502,10 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                     ),
                                 ),
                             ],
-                            return_ty: Scalar(
-                                Int,
+                            return_ty: Some(
+                                Scalar(
+                                    Int,
+                                ),
                             ),
                             throws: [],
                             descriptor: Descriptor {
@@ -526,14 +524,16 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                             },
                             generics: [],
                             argument_tys: [],
-                            return_ty: Ref(
-                                Class(
-                                    ClassRef {
-                                        name: Id {
-                                            data: "java.lang.Object",
+                            return_ty: Some(
+                                Ref(
+                                    Class(
+                                        ClassRef {
+                                            name: Id {
+                                                data: "java.lang.Object",
+                                            },
+                                            generics: [],
                                         },
-                                        generics: [],
-                                    },
+                                    ),
                                 ),
                             ),
                             throws: [],
@@ -553,15 +553,17 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                             },
                             generics: [],
                             argument_tys: [],
-                            return_ty: Ref(
-                                Array(
-                                    Class(
-                                        ClassRef {
-                                            name: Id {
-                                                data: "java.lang.Object",
+                            return_ty: Some(
+                                Ref(
+                                    Array(
+                                        Class(
+                                            ClassRef {
+                                                name: Id {
+                                                    data: "java.lang.Object",
+                                                },
+                                                generics: [],
                                             },
-                                            generics: [],
-                                        },
+                                        ),
                                     ),
                                 ),
                             ),
@@ -596,12 +598,14 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                     ),
                                 ),
                             ],
-                            return_ty: Ref(
-                                Array(
-                                    TypeParameter(
-                                        Id {
-                                            data: "T",
-                                        },
+                            return_ty: Some(
+                                Ref(
+                                    Array(
+                                        TypeParameter(
+                                            Id {
+                                                data: "T",
+                                            },
+                                        ),
                                     ),
                                 ),
                             ),
@@ -626,11 +630,13 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                     Int,
                                 ),
                             ],
-                            return_ty: Ref(
-                                TypeParameter(
-                                    Id {
-                                        data: "E",
-                                    },
+                            return_ty: Some(
+                                Ref(
+                                    TypeParameter(
+                                        Id {
+                                            data: "E",
+                                        },
+                                    ),
                                 ),
                             ),
                             throws: [],
@@ -661,11 +667,13 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                     ),
                                 ),
                             ],
-                            return_ty: Ref(
-                                TypeParameter(
-                                    Id {
-                                        data: "E",
-                                    },
+                            return_ty: Some(
+                                Ref(
+                                    TypeParameter(
+                                        Id {
+                                            data: "E",
+                                        },
+                                    ),
                                 ),
                             ),
                             throws: [],
@@ -693,8 +701,10 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                     ),
                                 ),
                             ],
-                            return_ty: Scalar(
-                                Boolean,
+                            return_ty: Some(
+                                Scalar(
+                                    Boolean,
+                                ),
                             ),
                             throws: [],
                             descriptor: Descriptor {
@@ -724,13 +734,7 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                     ),
                                 ),
                             ],
-                            return_ty: Ref(
-                                TypeParameter(
-                                    Id {
-                                        data: "void",
-                                    },
-                                ),
-                            ),
+                            return_ty: None,
                             throws: [],
                             descriptor: Descriptor {
                                 string: "(ILjava/lang/Object;)V",
@@ -752,11 +756,13 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                     Int,
                                 ),
                             ],
-                            return_ty: Ref(
-                                TypeParameter(
-                                    Id {
-                                        data: "E",
-                                    },
+                            return_ty: Some(
+                                Ref(
+                                    TypeParameter(
+                                        Id {
+                                            data: "E",
+                                        },
+                                    ),
                                 ),
                             ),
                             throws: [],
@@ -787,8 +793,10 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                     ),
                                 ),
                             ],
-                            return_ty: Scalar(
-                                Boolean,
+                            return_ty: Some(
+                                Scalar(
+                                    Boolean,
+                                ),
                             ),
                             throws: [],
                             descriptor: Descriptor {
@@ -807,8 +815,10 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                             },
                             generics: [],
                             argument_tys: [],
-                            return_ty: Scalar(
-                                Int,
+                            return_ty: Some(
+                                Scalar(
+                                    Int,
+                                ),
                             ),
                             throws: [],
                             descriptor: Descriptor {
@@ -838,8 +848,10 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                     ),
                                 ),
                             ],
-                            return_ty: Scalar(
-                                Boolean,
+                            return_ty: Some(
+                                Scalar(
+                                    Boolean,
+                                ),
                             ),
                             throws: [],
                             descriptor: Descriptor {
@@ -858,13 +870,7 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                             },
                             generics: [],
                             argument_tys: [],
-                            return_ty: Ref(
-                                TypeParameter(
-                                    Id {
-                                        data: "void",
-                                    },
-                                ),
-                            ),
+                            return_ty: None,
                             throws: [],
                             descriptor: Descriptor {
                                 string: "()V",
@@ -901,8 +907,10 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                     ),
                                 ),
                             ],
-                            return_ty: Scalar(
-                                Boolean,
+                            return_ty: Some(
+                                Scalar(
+                                    Boolean,
+                                ),
                             ),
                             throws: [],
                             descriptor: Descriptor {
@@ -943,8 +951,10 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                     ),
                                 ),
                             ],
-                            return_ty: Scalar(
-                                Boolean,
+                            return_ty: Some(
+                                Scalar(
+                                    Boolean,
+                                ),
                             ),
                             throws: [],
                             descriptor: Descriptor {
@@ -976,8 +986,10 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                     ),
                                 ),
                             ],
-                            return_ty: Scalar(
-                                Boolean,
+                            return_ty: Some(
+                                Scalar(
+                                    Boolean,
+                                ),
                             ),
                             throws: [],
                             descriptor: Descriptor {
@@ -1009,8 +1021,10 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                     ),
                                 ),
                             ],
-                            return_ty: Scalar(
-                                Boolean,
+                            return_ty: Some(
+                                Scalar(
+                                    Boolean,
+                                ),
                             ),
                             throws: [],
                             descriptor: Descriptor {
@@ -1033,20 +1047,22 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                     Int,
                                 ),
                             ],
-                            return_ty: Ref(
-                                Class(
-                                    ClassRef {
-                                        name: Id {
-                                            data: "java.util.ListIterator",
+                            return_ty: Some(
+                                Ref(
+                                    Class(
+                                        ClassRef {
+                                            name: Id {
+                                                data: "java.util.ListIterator",
+                                            },
+                                            generics: [
+                                                TypeParameter(
+                                                    Id {
+                                                        data: "E",
+                                                    },
+                                                ),
+                                            ],
                                         },
-                                        generics: [
-                                            TypeParameter(
-                                                Id {
-                                                    data: "E",
-                                                },
-                                            ),
-                                        ],
-                                    },
+                                    ),
                                 ),
                             ),
                             throws: [],
@@ -1066,20 +1082,22 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                             },
                             generics: [],
                             argument_tys: [],
-                            return_ty: Ref(
-                                Class(
-                                    ClassRef {
-                                        name: Id {
-                                            data: "java.util.ListIterator",
+                            return_ty: Some(
+                                Ref(
+                                    Class(
+                                        ClassRef {
+                                            name: Id {
+                                                data: "java.util.ListIterator",
+                                            },
+                                            generics: [
+                                                TypeParameter(
+                                                    Id {
+                                                        data: "E",
+                                                    },
+                                                ),
+                                            ],
                                         },
-                                        generics: [
-                                            TypeParameter(
-                                                Id {
-                                                    data: "E",
-                                                },
-                                            ),
-                                        ],
-                                    },
+                                    ),
                                 ),
                             ),
                             throws: [],
@@ -1099,20 +1117,22 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                             },
                             generics: [],
                             argument_tys: [],
-                            return_ty: Ref(
-                                Class(
-                                    ClassRef {
-                                        name: Id {
-                                            data: "java.util.Iterator",
+                            return_ty: Some(
+                                Ref(
+                                    Class(
+                                        ClassRef {
+                                            name: Id {
+                                                data: "java.util.Iterator",
+                                            },
+                                            generics: [
+                                                TypeParameter(
+                                                    Id {
+                                                        data: "E",
+                                                    },
+                                                ),
+                                            ],
                                         },
-                                        generics: [
-                                            TypeParameter(
-                                                Id {
-                                                    data: "E",
-                                                },
-                                            ),
-                                        ],
-                                    },
+                                    ),
                                 ),
                             ),
                             throws: [],
@@ -1139,20 +1159,22 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                     Int,
                                 ),
                             ],
-                            return_ty: Ref(
-                                Class(
-                                    ClassRef {
-                                        name: Id {
-                                            data: "java.util.List",
+                            return_ty: Some(
+                                Ref(
+                                    Class(
+                                        ClassRef {
+                                            name: Id {
+                                                data: "java.util.List",
+                                            },
+                                            generics: [
+                                                TypeParameter(
+                                                    Id {
+                                                        data: "E",
+                                                    },
+                                                ),
+                                            ],
                                         },
-                                        generics: [
-                                            TypeParameter(
-                                                Id {
-                                                    data: "E",
-                                                },
-                                            ),
-                                        ],
-                                    },
+                                    ),
                                 ),
                             ),
                             throws: [],
@@ -1191,13 +1213,7 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                     ),
                                 ),
                             ],
-                            return_ty: Ref(
-                                TypeParameter(
-                                    Id {
-                                        data: "void",
-                                    },
-                                ),
-                            ),
+                            return_ty: None,
                             throws: [],
                             descriptor: Descriptor {
                                 string: "(Ljava/util/function/Consumer;)V",
@@ -1215,20 +1231,22 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                             },
                             generics: [],
                             argument_tys: [],
-                            return_ty: Ref(
-                                Class(
-                                    ClassRef {
-                                        name: Id {
-                                            data: "java.util.Spliterator",
+                            return_ty: Some(
+                                Ref(
+                                    Class(
+                                        ClassRef {
+                                            name: Id {
+                                                data: "java.util.Spliterator",
+                                            },
+                                            generics: [
+                                                TypeParameter(
+                                                    Id {
+                                                        data: "E",
+                                                    },
+                                                ),
+                                            ],
                                         },
-                                        generics: [
-                                            TypeParameter(
-                                                Id {
-                                                    data: "E",
-                                                },
-                                            ),
-                                        ],
-                                    },
+                                    ),
                                 ),
                             ),
                             throws: [],
@@ -1267,8 +1285,10 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                     ),
                                 ),
                             ],
-                            return_ty: Scalar(
-                                Boolean,
+                            return_ty: Some(
+                                Scalar(
+                                    Boolean,
+                                ),
                             ),
                             throws: [],
                             descriptor: Descriptor {
@@ -1304,13 +1324,7 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                     ),
                                 ),
                             ],
-                            return_ty: Ref(
-                                TypeParameter(
-                                    Id {
-                                        data: "void",
-                                    },
-                                ),
-                            ),
+                            return_ty: None,
                             throws: [],
                             descriptor: Descriptor {
                                 string: "(Ljava/util/function/UnaryOperator;)V",
@@ -1347,13 +1361,7 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                     ),
                                 ),
                             ],
-                            return_ty: Ref(
-                                TypeParameter(
-                                    Id {
-                                        data: "void",
-                                    },
-                                ),
-                            ),
+                            return_ty: None,
                             throws: [],
                             descriptor: Descriptor {
                                 string: "(Ljava/util/Comparator;)V",
@@ -1453,16 +1461,18 @@ public class java.lang.Object {
                             },
                             generics: [],
                             argument_tys: [],
-                            return_ty: Ref(
-                                Class(
-                                    ClassRef {
-                                        name: Id {
-                                            data: "java.lang.Class",
+                            return_ty: Some(
+                                Ref(
+                                    Class(
+                                        ClassRef {
+                                            name: Id {
+                                                data: "java.lang.Class",
+                                            },
+                                            generics: [
+                                                Wildcard,
+                                            ],
                                         },
-                                        generics: [
-                                            Wildcard,
-                                        ],
-                                    },
+                                    ),
                                 ),
                             ),
                             throws: [],
@@ -1482,8 +1492,10 @@ public class java.lang.Object {
                             },
                             generics: [],
                             argument_tys: [],
-                            return_ty: Scalar(
-                                Int,
+                            return_ty: Some(
+                                Scalar(
+                                    Int,
+                                ),
                             ),
                             throws: [],
                             descriptor: Descriptor {
@@ -1513,8 +1525,10 @@ public class java.lang.Object {
                                     ),
                                 ),
                             ],
-                            return_ty: Scalar(
-                                Boolean,
+                            return_ty: Some(
+                                Scalar(
+                                    Boolean,
+                                ),
                             ),
                             throws: [],
                             descriptor: Descriptor {
@@ -1533,14 +1547,16 @@ public class java.lang.Object {
                             },
                             generics: [],
                             argument_tys: [],
-                            return_ty: Ref(
-                                Class(
-                                    ClassRef {
-                                        name: Id {
-                                            data: "java.lang.String",
+                            return_ty: Some(
+                                Ref(
+                                    Class(
+                                        ClassRef {
+                                            name: Id {
+                                                data: "java.lang.String",
+                                            },
+                                            generics: [],
                                         },
-                                        generics: [],
-                                    },
+                                    ),
                                 ),
                             ),
                             throws: [],
@@ -1560,13 +1576,7 @@ public class java.lang.Object {
                             },
                             generics: [],
                             argument_tys: [],
-                            return_ty: Ref(
-                                TypeParameter(
-                                    Id {
-                                        data: "void",
-                                    },
-                                ),
-                            ),
+                            return_ty: None,
                             throws: [],
                             descriptor: Descriptor {
                                 string: "()V",
@@ -1584,13 +1594,7 @@ public class java.lang.Object {
                             },
                             generics: [],
                             argument_tys: [],
-                            return_ty: Ref(
-                                TypeParameter(
-                                    Id {
-                                        data: "void",
-                                    },
-                                ),
-                            ),
+                            return_ty: None,
                             throws: [],
                             descriptor: Descriptor {
                                 string: "()V",
@@ -1608,13 +1612,7 @@ public class java.lang.Object {
                             },
                             generics: [],
                             argument_tys: [],
-                            return_ty: Ref(
-                                TypeParameter(
-                                    Id {
-                                        data: "void",
-                                    },
-                                ),
-                            ),
+                            return_ty: None,
                             throws: [
                                 ClassRef {
                                     name: Id {
@@ -1643,13 +1641,7 @@ public class java.lang.Object {
                                     Long,
                                 ),
                             ],
-                            return_ty: Ref(
-                                TypeParameter(
-                                    Id {
-                                        data: "void",
-                                    },
-                                ),
-                            ),
+                            return_ty: None,
                             throws: [
                                 ClassRef {
                                     name: Id {
@@ -1681,13 +1673,7 @@ public class java.lang.Object {
                                     Int,
                                 ),
                             ],
-                            return_ty: Ref(
-                                TypeParameter(
-                                    Id {
-                                        data: "void",
-                                    },
-                                ),
-                            ),
+                            return_ty: None,
                             throws: [
                                 ClassRef {
                                     name: Id {

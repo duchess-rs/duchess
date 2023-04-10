@@ -1,5 +1,3 @@
-
-
 use crate::jvm::JavaScalar;
 use crate::jvm::Jvm;
 use crate::jvm::JvmOp;
@@ -84,9 +82,7 @@ where
 ///
 /// This is intended to be used to explicitly bring a value back to Rust at the end of a JVM session or operation.
 pub trait IntoRust<T> {
-    type Op: for<'jvm> JvmOp<Output<'jvm> = T>;
-
-    fn into_rust(self) -> Self::Op;
+    fn into_rust(self, jvm: &mut Jvm<'_>) -> crate::Result<T>;
 }
 
 /// A [`JvmOp`] that produces a [`Local`] reference to a `T` object.

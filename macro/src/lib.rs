@@ -1,5 +1,5 @@
 use argument::DuchessDeclaration;
-use class_info::{SpannedClassInfo};
+use class_info::SpannedClassInfo;
 use parse::Parser;
 use proc_macro::TokenStream;
 
@@ -12,12 +12,16 @@ mod span_error;
 
 /// The main duchess macro, used like so
 ///
-/// ```rust
-/// java_package! {
+/// ```rust,ignore
+/// duchess::java_package! {
 ///     package some.pkg.name;
 ///     class SomeClassName { * }
 /// }
 /// ```
+///
+/// see the tutorial in the [duchess book] for more info.
+///
+/// [duchess book]: https://nikomatsakis.github.io/duchess/
 #[proc_macro]
 pub fn java_package(input: TokenStream) -> TokenStream {
     let input: proc_macro2::TokenStream = input.into();

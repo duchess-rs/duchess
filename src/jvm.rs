@@ -121,7 +121,7 @@ impl<'jvm> Jvm<'jvm> {
 /// # Example
 ///
 /// ```
-/// # use duchess::jvm::JavaObject;
+/// # use duchess::JavaObject;
 /// pub struct BigDecimal {
 ///     _private: (), // prevent construction
 /// }

@@ -79,30 +79,8 @@ where
     for<'jvm> J: JvmOp<Input<'jvm> = ()>,
     for<'jvm> J::Output<'jvm>: AsRef<JavaString>,
 {
-    type Op = IntoRustString<J>;
-
-    fn into_rust(self) -> Self::Op {
-        IntoRustString(self)
-    }
-}
-
-/// A [`JvmOp`] that will produce an owned Rust [`String`] with the same codepoints as the Java String produced by `J`.
-#[derive(Clone)]
-pub struct IntoRustString<J>(J);
-
-impl<J: JvmOp> JvmOp for IntoRustString<J>
-where
-    for<'jvm> J::Output<'jvm>: AsRef<JavaString>,
-{
-    type Input<'jvm> = J::Input<'jvm>;
-    type Output<'jvm> = String;
-
-    fn execute_with<'jvm>(
-        self,
-        jvm: &mut Jvm<'jvm>,
-        arg: Self::Input<'jvm>,
-    ) -> crate::Result<Self::Output<'jvm>> {
-        let object = self.0.execute_with(jvm, arg)?;
+    fn into_rust(self, jvm: &mut Jvm<'_>) -> crate::Result<String> {
+        let object = self.execute_with(jvm, ())?;
         let env = jvm.to_env();
         // XX: safety? is this the right way to do this cast?
         let string_object = unsafe { JString::from_raw(object.as_ref().as_jobject().as_raw()) };

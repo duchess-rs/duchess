@@ -166,7 +166,7 @@ fn main() -> jni::errors::Result<()> {
         let http_request =
             HttpRequest::new("POST", "/", [1i8, 2, 3].as_slice(), &params).execute(jvm)?;
 
-        let as_str = http_request.to_string().into_rust().execute(jvm)?;
+        let as_str = http_request.to_string().into_rust(jvm)?;
         println!("{}", as_str);
 
         Ok(())

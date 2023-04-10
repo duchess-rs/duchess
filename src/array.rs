@@ -20,12 +20,6 @@ unsafe impl<T: ArrayElement> JavaObject for JavaArray<T> {}
 
 unsafe impl<T: ArrayElement> Upcast<JavaArray<T>> for JavaArray<T> {}
 
-#[derive(Clone)]
-pub struct IntoRustVec<J, T> {
-    op: J,
-    _element: PhantomData<T>,
-}
-
 macro_rules! primivite_array {
     ($([$rust:ty]: $new_fn:ident $get_fn:ident $set_fn:ident,)*) => {
         $(
@@ -50,29 +44,8 @@ macro_rules! primivite_array {
                 for<'jvm> J: JvmOp<Input<'jvm> = ()>,
                 for<'jvm> J::Output<'jvm>: AsRef<JavaArray<$rust>>,
             {
-                type Op = IntoRustVec<J, $rust>;
-
-                fn into_rust(self) -> Self::Op {
-                    IntoRustVec {
-                        op: self,
-                        _element: PhantomData,
-                    }
-                }
-            }
-
-            impl<J: JvmOp> JvmOp for IntoRustVec<J, $rust>
-            where
-                for<'jvm> J::Output<'jvm>: AsRef<JavaArray<$rust>>,
-            {
-                type Input<'jvm> = J::Input<'jvm>;
-                type Output<'jvm> = Vec<$rust>;
-
-                fn execute_with<'jvm>(
-                    self,
-                    jvm: &mut Jvm<'jvm>,
-                    arg: Self::Input<'jvm>,
-                ) -> crate::Result<Self::Output<'jvm>> {
-                    let object = self.op.execute_with(jvm, arg)?;
+                fn into_rust(self, jvm: &mut Jvm<'_>) -> $crate::Result<Vec<$rust>> {
+                    let object = self.execute_with(jvm, ())?;
 
                     let env = jvm.to_env();
                     // XX: safety, is this violating any rules? right way to cast?
@@ -126,29 +99,8 @@ where
     for<'jvm> J: JvmOp<Input<'jvm> = ()>,
     for<'jvm> J::Output<'jvm>: AsRef<JavaArray<bool>>,
 {
-    type Op = IntoRustVec<J, bool>;
-
-    fn into_rust(self) -> Self::Op {
-        IntoRustVec {
-            op: self,
-            _element: PhantomData,
-        }
-    }
-}
-
-impl<J: JvmOp> JvmOp for IntoRustVec<J, bool>
-where
-    for<'jvm> J::Output<'jvm>: AsRef<JavaArray<bool>>,
-{
-    type Input<'jvm> = J::Input<'jvm>;
-    type Output<'jvm> = Vec<bool>;
-
-    fn execute_with<'jvm>(
-        self,
-        jvm: &mut Jvm<'jvm>,
-        arg: Self::Input<'jvm>,
-    ) -> crate::Result<Self::Output<'jvm>> {
-        let object = self.op.execute_with(jvm, arg)?;
+    fn into_rust(self, jvm: &mut Jvm<'_>) -> crate::Result<Vec<bool>> {
+        let object = self.execute_with(jvm, ())?;
 
         let env = jvm.to_env();
         // XX: safety, is this violating any rules? right way to cast?
