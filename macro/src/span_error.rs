@@ -10,6 +10,6 @@ impl SpanError {
     pub fn into_tokens(self) -> TokenStream {
         let SpanError { span, message } = self;
         let message = Literal::string(&message);
-        quote_spanned! { span => compile_error!(#message) }
+        quote_spanned! { span => compile_error! { #message } }
     }
 }
