@@ -66,6 +66,14 @@ impl IntoJava<JavaString> for &str {
     }
 }
 
+impl IntoJava<JavaString> for String {
+    type Output<'jvm> = Local<'jvm, JavaString>;
+
+    fn into_java<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<Local<'jvm, JavaString>> {
+        <&str as IntoJava<JavaString>>::into_java(&self, jvm)
+    }
+}
+
 impl<J> IntoRust<String> for J
 where
     for<'jvm> J: JvmOp<Input<'jvm> = ()>,

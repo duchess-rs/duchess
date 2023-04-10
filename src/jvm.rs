@@ -7,7 +7,7 @@ use std::{
 };
 
 use jni::{
-    objects::{AutoLocal, GlobalRef, JObject, JValue, JValueOwned},
+    objects::{AutoLocal, GlobalRef, JObject, JValueOwned},
     sys, InitArgsBuilder, JNIEnv, JavaVM,
 };
 use once_cell::sync::Lazy;

@@ -1,5 +1,5 @@
 use argument::DuchessDeclaration;
-use class_info::{ClassInfo, SpannedClassInfo};
+use class_info::{SpannedClassInfo};
 use parse::Parser;
 use proc_macro::TokenStream;
 

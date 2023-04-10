@@ -1,9 +1,5 @@
-use crate::{
-    argument::DuchessDeclaration,
-    class_info::{
-        ClassInfo, ClassRef, Constructor, Id, Method, RefType, ScalarType, SpannedClassInfo, Type,
-    },
-    span_error::SpanError,
+use crate::class_info::{
+    ClassRef, Constructor, Id, Method, RefType, ScalarType, SpannedClassInfo, Type,
 };
 use inflector::Inflector;
 use proc_macro2::{Ident, Literal, Span, TokenStream};
@@ -18,7 +14,7 @@ struct MethodOutput {
 }
 
 impl SpannedClassInfo {
-    pub fn into_tokens(mut self) -> TokenStream {
+    pub fn into_tokens(self) -> TokenStream {
         let struct_name = self.struct_name();
         let ext_trait_name = self.ext_trait_name();
         let cached_class = self.cached_class();
@@ -238,8 +234,6 @@ impl SpannedClassInfo {
         let output_ty = sig.output_type(&method.return_ty)?;
         let output_trait = sig.output_trait(&method.return_ty)?;
 
-        let generics = self.generic_names();
-
         let descriptor = Literal::string(&method.descriptor.string);
 
         // Code to convert each input appropriately
@@ -452,7 +446,7 @@ impl Signature {
         if !self.capture_generics {
             Err(UnsupportedWildcard)
         } else {
-            let mut i = self.generics.len();
+            let i = self.generics.len();
             let ident = Ident::new(&format!("P{}", i), self.span);
             self.generics.push(ident.clone());
             Ok(ident)
@@ -469,7 +463,7 @@ impl Signature {
         self.where_bounds.push(t);
     }
 
-    /// Returnss an appropriate `impl type` for a funtion that
+    /// Returns an appropriate `impl type` for a funtion that
     /// takes `ty` as input. Assumes objects are nullable.
     fn input_trait(&mut self, ty: &Type) -> Result<TokenStream, UnsupportedWildcard> {
         match ty {
@@ -514,15 +508,6 @@ impl Signature {
             }
             None => Ok(quote_spanned!(this.span => duchess::IntoVoid)),
         })
-    }
-
-    /// For a Java type
-    fn java_type(&mut self, ty: &Type) -> Result<TokenStream, UnsupportedWildcard> {
-        match ty {
-            Type::Ref(ty) => self.java_ref_ty(ty),
-
-            Type::Scalar(ty) => Ok(self.java_scalar_ty(ty)),
-        }
     }
 
     fn java_ref_ty(&mut self, ty: &RefType) -> Result<TokenStream, UnsupportedWildcard> {

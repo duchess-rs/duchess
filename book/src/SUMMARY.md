@@ -1,6 +1,8 @@
 # Summary
 
 - [Intro](./intro.md)
+    - [Calling Java from Rust](./call_java_from_rust.md)
+    - [Implementing native methods](./implementing_native_methods.md)
 - [Reference](./reference.md)
     - [The `java_package` macro](./java_package.md)
     - [JVM Operations](./jvm_operations.md)

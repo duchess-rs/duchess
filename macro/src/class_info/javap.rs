@@ -21,7 +21,10 @@ fn format_lalrpop_error(
         lalrpop_util::ParseError::ExtraToken { token } => {
             format!("extra token at end of input (`{}`)", token.1)
         }
-        lalrpop_util::ParseError::UnrecognizedEOF { location, expected } => {
+        lalrpop_util::ParseError::UnrecognizedEOF {
+            location: _,
+            expected,
+        } => {
             format!("unexpected end of input, expected one of `{:?}`", expected)
         }
         lalrpop_util::ParseError::UnrecognizedToken {

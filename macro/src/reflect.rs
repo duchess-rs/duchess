@@ -1,7 +1,6 @@
-use std::{os::unix::process::CommandExt, process::Command};
+use std::process::Command;
 
 use proc_macro2::TokenStream;
-use quote::quote;
 
 use crate::{
     argument::{DuchessDeclaration, JavaClass, JavaPackage},
@@ -10,13 +9,13 @@ use crate::{
 };
 
 impl DuchessDeclaration {
-    pub fn into_tokens(mut self) -> Result<TokenStream, SpanError> {
+    pub fn into_tokens(self) -> Result<TokenStream, SpanError> {
         self.packages.into_iter().map(|p| p.into_tokens()).collect()
     }
 }
 
 impl JavaPackage {
-    pub fn into_tokens(mut self) -> Result<TokenStream, SpanError> {
+    pub fn into_tokens(self) -> Result<TokenStream, SpanError> {
         self.classes
             .iter()
             .map(|c| Ok(c.parse_javap(&self.package_name.text)?.into_tokens()))
