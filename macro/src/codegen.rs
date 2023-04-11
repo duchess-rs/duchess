@@ -110,13 +110,15 @@ impl SpannedClassInfo {
             };
         };
 
-        if std::env::var("DUCHESS_DEBUG").is_ok() {
-            match rust_format::RustFmt::default().format_tokens(output.clone()) {
-                Ok(v) => {
-                    eprintln!("{v}");
-                }
-                Err(_) => {
-                    eprintln!("{output:?}");
+        if let Ok(f) = std::env::var("DUCHESS_DEBUG") {
+            if f == "*" || f == "1" || &f == &*self.info.name {
+                match rust_format::RustFmt::default().format_tokens(output.clone()) {
+                    Ok(v) => {
+                        eprintln!("{v}");
+                    }
+                    Err(_) => {
+                        eprintln!("{output:?}");
+                    }
                 }
             }
         }
