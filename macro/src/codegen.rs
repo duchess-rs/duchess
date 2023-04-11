@@ -97,11 +97,14 @@ impl SpannedClassInfo {
         let output = self.in_modules(&package, output);
 
         if std::env::var("DUCHESS_DEBUG").is_ok() {
-            eprintln!(
-                "{:?}",
-                // output,
-                rust_format::RustFmt::default().format_tokens(output.clone())
-            );
+            match rust_format::RustFmt::default().format_tokens(output.clone()) {
+                Ok(v) => {
+                    eprintln!("{v}");
+                }
+                Err(_) => {
+                    eprintln!("{output:?}");
+                }
+            }
         }
 
         output
