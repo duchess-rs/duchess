@@ -1,4 +1,3 @@
-use crate::jvm::IsVoid;
 use crate::jvm::JavaScalar;
 use crate::jvm::Jvm;
 use crate::jvm::JvmOp;
