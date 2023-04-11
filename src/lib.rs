@@ -4,6 +4,7 @@ mod array;
 mod collections;
 mod inspect;
 mod jvm;
+mod object;
 mod ops;
 mod str;
 
@@ -35,6 +36,7 @@ pub mod java {
     pub use crate::array::JavaArray as Array;
 
     pub mod lang {
+        pub use crate::object::Object;
         pub use crate::str::JavaString as String;
     }
     pub mod util {
