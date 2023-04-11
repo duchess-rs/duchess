@@ -13,7 +13,7 @@ impl DuchessDeclaration {
         let spanned_packages = self.to_spanned_packages()?;
         Ok(spanned_packages
             .into_values()
-            .map(|p| p.into_tokens())
+            .map(|p| p.into_tokens(0))
             .collect())
     }
 

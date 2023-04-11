@@ -25,17 +25,30 @@ struct MethodOutput {
 }
 
 impl SpannedPackageInfo {
-    pub fn into_tokens(self) -> TokenStream {
+    pub fn into_tokens(self, depth: usize) -> TokenStream {
         let name = Ident::new(&self.name, self.span);
         let inner: TokenStream = self
             .subpackages
             .into_values()
-            .map(|p| p.into_tokens())
+            .map(|p| p.into_tokens(depth + 1))
             .chain(self.classes.into_iter().map(|c| c.into_tokens()))
             .collect();
+
+        let path: TokenStream = (1..depth)
+            .map(|_| quote_spanned!(self.span => "::super"))
+            .collect();
+
         quote_spanned!(self.span =>
             #[allow(unused_imports)]
-            pub mod #name { use duchess::java; #inner }
+            pub mod #name {
+                // Import the contents of the parent module that we are created inside
+                use super #path :: *;
+
+                // Import the java package provided by duchess
+                use duchess::java;
+
+                #inner
+            }
         )
     }
 }
