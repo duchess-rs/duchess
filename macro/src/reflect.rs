@@ -1,30 +1,66 @@
-use std::process::Command;
+use std::{collections::BTreeMap, process::Command};
 
 use proc_macro2::TokenStream;
 
 use crate::{
-    argument::{DuchessDeclaration, JavaClass, JavaPackage},
-    class_info::{self, SpannedClassInfo},
+    argument::{DuchessDeclaration, Ident, JavaClass, JavaPackage, JavaPath},
+    class_info::{self, Id, SpannedClassInfo, SpannedPackageInfo},
     span_error::SpanError,
 };
 
 impl DuchessDeclaration {
     pub fn into_tokens(self) -> Result<TokenStream, SpanError> {
-        self.packages.into_iter().map(|p| p.into_tokens()).collect()
+        let spanned_packages = self.to_spanned_packages()?;
+        Ok(spanned_packages
+            .into_values()
+            .map(|p| p.into_tokens(0))
+            .collect())
+    }
+
+    fn to_spanned_packages(&self) -> Result<BTreeMap<Id, SpannedPackageInfo>, SpanError> {
+        let mut result = BTreeMap::new();
+        for package in &self.packages {
+            package.to_spanned_packages(&package.package_name.ids, &mut result)?;
+        }
+        Ok(result)
     }
 }
 
 impl JavaPackage {
-    pub fn into_tokens(self) -> Result<TokenStream, SpanError> {
-        self.classes
-            .iter()
-            .map(|c| Ok(c.parse_javap(&self.package_name.text)?.into_tokens()))
-            .collect()
+    fn to_spanned_packages(
+        &self,
+        name: &[Ident],
+        map: &mut BTreeMap<Id, SpannedPackageInfo>,
+    ) -> Result<(), SpanError> {
+        let (first, rest) = name.split_first().unwrap();
+
+        let package_info = || SpannedPackageInfo {
+            name: first.to_id(),
+            span: first.span,
+            subpackages: Default::default(),
+            classes: Default::default(),
+        };
+
+        let first_id = first.to_id();
+
+        // As written, this allows the same package more than once. I don't see any reason to forbid it,
+        // but maybe we want to?
+        let parent = map.entry(first_id).or_insert_with(package_info);
+
+        if rest.is_empty() {
+            for c in &self.classes {
+                let j = c.parse_javap(&self.package_name)?;
+                parent.classes.push(j);
+            }
+            Ok(())
+        } else {
+            self.to_spanned_packages(rest, &mut parent.subpackages)
+        }
     }
 }
 
 impl JavaClass {
-    fn parse_javap(&self, package_name: &str) -> Result<SpannedClassInfo, SpanError> {
+    fn parse_javap(&self, package_name: &JavaPath) -> Result<SpannedClassInfo, SpanError> {
         let mut command = Command::new("javap");
 
         command

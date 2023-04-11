@@ -1,6 +1,7 @@
 use proc_macro2::{Delimiter, Span};
 
 use crate::{
+    class_info::Id,
     parse::{Parse, Parser},
     span_error::SpanError,
 };
@@ -107,30 +108,79 @@ impl Parse for MemberListing {
 }
 
 pub struct JavaPath {
-    pub text: String,
+    pub ids: Vec<Ident>,
     pub span: Span,
 }
 
 impl Parse for JavaPath {
     fn parse(p: &mut Parser) -> Result<Option<Self>, SpanError> {
-        let Some(mut text) = p.eat_ident() else {
+        let Some(text) = Ident::parse(p)? else {
             return Ok(None);
         };
 
-        let span = p.last_span().unwrap();
+        let mut span = text.span;
+        let mut ids = vec![text];
 
         while let Some(()) = p.eat_punct('.') {
-            let Some(next) = p.eat_ident() else {
+            let Some(next) = Ident::parse(p)? else {
                 return Err(SpanError { span: p.last_span().unwrap(), message: format!("expected identifier after `.`") });
             };
-            text.push_str(".");
-            text.push_str(&next);
+            span = span.join(next.span).unwrap_or(span);
+            ids.push(next);
         }
 
-        Ok(Some(JavaPath { text, span }))
+        Ok(Some(JavaPath { ids, span }))
     }
 
     fn description() -> String {
         format!("java class name (e.g., `java.lang.Object`)")
+    }
+}
+
+impl std::fmt::Display for JavaPath {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some((id0, ids)) = self.ids.split_first() {
+            write!(f, "{}", id0)?;
+            for id in ids {
+                write!(f, ".{}", id)?;
+            }
+            Ok(())
+        } else {
+            Ok(())
+        }
+    }
+}
+
+pub struct Ident {
+    pub text: String,
+    pub span: Span,
+}
+
+impl Ident {
+    pub fn to_id(&self) -> Id {
+        Id::from(&self.text[..])
+    }
+}
+
+impl Parse for Ident {
+    fn parse(p: &mut Parser) -> Result<Option<Self>, SpanError> {
+        let Some(text) = p.eat_ident() else {
+            return Ok(None);
+        };
+
+        Ok(Some(Ident {
+            text,
+            span: p.last_span().unwrap(),
+        }))
+    }
+
+    fn description() -> String {
+        format!("Java identifier")
+    }
+}
+
+impl std::fmt::Display for Ident {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", &self.text)
     }
 }

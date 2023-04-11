@@ -157,3 +157,52 @@ where
         self.execute_with(jvm, ())
     }
 }
+
+/// A java method, invoked on `B`, that returns a `T` object.
+pub trait JavaMethod<B, T>
+where
+    B: JvmOp,
+    T: JavaObject,
+    for<'jvm> Self: JvmOp<Input<'jvm> = B::Input<'jvm>, Output<'jvm> = Option<Local<'jvm, T>>>,
+{
+}
+
+impl<J, B, T> JavaMethod<B, T> for J
+where
+    B: JvmOp,
+    T: JavaObject,
+    for<'jvm> Self: JvmOp<Input<'jvm> = B::Input<'jvm>, Output<'jvm> = Option<Local<'jvm, T>>>,
+{
+}
+
+/// A java method, invoked on `B`, that returns a scalar value of type `T`.
+pub trait ScalarMethod<B, T>
+where
+    B: JvmOp,
+    T: JavaScalar,
+    for<'jvm> Self: JvmOp<Input<'jvm> = B::Input<'jvm>, Output<'jvm> = T>,
+{
+}
+
+impl<J, B, T> ScalarMethod<B, T> for J
+where
+    B: JvmOp,
+    T: JavaScalar,
+    for<'jvm> Self: JvmOp<Input<'jvm> = B::Input<'jvm>, Output<'jvm> = T>,
+{
+}
+
+/// A java method, invoked on `B`, that returns void.
+pub trait VoidMethod<B>
+where
+    B: JvmOp,
+    for<'jvm> Self: JvmOp<Input<'jvm> = B::Input<'jvm>, Output<'jvm> = ()>,
+{
+}
+
+impl<J, B> VoidMethod<B> for J
+where
+    B: JvmOp,
+    for<'jvm> Self: JvmOp<Input<'jvm> = B::Input<'jvm>, Output<'jvm> = ()>,
+{
+}

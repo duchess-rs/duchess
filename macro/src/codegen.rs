@@ -1,16 +1,56 @@
 use crate::class_info::{
-    ClassRef, Constructor, Id, Method, RefType, ScalarType, SpannedClassInfo, Type,
+    ClassRef, Constructor, Id, Method, RefType, ScalarType, SpannedClassInfo, SpannedPackageInfo,
+    Type,
 };
 use inflector::Inflector;
 use proc_macro2::{Ident, Literal, Span, TokenStream};
 use quote::quote_spanned;
 use rust_format::Formatter;
 
+/// The various pieces that we use to reflect a Java method into Rust.
 struct MethodOutput {
+    /// Declaration of the struct for the method, e.g., `struct toString<...> { ... }`.
     method_struct: TokenStream,
+
+    /// Declaration of the items for the method in the `FooExt` trait, e.g.
+    /// `type toString: IntoOptionLocal<String>; fn toString(&self) -> Self::toString;`
     trait_method: TokenStream,
+
+    /// Declaration of the `type` and `fn` to be used in the blanket impl we are going to create,
+    /// which will map the associated type to the `method_struct`.
     trait_impl_method: TokenStream,
+
+    /// Implementation of `jvmop` for the method struct.
     jvm_op_impl: TokenStream,
+}
+
+impl SpannedPackageInfo {
+    pub fn into_tokens(self, depth: usize) -> TokenStream {
+        let name = Ident::new(&self.name, self.span);
+        let inner: TokenStream = self
+            .subpackages
+            .into_values()
+            .map(|p| p.into_tokens(depth + 1))
+            .chain(self.classes.into_iter().map(|c| c.into_tokens()))
+            .collect();
+
+        let path: TokenStream = (1..depth)
+            .map(|_| quote_spanned!(self.span => "::super"))
+            .collect();
+
+        quote_spanned!(self.span =>
+            #[allow(unused_imports)]
+            pub mod #name {
+                // Import the contents of the parent module that we are created inside
+                use super #path :: *;
+
+                // Import the java package provided by duchess
+                use duchess::java;
+
+                #inner
+            }
+        )
+    }
 }
 
 impl SpannedClassInfo {
@@ -51,7 +91,7 @@ impl SpannedClassInfo {
             }
 
             #[allow(non_camel_case_types)]
-            pub trait #ext_trait_name {
+            pub trait #ext_trait_name : duchess::JvmOp {
                 #(#trait_methods)*
             }
 
@@ -93,30 +133,20 @@ impl SpannedClassInfo {
             };
         };
 
-        let package = self.package_name();
-        let output = self.in_modules(&package, output);
-
-        if std::env::var("DUCHESS_DEBUG").is_ok() {
-            eprintln!(
-                "{:?}",
-                // output,
-                rust_format::RustFmt::default().format_tokens(output.clone())
-            );
+        if let Ok(f) = std::env::var("DUCHESS_DEBUG") {
+            if f == "*" || f == "1" || self.info.name.starts_with(&f) {
+                match rust_format::RustFmt::default().format_tokens(output.clone()) {
+                    Ok(v) => {
+                        eprintln!("{v}");
+                    }
+                    Err(_) => {
+                        eprintln!("{output:?}");
+                    }
+                }
+            }
         }
 
         output
-    }
-
-    fn in_modules(&self, package: &[Ident], output: TokenStream) -> TokenStream {
-        if let Some((first, rest)) = package.split_first() {
-            let inner = self.in_modules(rest, output);
-            quote_spanned!(self.span =>
-                #[allow(unused_imports)]
-                pub mod #first { use duchess::java; #inner }
-            )
-        } else {
-            output
-        }
     }
 
     fn cached_class(&self) -> TokenStream {
@@ -232,7 +262,7 @@ impl SpannedClassInfo {
             .collect();
 
         let output_ty = sig.output_type(&method.return_ty)?;
-        let output_trait = sig.output_trait(&method.return_ty)?;
+        let output_trait = sig.method_trait(&method.return_ty)?;
 
         let descriptor = Literal::string(&method.descriptor.string);
 
@@ -333,12 +363,6 @@ impl SpannedClassInfo {
             trait_impl_method,
             jvm_op_impl: impl_output,
         })
-    }
-
-    fn package_name(&self) -> Vec<Ident> {
-        let mut modules: Vec<_> = self.info.name.split('.').collect();
-        modules.pop().unwrap();
-        modules.iter().map(|m| Ident::new(m, self.span)).collect()
     }
 
     fn struct_name(&self) -> Ident {
@@ -494,28 +518,35 @@ impl Signature {
         })
     }
 
-    /// Returns an appropriate `impl type` for a funtion that
+    /// Returns an appropriate trait for a method that
     /// returns `ty`. Assumes objects are nullable.
-    fn output_trait(&mut self, ty: &Option<Type>) -> Result<TokenStream, UnsupportedWildcard> {
+    fn method_trait(&mut self, ty: &Option<Type>) -> Result<TokenStream, UnsupportedWildcard> {
         self.forbid_capture(|this| match ty {
             Some(Type::Ref(ty)) => {
                 let t = this.java_ref_ty(ty)?;
-                Ok(quote_spanned!(this.span => duchess::IntoOptLocal<#t>))
+                Ok(quote_spanned!(this.span => duchess::JavaMethod<Self, #t>))
             }
             Some(Type::Scalar(ty)) => {
                 let t = this.java_scalar_ty(ty);
-                Ok(quote_spanned!(this.span => duchess::IntoScalar<#t>))
+                Ok(quote_spanned!(this.span => duchess::ScalarMethod<Self, #t>))
             }
-            None => Ok(quote_spanned!(this.span => duchess::IntoVoid)),
+            None => Ok(quote_spanned!(this.span => duchess::VoidMethod<Self>)),
         })
+    }
+
+    fn java_ty(&mut self, ty: &Type) -> Result<TokenStream, UnsupportedWildcard> {
+        match ty {
+            Type::Ref(ty) => self.java_ref_ty(ty),
+            Type::Scalar(ty) => Ok(self.java_scalar_ty(ty)),
+        }
     }
 
     fn java_ref_ty(&mut self, ty: &RefType) -> Result<TokenStream, UnsupportedWildcard> {
         match ty {
             RefType::Class(ty) => Ok(self.class_ref_ty(ty)?),
             RefType::Array(e) => {
-                let e = self.java_ref_ty(e)?;
-                Ok(quote_spanned!(self.span => java::JavaArray<#e>))
+                let e = self.java_ty(e)?;
+                Ok(quote_spanned!(self.span => java::Array<#e>))
             }
             RefType::TypeParameter(t) => {
                 let ident = self.java_type_parameter_ident(t);

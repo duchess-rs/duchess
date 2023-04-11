@@ -1,4 +1,7 @@
-use crate::inspect::{ArgOp, Inspect};
+use crate::{
+    inspect::{ArgOp, Inspect},
+    not_null::NotNull,
+};
 
 use std::{
     marker::PhantomData,
@@ -35,6 +38,14 @@ pub trait JvmOp: Clone {
         for<'jvm> K: JvmOp<Input<'jvm> = Self::Output<'jvm>, Output<'jvm> = ()>,
     {
         Inspect::new(self, op)
+    }
+
+    fn assert_not_null<T>(self) -> NotNull<Self>
+    where
+        T: JavaObject,
+        for<'jvm> Self: JvmOp<Output<'jvm> = Option<Local<'jvm, T>>>,
+    {
+        NotNull::new(self)
     }
 
     fn execute_with<'jvm>(
@@ -127,7 +138,7 @@ impl<'jvm> Jvm<'jvm> {
 /// }
 /// unsafe impl JavaObject for BigDecimal {}
 /// ```
-pub unsafe trait JavaObject: Sized {}
+pub unsafe trait JavaObject: 'static + Sized {}
 
 /// Extension trait for [JavaObject].
 pub trait JavaObjectExt: Sized {

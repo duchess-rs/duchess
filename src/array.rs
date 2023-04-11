@@ -12,7 +12,7 @@ pub struct JavaArray<T: ArrayElement> {
     _element: PhantomData<T>,
 }
 
-pub unsafe trait ArrayElement {}
+pub unsafe trait ArrayElement: 'static {}
 
 unsafe impl<T: ArrayElement> JavaObject for JavaArray<T> {}
 
