@@ -3,8 +3,8 @@ use std::process::Command;
 use proc_macro2::TokenStream;
 
 use crate::{
-    argument::{DuchessDeclaration, JavaClass, JavaPackage},
     class_info::{self, SpannedClassInfo},
+    argument::{DuchessDeclaration, JavaClass, JavaPackage, JavaPath},
     span_error::SpanError,
 };
 
@@ -18,13 +18,13 @@ impl JavaPackage {
     pub fn into_tokens(self) -> Result<TokenStream, SpanError> {
         self.classes
             .iter()
-            .map(|c| Ok(c.parse_javap(&self.package_name.text)?.into_tokens()))
+            .map(|c| Ok(c.parse_javap(&self.package_name)?.into_tokens()))
             .collect()
     }
 }
 
 impl JavaClass {
-    fn parse_javap(&self, package_name: &str) -> Result<SpannedClassInfo, SpanError> {
+    fn parse_javap(&self, package_name: &JavaPath) -> Result<SpannedClassInfo, SpanError> {
         let mut command = Command::new("javap");
 
         command

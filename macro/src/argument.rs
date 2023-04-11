@@ -1,6 +1,7 @@
 use proc_macro2::{Delimiter, Span};
 
 use crate::{
+    class_info::Id,
     parse::{Parse, Parser},
     span_error::SpanError,
 };
@@ -107,15 +108,17 @@ impl Parse for MemberListing {
 }
 
 pub struct JavaPath {
-    pub text: String,
+    pub ids: Vec<Id>,
     pub span: Span,
 }
 
 impl Parse for JavaPath {
     fn parse(p: &mut Parser) -> Result<Option<Self>, SpanError> {
-        let Some(mut text) = p.eat_ident() else {
+        let Some(text) = p.eat_ident() else {
             return Ok(None);
         };
+
+        let mut ids = vec![Id::from(text)];
 
         let span = p.last_span().unwrap();
 
@@ -123,14 +126,27 @@ impl Parse for JavaPath {
             let Some(next) = p.eat_ident() else {
                 return Err(SpanError { span: p.last_span().unwrap(), message: format!("expected identifier after `.`") });
             };
-            text.push_str(".");
-            text.push_str(&next);
+            ids.push(Id::from(next));
         }
 
-        Ok(Some(JavaPath { text, span }))
+        Ok(Some(JavaPath { ids, span }))
     }
 
     fn description() -> String {
         format!("java class name (e.g., `java.lang.Object`)")
+    }
+}
+
+impl std::fmt::Display for JavaPath {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some((id0, ids)) = self.ids.split_first() {
+            write!(f, "{}", id0.as_str());
+            for id in ids {
+                write!(f, ".{}", id.as_str());
+            }
+            Ok(())
+        } else {
+            Ok(())
+        }
     }
 }
