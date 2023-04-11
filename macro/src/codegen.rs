@@ -91,7 +91,7 @@ impl SpannedClassInfo {
             }
 
             #[allow(non_camel_case_types)]
-            pub trait #ext_trait_name {
+            pub trait #ext_trait_name : duchess::JvmOp {
                 #(#trait_methods)*
             }
 
@@ -262,7 +262,7 @@ impl SpannedClassInfo {
             .collect();
 
         let output_ty = sig.output_type(&method.return_ty)?;
-        let output_trait = sig.output_trait(&method.return_ty)?;
+        let output_trait = sig.method_trait(&method.return_ty)?;
 
         let descriptor = Literal::string(&method.descriptor.string);
 
@@ -518,19 +518,19 @@ impl Signature {
         })
     }
 
-    /// Returns an appropriate `impl type` for a funtion that
+    /// Returns an appropriate trait for a method that
     /// returns `ty`. Assumes objects are nullable.
-    fn output_trait(&mut self, ty: &Option<Type>) -> Result<TokenStream, UnsupportedWildcard> {
+    fn method_trait(&mut self, ty: &Option<Type>) -> Result<TokenStream, UnsupportedWildcard> {
         self.forbid_capture(|this| match ty {
             Some(Type::Ref(ty)) => {
                 let t = this.java_ref_ty(ty)?;
-                Ok(quote_spanned!(this.span => duchess::IntoOptLocal<#t>))
+                Ok(quote_spanned!(this.span => duchess::JavaMethod<Self, #t>))
             }
             Some(Type::Scalar(ty)) => {
                 let t = this.java_scalar_ty(ty);
-                Ok(quote_spanned!(this.span => duchess::IntoScalar<#t>))
+                Ok(quote_spanned!(this.span => duchess::ScalarMethod<Self, #t>))
             }
-            None => Ok(quote_spanned!(this.span => duchess::IntoVoid)),
+            None => Ok(quote_spanned!(this.span => duchess::VoidMethod<Self>)),
         })
     }
 

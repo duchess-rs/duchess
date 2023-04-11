@@ -19,14 +19,12 @@ pub use prelude::*;
 
 pub mod prelude {
     pub use crate::jvm::JvmOp;
-    pub use crate::ops::{IntoJava, IntoLocal, IntoOptLocal, IntoRust, IntoScalar, IntoVoid};
+    pub use crate::ops::{IntoJava, IntoLocal, IntoOptLocal, IntoRust, IntoScalar, IntoVoid, JavaMethod, ScalarMethod, VoidMethod};
 }
 
 /// Internal module containing non-semver protected
 /// names used by generated code.
 pub mod plumbing {
-    pub use crate::collections::list::{ArrayList, List, ListExt};
-    pub use crate::collections::map::{HashMap, Map, MapExt};
     pub use crate::jvm::{FromJValue, JavaObjectExt, Upcast};
     pub use crate::str::{JavaString, ToJavaStringOp};
     pub use duchess_macro::duchess_javap;
