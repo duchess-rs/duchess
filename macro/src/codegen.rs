@@ -523,7 +523,7 @@ impl Signature {
             RefType::Class(ty) => Ok(self.class_ref_ty(ty)?),
             RefType::Array(e) => {
                 let e = self.java_ty(e)?;
-                Ok(quote_spanned!(self.span => java::JavaArray<#e>))
+                Ok(quote_spanned!(self.span => java::Array<#e>))
             }
             RefType::TypeParameter(t) => {
                 let ident = self.java_type_parameter_ident(t);
