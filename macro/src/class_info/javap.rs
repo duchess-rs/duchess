@@ -556,13 +556,15 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                             return_ty: Some(
                                 Ref(
                                     Array(
-                                        Class(
-                                            ClassRef {
-                                                name: Id {
-                                                    data: "java.lang.Object",
+                                        Ref(
+                                            Class(
+                                                ClassRef {
+                                                    name: Id {
+                                                        data: "java.lang.Object",
+                                                    },
+                                                    generics: [],
                                                 },
-                                                generics: [],
-                                            },
+                                            ),
                                         ),
                                     ),
                                 ),
@@ -590,10 +592,12 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                             argument_tys: [
                                 Ref(
                                     Array(
-                                        TypeParameter(
-                                            Id {
-                                                data: "T",
-                                            },
+                                        Ref(
+                                            TypeParameter(
+                                                Id {
+                                                    data: "T",
+                                                },
+                                            ),
                                         ),
                                     ),
                                 ),
@@ -601,10 +605,12 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                             return_ty: Some(
                                 Ref(
                                     Array(
-                                        TypeParameter(
-                                            Id {
-                                                data: "T",
-                                            },
+                                        Ref(
+                                            TypeParameter(
+                                                Id {
+                                                    data: "T",
+                                                },
+                                            ),
                                         ),
                                     ),
                                 ),
