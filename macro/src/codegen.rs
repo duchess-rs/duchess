@@ -513,11 +513,18 @@ impl Signature {
         })
     }
 
+    fn java_ty(&mut self, ty: &Type) -> Result<TokenStream, UnsupportedWildcard> {
+        match ty {
+            Type::Ref(ty) => self.java_ref_ty(ty),
+            Type::Scalar(ty) => Ok(self.java_scalar_ty(ty)),
+        }
+    }
+
     fn java_ref_ty(&mut self, ty: &RefType) -> Result<TokenStream, UnsupportedWildcard> {
         match ty {
             RefType::Class(ty) => Ok(self.class_ref_ty(ty)?),
             RefType::Array(e) => {
-                let e = self.java_ref_ty(e)?;
+                let e = self.java_ty(e)?;
                 Ok(quote_spanned!(self.span => java::JavaArray<#e>))
             }
             RefType::TypeParameter(t) => {

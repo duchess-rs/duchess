@@ -112,7 +112,7 @@ ScalarType: ScalarType = {
 
 RefType: RefType = {
     ClassRefOrId,
-    <RefType> "[" "]" => RefType::Array(Arc::new(<>)),
+    <Type> "[" "]" => RefType::Array(Arc::new(<>)),
     "?" "extends" <ClassRefOrId> => RefType::Extends(Arc::new(<>)),
     "?" "super" <ClassRefOrId> => RefType::Super(Arc::new(<>)),
     "?" => RefType::Wildcard,

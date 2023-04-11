@@ -112,7 +112,7 @@ pub enum Type {
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
 pub enum RefType {
     Class(ClassRef),
-    Array(Arc<RefType>),
+    Array(Arc<Type>),
     TypeParameter(Id),
     Extends(Arc<RefType>),
     Super(Arc<RefType>),
