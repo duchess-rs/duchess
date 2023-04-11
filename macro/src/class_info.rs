@@ -1,12 +1,19 @@
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 
 use proc_macro2::Span;
 
 use crate::{parse::Parse, span_error::SpanError};
 
-pub struct SpannedClassInfo {
+pub struct SpannedPackageInfo {
+    pub name: Id,
     pub span: Span,
+    pub subpackages: BTreeMap<Id, SpannedPackageInfo>,
+    pub classes: Vec<SpannedClassInfo>,
+}
+
+pub struct SpannedClassInfo {
     pub info: ClassInfo,
+    pub span: Span,
 }
 
 impl SpannedClassInfo {

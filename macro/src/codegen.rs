@@ -1,5 +1,6 @@
 use crate::class_info::{
-    ClassRef, Constructor, Id, Method, RefType, ScalarType, SpannedClassInfo, Type,
+    ClassRef, Constructor, Id, Method, RefType, ScalarType, SpannedClassInfo, SpannedPackageInfo,
+    Type,
 };
 use inflector::Inflector;
 use proc_macro2::{Ident, Literal, Span, TokenStream};
@@ -11,6 +12,22 @@ struct MethodOutput {
     trait_method: TokenStream,
     trait_impl_method: TokenStream,
     jvm_op_impl: TokenStream,
+}
+
+impl SpannedPackageInfo {
+    pub fn into_tokens(self) -> TokenStream {
+        let name = Ident::new(&self.name, self.span);
+        let inner: TokenStream = self
+            .subpackages
+            .into_values()
+            .map(|p| p.into_tokens())
+            .chain(self.classes.into_iter().map(|c| c.into_tokens()))
+            .collect();
+        quote_spanned!(self.span =>
+            #[allow(unused_imports)]
+            pub mod #name { use duchess::java; #inner }
+        )
+    }
 }
 
 impl SpannedClassInfo {
@@ -93,9 +110,6 @@ impl SpannedClassInfo {
             };
         };
 
-        let package = self.package_name();
-        let output = self.in_modules(&package, output);
-
         if std::env::var("DUCHESS_DEBUG").is_ok() {
             match rust_format::RustFmt::default().format_tokens(output.clone()) {
                 Ok(v) => {
@@ -108,18 +122,6 @@ impl SpannedClassInfo {
         }
 
         output
-    }
-
-    fn in_modules(&self, package: &[Ident], output: TokenStream) -> TokenStream {
-        if let Some((first, rest)) = package.split_first() {
-            let inner = self.in_modules(rest, output);
-            quote_spanned!(self.span =>
-                #[allow(unused_imports)]
-                pub mod #first { use duchess::java; #inner }
-            )
-        } else {
-            output
-        }
     }
 
     fn cached_class(&self) -> TokenStream {
@@ -336,12 +338,6 @@ impl SpannedClassInfo {
             trait_impl_method,
             jvm_op_impl: impl_output,
         })
-    }
-
-    fn package_name(&self) -> Vec<Ident> {
-        let mut modules: Vec<_> = self.info.name.split('.').collect();
-        modules.pop().unwrap();
-        modules.iter().map(|m| Ident::new(m, self.span)).collect()
     }
 
     fn struct_name(&self) -> Ident {
