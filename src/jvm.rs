@@ -127,7 +127,7 @@ impl<'jvm> Jvm<'jvm> {
 /// }
 /// unsafe impl JavaObject for BigDecimal {}
 /// ```
-pub unsafe trait JavaObject: Sized {}
+pub unsafe trait JavaObject: 'static + Sized {}
 
 /// Extension trait for [JavaObject].
 pub trait JavaObjectExt: Sized {
