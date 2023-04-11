@@ -111,7 +111,7 @@ impl SpannedClassInfo {
         };
 
         if let Ok(f) = std::env::var("DUCHESS_DEBUG") {
-            if f == "*" || f == "1" || &f == &*self.info.name {
+            if f == "*" || f == "1" || self.info.name.starts_with(&f) {
                 match rust_format::RustFmt::default().format_tokens(output.clone()) {
                     Ok(v) => {
                         eprintln!("{v}");
