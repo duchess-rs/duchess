@@ -4,6 +4,7 @@ mod array;
 mod collections;
 mod inspect;
 mod jvm;
+mod not_null;
 mod object;
 mod ops;
 mod str;
@@ -19,7 +20,10 @@ pub use prelude::*;
 
 pub mod prelude {
     pub use crate::jvm::JvmOp;
-    pub use crate::ops::{IntoJava, IntoLocal, IntoOptLocal, IntoRust, IntoScalar, IntoVoid, JavaMethod, ScalarMethod, VoidMethod};
+    pub use crate::ops::{
+        IntoJava, IntoLocal, IntoOptLocal, IntoRust, IntoScalar, IntoVoid, JavaMethod,
+        ScalarMethod, VoidMethod,
+    };
 }
 
 /// Internal module containing non-semver protected
