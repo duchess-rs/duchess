@@ -43,5 +43,6 @@ pub mod java {
         pub use crate::collections::list::ArrayList;
         pub use crate::collections::list::List;
         pub use crate::collections::map::HashMap;
+        pub use crate::collections::map::Map;
     }
 }
