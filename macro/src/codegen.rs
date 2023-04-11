@@ -7,10 +7,20 @@ use proc_macro2::{Ident, Literal, Span, TokenStream};
 use quote::quote_spanned;
 use rust_format::Formatter;
 
+/// The various pieces that we use to reflect a Java method into Rust.
 struct MethodOutput {
+    /// Declaration of the struct for the method, e.g., `struct toString<...> { ... }`.
     method_struct: TokenStream,
+
+    /// Declaration of the items for the method in the `FooExt` trait, e.g.
+    /// `type toString: IntoOptionLocal<String>; fn toString(&self) -> Self::toString;`
     trait_method: TokenStream,
+
+    /// Declaration of the `type` and `fn` to be used in the blanket impl we are going to create,
+    /// which will map the associated type to the `method_struct`.
     trait_impl_method: TokenStream,
+
+    /// Implementation of `jvmop` for the method struct.
     jvm_op_impl: TokenStream,
 }
 
