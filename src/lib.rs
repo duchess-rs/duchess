@@ -5,9 +5,11 @@ mod collections;
 mod inspect;
 mod jvm;
 mod not_null;
-mod object;
 mod ops;
 mod str;
+
+/// Contains reusable declarations for classes distributed by the JDK under the `java.*` packages.
+pub mod java;
 
 pub use duchess_macro::java_package;
 pub use jni::errors::Result;
@@ -32,21 +34,4 @@ pub mod plumbing {
     pub use crate::jvm::{FromJValue, JavaObjectExt, Upcast};
     pub use crate::str::{JavaString, ToJavaStringOp};
     pub use duchess_macro::duchess_javap;
-}
-
-pub mod java {
-    pub use crate::array::JavaArray as Array;
-
-    pub mod lang {
-        pub use crate::object::Object;
-        pub use crate::str::JavaString as String;
-    }
-    pub mod util {
-        pub use crate::collections::list::ArrayList;
-        pub use crate::collections::list::List;
-        pub use crate::collections::list::ListExt;
-        pub use crate::collections::map::HashMap;
-        pub use crate::collections::map::Map;
-        pub use crate::collections::map::MapExt;
-    }
 }
