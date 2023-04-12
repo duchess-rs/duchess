@@ -21,6 +21,9 @@ unsafe impl<T: JavaType> JavaObject for JavaArray<T> {}
 
 unsafe impl<T: JavaType> Upcast<JavaArray<T>> for JavaArray<T> {}
 
+// All objects are valid array elements
+unsafe impl<T: JavaObject> ArrayElement for T {}
+
 macro_rules! primivite_array {
     ($([$rust:ty]: $new_fn:ident $get_fn:ident $set_fn:ident,)*) => {
         $(
