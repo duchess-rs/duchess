@@ -44,6 +44,7 @@ impl Parse for SpannedClassInfo {
 pub struct ClassInfo {
     pub flags: Flags,
     pub name: Id,
+    pub kind: ClassKind,
     pub generics: Vec<Id>,
     pub extends: Option<ClassRef>,
     pub implements: Vec<ClassRef>,
@@ -53,11 +54,20 @@ pub struct ClassInfo {
 }
 
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
+pub enum ClassKind {
+    Class,
+    Interface,
+}
+
+#[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
 pub struct Flags {
     pub privacy: Privacy,
     pub is_final: bool,
     pub is_synchronized: bool,
     pub is_native: bool,
+    pub is_abstract: bool,
+    pub is_static: bool,
+    pub is_default: bool,
 }
 
 impl Flags {
@@ -67,6 +77,9 @@ impl Flags {
             is_final: false,
             is_synchronized: false,
             is_native: false,
+            is_abstract: false,
+            is_static: false,
+            is_default: false,
         }
     }
 }
@@ -112,6 +125,26 @@ pub struct ClassRef {
 
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
 pub enum Type {
+    Ref(RefType),
+    Scalar(ScalarType),
+    Repeat(Arc<Type>),
+}
+
+impl Type {
+    /// Convert a potentially repeating type to a non-repeating one.
+    /// Types like `T...` become an array `T[]`.
+    pub fn to_non_repeating(&self) -> NonRepeatingType {
+        match self {
+            Type::Ref(t) => NonRepeatingType::Ref(t.clone()),
+            Type::Scalar(t) => NonRepeatingType::Scalar(t.clone()),
+            Type::Repeat(t) => NonRepeatingType::Ref(RefType::Array(t.clone())),
+        }
+    }
+}
+
+/// A variant of type
+#[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
+pub enum NonRepeatingType {
     Ref(RefType),
     Scalar(ScalarType),
 }

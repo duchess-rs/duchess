@@ -1,6 +1,6 @@
 use crate::class_info::{
-    ClassRef, Constructor, Id, Method, RefType, ScalarType, SpannedClassInfo, SpannedPackageInfo,
-    Type,
+    ClassRef, Constructor, Id, Method, NonRepeatingType, RefType, ScalarType, SpannedClassInfo,
+    SpannedPackageInfo, Type,
 };
 use inflector::Inflector;
 use proc_macro2::{Ident, Literal, Span, TokenStream};
@@ -402,11 +402,11 @@ impl SpannedClassInfo {
         input_names
             .iter()
             .zip(input_types)
-            .map(|(input_name, input_ty)| match input_ty {
-                Type::Scalar(_) => quote_spanned!(self.span =>
+            .map(|(input_name, input_ty)| match input_ty.to_non_repeating() {
+                NonRepeatingType::Scalar(_) => quote_spanned!(self.span =>
                     let #input_name = self.#input_name.execute(jvm)?;
                 ),
-                Type::Ref(_) => quote_spanned!(self.span =>
+                NonRepeatingType::Ref(_) => quote_spanned!(self.span =>
                     let #input_name = self.#input_name.into_java(jvm)?;
                     let #input_name = #input_name.as_ref();
                     let #input_name = &#input_name.as_jobject();
@@ -490,28 +490,28 @@ impl Signature {
     /// Returns an appropriate `impl type` for a funtion that
     /// takes `ty` as input. Assumes objects are nullable.
     fn input_trait(&mut self, ty: &Type) -> Result<TokenStream, UnsupportedWildcard> {
-        match ty {
-            Type::Ref(ty) => {
-                let t = self.java_ref_ty(ty)?;
+        match ty.to_non_repeating() {
+            NonRepeatingType::Ref(ty) => {
+                let t = self.java_ref_ty(&ty)?;
                 Ok(quote_spanned!(self.span => duchess::IntoJava<#t>))
             }
-            Type::Scalar(ty) => {
-                let t = self.java_scalar_ty(ty);
+            NonRepeatingType::Scalar(ty) => {
+                let t = self.java_scalar_ty(&ty);
                 Ok(quote_spanned!(self.span => duchess::IntoScalar<#t>))
             }
         }
     }
 
-    /// Returnss an appropriate `impl type` for a funtion that
+    /// Returns an appropriate `impl type` for a funtion that
     /// returns `ty`. Assumes objects are nullable.
     fn output_type(&mut self, ty: &Option<Type>) -> Result<TokenStream, UnsupportedWildcard> {
-        self.forbid_capture(|this| match ty {
-            Some(Type::Ref(ty)) => {
-                let t = this.java_ref_ty(ty)?;
+        self.forbid_capture(|this| match ty.as_ref().map(|ty| ty.to_non_repeating()) {
+            Some(NonRepeatingType::Ref(ty)) => {
+                let t = this.java_ref_ty(&ty)?;
                 Ok(quote_spanned!(this.span => Option<Local<'jvm, #t>>))
             }
-            Some(Type::Scalar(ty)) => {
-                let t = this.java_scalar_ty(ty);
+            Some(NonRepeatingType::Scalar(ty)) => {
+                let t = this.java_scalar_ty(&ty);
                 Ok(quote_spanned!(this.span => #t))
             }
             None => Ok(quote_spanned!(this.span => ())),
@@ -521,13 +521,13 @@ impl Signature {
     /// Returns an appropriate trait for a method that
     /// returns `ty`. Assumes objects are nullable.
     fn method_trait(&mut self, ty: &Option<Type>) -> Result<TokenStream, UnsupportedWildcard> {
-        self.forbid_capture(|this| match ty {
-            Some(Type::Ref(ty)) => {
-                let t = this.java_ref_ty(ty)?;
+        self.forbid_capture(|this| match ty.as_ref().map(|ty| ty.to_non_repeating()) {
+            Some(NonRepeatingType::Ref(ty)) => {
+                let t = this.java_ref_ty(&ty)?;
                 Ok(quote_spanned!(this.span => duchess::JavaMethod<Self, #t>))
             }
-            Some(Type::Scalar(ty)) => {
-                let t = this.java_scalar_ty(ty);
+            Some(NonRepeatingType::Scalar(ty)) => {
+                let t = this.java_scalar_ty(&ty);
                 Ok(quote_spanned!(this.span => duchess::ScalarMethod<Self, #t>))
             }
             None => Ok(quote_spanned!(this.span => duchess::VoidMethod<Self>)),
@@ -538,6 +538,7 @@ impl Signature {
         match ty {
             Type::Ref(ty) => self.java_ref_ty(ty),
             Type::Scalar(ty) => Ok(self.java_scalar_ty(ty)),
+            Type::Repeat(_) => Err(UnsupportedWildcard),
         }
     }
 
