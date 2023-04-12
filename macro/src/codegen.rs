@@ -1,6 +1,9 @@
-use crate::class_info::{
-    ClassRef, Constructor, Id, Method, NonRepeatingType, RefType, ScalarType, SpannedClassInfo,
-    SpannedPackageInfo, Type,
+use crate::{
+    class_info::{
+        ClassRef, Constructor, Id, Method, NonRepeatingType, RefType, ScalarType, SpannedClassInfo,
+        SpannedPackageInfo, Type,
+    },
+    span_error::SpanError,
 };
 use inflector::Inflector;
 use proc_macro2::{Ident, Literal, Span, TokenStream};
@@ -25,20 +28,20 @@ struct MethodOutput {
 }
 
 impl SpannedPackageInfo {
-    pub fn into_tokens(self, depth: usize) -> TokenStream {
+    pub fn into_tokens(self, depth: usize) -> Result<TokenStream, SpanError> {
         let name = Ident::new(&self.name, self.span);
         let inner: TokenStream = self
             .subpackages
             .into_values()
             .map(|p| p.into_tokens(depth + 1))
             .chain(self.classes.into_iter().map(|c| c.into_tokens()))
-            .collect();
+            .collect::<Result<_, _>>()?;
 
         let path: TokenStream = (1..depth)
             .map(|_| quote_spanned!(self.span => "::super"))
             .collect();
 
-        quote_spanned!(self.span =>
+        Ok(quote_spanned!(self.span =>
             #[allow(unused_imports)]
             pub mod #name {
                 // Import the contents of the parent module that we are created inside
@@ -49,33 +52,33 @@ impl SpannedPackageInfo {
 
                 #inner
             }
-        )
+        ))
     }
 }
 
 impl SpannedClassInfo {
-    pub fn into_tokens(self) -> TokenStream {
+    pub fn into_tokens(self) -> Result<TokenStream, SpanError> {
         let struct_name = self.struct_name();
         let ext_trait_name = self.ext_trait_name();
         let cached_class = self.cached_class();
         let this_ty = self.this_type();
         let generics = self.generic_names();
 
-        // Ignore constructors with unsupported wildcards.
+        // Convert constructors
         let constructors: Vec<_> = self
             .info
             .constructors
             .iter()
-            .flat_map(|c| self.constructor(c).ok())
-            .collect();
+            .map(|c| self.constructor(c))
+            .collect::<Result<_, _>>()?;
 
-        // Ignore constructors with unsupported wildcards.
+        // Convert methods
         let methods: Vec<_> = self
             .info
             .methods
             .iter()
-            .flat_map(|m| self.method(m).ok())
-            .collect();
+            .map(|m| self.method(m))
+            .collect::<Result<_, _>>()?;
 
         let method_structs: Vec<_> = methods.iter().map(|m| &m.method_struct).collect();
         let trait_methods: Vec<_> = methods.iter().map(|m| &m.trait_method).collect();
@@ -146,7 +149,7 @@ impl SpannedClassInfo {
             }
         }
 
-        output
+        Ok(output)
     }
 
     fn cached_class(&self) -> TokenStream {
@@ -166,8 +169,8 @@ impl SpannedClassInfo {
         }
     }
 
-    fn constructor(&self, constructor: &Constructor) -> Result<TokenStream, UnsupportedWildcard> {
-        let mut sig = Signature::new(self.span, &self.info.generics);
+    fn constructor(&self, constructor: &Constructor) -> Result<TokenStream, SpanError> {
+        let mut sig = Signature::new(&self.info.name, self.span, &self.info.generics);
 
         let input_traits: Vec<_> = constructor
             .args
@@ -246,8 +249,12 @@ impl SpannedClassInfo {
         Ok(output)
     }
 
-    fn method(&self, method: &Method) -> Result<MethodOutput, UnsupportedWildcard> {
-        let mut sig = Signature::new(self.span, self.info.generics.iter().chain(&method.generics));
+    fn method(&self, method: &Method) -> Result<MethodOutput, SpanError> {
+        let mut sig = Signature::new(
+            &method.name,
+            self.span,
+            self.info.generics.iter().chain(&method.generics),
+        );
 
         let this_ty = self.this_type();
 
@@ -417,28 +424,21 @@ impl SpannedClassInfo {
 }
 
 struct Signature {
+    method_name: Id,
     span: Span,
     generics: Vec<Ident>,
     where_bounds: Vec<TokenStream>,
     capture_generics: bool,
 }
 
-/// We translate Java wildcards to Rust generics, but there are
-/// limits to what we can do with this technique. For example,
-/// an input `ArrayList<ArrayList<?>>` has no Rust equivalent,
-/// it would be something like `ArrayList<exists<T> ArrayList<T>>`,
-/// if we had `exists`. Similarly returning a type like
-/// `-> ArrayList<? extends Foo>` isn't possible today, though we
-/// could conceivably handle it via some kind of fresh struct or
-/// `impl Trait` return value.
-///
-/// When we encounter cases like this, we return
-/// `Err(UnsupportedWildcard)`.
-struct UnsupportedWildcard;
-
 impl Signature {
-    pub fn new<'i>(span: Span, generics: impl IntoIterator<Item = &'i Id>) -> Self {
+    pub fn new<'i>(
+        method_name: &Id,
+        span: Span,
+        generics: impl IntoIterator<Item = &'i Id>,
+    ) -> Self {
         let mut this = Signature {
+            method_name: method_name.clone(),
             span,
             generics: vec![],
             where_bounds: vec![],
@@ -466,9 +466,12 @@ impl Signature {
     /// translated to a Rust type like `ArrayList<Pi>` for some fresh `Pi`.
     ///
     /// See also `Self::push_where_bound`.
-    fn fresh_generic(&mut self) -> Result<Ident, UnsupportedWildcard> {
+    fn fresh_generic(&mut self) -> Result<Ident, SpanError> {
         if !self.capture_generics {
-            Err(UnsupportedWildcard)
+            Err(SpanError {
+                span: self.span,
+                message: format!("unsupported wildcards in `{}`", self.method_name),
+            })
         } else {
             let i = self.generics.len();
             let ident = Ident::new(&format!("P{}", i), self.span);
@@ -489,7 +492,7 @@ impl Signature {
 
     /// Returns an appropriate `impl type` for a funtion that
     /// takes `ty` as input. Assumes objects are nullable.
-    fn input_trait(&mut self, ty: &Type) -> Result<TokenStream, UnsupportedWildcard> {
+    fn input_trait(&mut self, ty: &Type) -> Result<TokenStream, SpanError> {
         match ty.to_non_repeating() {
             NonRepeatingType::Ref(ty) => {
                 let t = self.java_ref_ty(&ty)?;
@@ -504,7 +507,7 @@ impl Signature {
 
     /// Returns an appropriate `impl type` for a funtion that
     /// returns `ty`. Assumes objects are nullable.
-    fn output_type(&mut self, ty: &Option<Type>) -> Result<TokenStream, UnsupportedWildcard> {
+    fn output_type(&mut self, ty: &Option<Type>) -> Result<TokenStream, SpanError> {
         self.forbid_capture(|this| match ty.as_ref().map(|ty| ty.to_non_repeating()) {
             Some(NonRepeatingType::Ref(ty)) => {
                 let t = this.java_ref_ty(&ty)?;
@@ -520,7 +523,7 @@ impl Signature {
 
     /// Returns an appropriate trait for a method that
     /// returns `ty`. Assumes objects are nullable.
-    fn method_trait(&mut self, ty: &Option<Type>) -> Result<TokenStream, UnsupportedWildcard> {
+    fn method_trait(&mut self, ty: &Option<Type>) -> Result<TokenStream, SpanError> {
         self.forbid_capture(|this| match ty.as_ref().map(|ty| ty.to_non_repeating()) {
             Some(NonRepeatingType::Ref(ty)) => {
                 let t = this.java_ref_ty(&ty)?;
@@ -534,15 +537,14 @@ impl Signature {
         })
     }
 
-    fn java_ty(&mut self, ty: &Type) -> Result<TokenStream, UnsupportedWildcard> {
-        match ty {
-            Type::Ref(ty) => self.java_ref_ty(ty),
-            Type::Scalar(ty) => Ok(self.java_scalar_ty(ty)),
-            Type::Repeat(_) => Err(UnsupportedWildcard),
+    fn java_ty(&mut self, ty: &Type) -> Result<TokenStream, SpanError> {
+        match &ty.to_non_repeating() {
+            NonRepeatingType::Ref(ty) => self.java_ref_ty(ty),
+            NonRepeatingType::Scalar(ty) => Ok(self.java_scalar_ty(ty)),
         }
     }
 
-    fn java_ref_ty(&mut self, ty: &RefType) -> Result<TokenStream, UnsupportedWildcard> {
+    fn java_ref_ty(&mut self, ty: &RefType) -> Result<TokenStream, SpanError> {
         match ty {
             RefType::Class(ty) => Ok(self.class_ref_ty(ty)?),
             RefType::Array(e) => {
@@ -572,7 +574,7 @@ impl Signature {
         }
     }
 
-    fn class_ref_ty(&mut self, ty: &ClassRef) -> Result<TokenStream, UnsupportedWildcard> {
+    fn class_ref_ty(&mut self, ty: &ClassRef) -> Result<TokenStream, SpanError> {
         let ClassRef { name, generics } = ty;
         let rust_name = name.to_module_name(self.span);
         if generics.len() == 0 {
