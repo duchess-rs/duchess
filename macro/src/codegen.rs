@@ -474,7 +474,7 @@ impl Signature {
             })
         } else {
             let i = self.generics.len();
-            let ident = Ident::new(&format!("P{}", i), self.span);
+            let ident = Ident::new(&format!("P_{}", i), self.span);
             self.generics.push(ident.clone());
             Ok(ident)
         }
@@ -606,7 +606,7 @@ impl Signature {
 }
 
 fn java_type_parameter_ident(span: Span, t: &Id) -> Ident {
-    Ident::new(&format!("J{}", t), span)
+    Ident::new(&format!("J_{}", t), span)
 }
 
 trait IdExt {
