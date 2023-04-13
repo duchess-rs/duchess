@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, sync::Arc};
 
-use proc_macro2::Span;
+use proc_macro2::{Ident, Span};
 
 use crate::{parse::Parse, span_error::SpanError};
 
@@ -215,6 +215,10 @@ impl From<&str> for Id {
 impl Id {
     pub fn dot(&self, s: &str) -> Id {
         Id::from(format!("{self}.{s}"))
+    }
+
+    pub fn to_ident(&self, span: Span) -> Ident {
+        Ident::new(&self.data, span)
     }
 }
 

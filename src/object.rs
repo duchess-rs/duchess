@@ -12,9 +12,6 @@ r#"
             public java.lang.Object();
                 descriptor: ()V
 
-            public final native java.lang.Class<?> getClass();
-                descriptor: ()Ljava/lang/Class;
-
             public native int hashCode();
                 descriptor: ()I
 
@@ -29,6 +26,22 @@ r#"
 
             public final native void notifyAll();
                 descriptor: ()V
+        }
+    "#
+}
+
+duchess_macro::duchess_javap! {
+    r#"
+    Compiled from "Record.java"
+        public abstract class java.lang.Record {
+        public abstract boolean equals(java.lang.Object);
+            descriptor: (Ljava/lang/Object;)Z
+
+        public abstract int hashCode();
+            descriptor: ()I
+
+        public abstract java.lang.String toString();
+            descriptor: ()Ljava/lang/String;
         }
     "#
 }

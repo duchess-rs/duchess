@@ -23,7 +23,7 @@ use once_cell::sync::Lazy;
 /// *Eventual goal:* Each call to `execute` represents a single crossing
 /// over into the JVM, so the more you can chain together your jvm-ops,
 /// the better.
-pub trait JvmOp: Clone {
+pub trait JvmOp: Sized {
     type Input<'jvm>;
     type Output<'jvm>;
 
@@ -138,7 +138,7 @@ impl<'jvm> Jvm<'jvm> {
 /// }
 /// unsafe impl JavaObject for BigDecimal {}
 /// ```
-pub unsafe trait JavaObject: 'static + Sized {}
+pub unsafe trait JavaObject: 'static + Sized + JavaType {}
 
 /// Extension trait for [JavaObject].
 pub trait JavaObjectExt: Sized {
@@ -176,13 +176,24 @@ impl<T: JavaObject> JavaObjectExt for T {
     }
 }
 
-pub trait JavaScalar {}
+pub unsafe trait JavaType: 'static {}
+unsafe impl<T: JavaObject> JavaType for T {}
+unsafe impl JavaType for i8 {}
+unsafe impl JavaType for i16 {}
+unsafe impl JavaType for i32 {}
+unsafe impl JavaType for i64 {}
+unsafe impl JavaType for bool {}
+unsafe impl JavaType for f32 {}
+unsafe impl JavaType for f64 {}
 
+pub trait JavaScalar: JavaType {}
 impl JavaScalar for i8 {}
 impl JavaScalar for i16 {}
 impl JavaScalar for i32 {}
 impl JavaScalar for i64 {}
 impl JavaScalar for bool {}
+impl JavaScalar for f32 {}
+impl JavaScalar for f64 {}
 
 /// A wrapper for a [JObject] that only allows access by reference. This prevents passing the
 /// wrapped `JObject` to `JNIEnv::delete_local_ref`.

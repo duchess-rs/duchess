@@ -58,7 +58,7 @@ identity_jvm_op! {
 /// let b = [1, 2, 3].as_slice();
 /// my_java_call(a, b).execute(&jvm)?;
 /// ```
-pub trait IntoJava<T: JavaObject>: Clone {
+pub trait IntoJava<T: JavaObject> {
     type Output<'jvm>: AsRef<T>;
 
     fn into_java<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<Self::Output<'jvm>>;

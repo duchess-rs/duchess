@@ -208,10 +208,14 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                         is_final: false,
                         is_synchronized: false,
                         is_native: false,
+                        is_abstract: false,
+                        is_static: false,
+                        is_default: false,
                     },
                     name: Id {
                         data: "java.util.ArrayList",
                     },
+                    kind: Class,
                     generics: [
                         Id {
                             data: "E",
@@ -270,6 +274,9 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 is_final: false,
                                 is_synchronized: false,
                                 is_native: false,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             args: [
                                 Scalar(
@@ -287,6 +294,9 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 is_final: false,
                                 is_synchronized: false,
                                 is_native: false,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             args: [],
                             throws: [],
@@ -300,6 +310,9 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 is_final: false,
                                 is_synchronized: false,
                                 is_native: false,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             args: [
                                 Ref(
@@ -335,6 +348,9 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 is_final: false,
                                 is_synchronized: false,
                                 is_native: false,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             name: Id {
                                 data: "trimToSize",
@@ -353,6 +369,9 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 is_final: false,
                                 is_synchronized: false,
                                 is_native: false,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             name: Id {
                                 data: "ensureCapacity",
@@ -375,6 +394,9 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 is_final: false,
                                 is_synchronized: false,
                                 is_native: false,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             name: Id {
                                 data: "size",
@@ -397,6 +419,9 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 is_final: false,
                                 is_synchronized: false,
                                 is_native: false,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             name: Id {
                                 data: "isEmpty",
@@ -419,6 +444,9 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 is_final: false,
                                 is_synchronized: false,
                                 is_native: false,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             name: Id {
                                 data: "contains",
@@ -452,6 +480,9 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 is_final: false,
                                 is_synchronized: false,
                                 is_native: false,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             name: Id {
                                 data: "indexOf",
@@ -485,6 +516,9 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 is_final: false,
                                 is_synchronized: false,
                                 is_native: false,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             name: Id {
                                 data: "lastIndexOf",
@@ -518,6 +552,9 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 is_final: false,
                                 is_synchronized: false,
                                 is_native: false,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             name: Id {
                                 data: "clone",
@@ -547,6 +584,9 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 is_final: false,
                                 is_synchronized: false,
                                 is_native: false,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             name: Id {
                                 data: "toArray",
@@ -580,6 +620,9 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 is_final: false,
                                 is_synchronized: false,
                                 is_native: false,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             name: Id {
                                 data: "toArray",
@@ -626,6 +669,9 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 is_final: false,
                                 is_synchronized: false,
                                 is_native: false,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             name: Id {
                                 data: "get",
@@ -656,6 +702,9 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 is_final: false,
                                 is_synchronized: false,
                                 is_native: false,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             name: Id {
                                 data: "set",
@@ -693,6 +742,9 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 is_final: false,
                                 is_synchronized: false,
                                 is_native: false,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             name: Id {
                                 data: "add",
@@ -723,6 +775,9 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 is_final: false,
                                 is_synchronized: false,
                                 is_native: false,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             name: Id {
                                 data: "add",
@@ -752,6 +807,9 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 is_final: false,
                                 is_synchronized: false,
                                 is_native: false,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             name: Id {
                                 data: "remove",
@@ -782,6 +840,9 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 is_final: false,
                                 is_synchronized: false,
                                 is_native: false,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             name: Id {
                                 data: "equals",
@@ -815,6 +876,9 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 is_final: false,
                                 is_synchronized: false,
                                 is_native: false,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             name: Id {
                                 data: "hashCode",
@@ -837,6 +901,9 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 is_final: false,
                                 is_synchronized: false,
                                 is_native: false,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             name: Id {
                                 data: "remove",
@@ -870,6 +937,9 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 is_final: false,
                                 is_synchronized: false,
                                 is_native: false,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             name: Id {
                                 data: "clear",
@@ -888,6 +958,9 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 is_final: false,
                                 is_synchronized: false,
                                 is_native: false,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             name: Id {
                                 data: "addAll",
@@ -929,6 +1002,9 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 is_final: false,
                                 is_synchronized: false,
                                 is_native: false,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             name: Id {
                                 data: "addAll",
@@ -973,6 +1049,9 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 is_final: false,
                                 is_synchronized: false,
                                 is_native: false,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             name: Id {
                                 data: "removeAll",
@@ -1008,6 +1087,9 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 is_final: false,
                                 is_synchronized: false,
                                 is_native: false,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             name: Id {
                                 data: "retainAll",
@@ -1043,6 +1125,9 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 is_final: false,
                                 is_synchronized: false,
                                 is_native: false,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             name: Id {
                                 data: "listIterator",
@@ -1082,6 +1167,9 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 is_final: false,
                                 is_synchronized: false,
                                 is_native: false,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             name: Id {
                                 data: "listIterator",
@@ -1117,6 +1205,9 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 is_final: false,
                                 is_synchronized: false,
                                 is_native: false,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             name: Id {
                                 data: "iterator",
@@ -1152,6 +1243,9 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 is_final: false,
                                 is_synchronized: false,
                                 is_native: false,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             name: Id {
                                 data: "subList",
@@ -1194,6 +1288,9 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 is_final: false,
                                 is_synchronized: false,
                                 is_native: false,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             name: Id {
                                 data: "forEach",
@@ -1231,6 +1328,9 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 is_final: false,
                                 is_synchronized: false,
                                 is_native: false,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             name: Id {
                                 data: "spliterator",
@@ -1266,6 +1366,9 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 is_final: false,
                                 is_synchronized: false,
                                 is_native: false,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             name: Id {
                                 data: "removeIf",
@@ -1307,6 +1410,9 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 is_final: false,
                                 is_synchronized: false,
                                 is_native: false,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             name: Id {
                                 data: "replaceAll",
@@ -1342,6 +1448,9 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 is_final: false,
                                 is_synchronized: false,
                                 is_native: false,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             name: Id {
                                 data: "sort",
@@ -1431,10 +1540,14 @@ public class java.lang.Object {
                         is_final: false,
                         is_synchronized: false,
                         is_native: false,
+                        is_abstract: false,
+                        is_static: false,
+                        is_default: false,
                     },
                     name: Id {
                         data: "java.lang.Object",
                     },
+                    kind: Class,
                     generics: [],
                     extends: None,
                     implements: [],
@@ -1445,6 +1558,9 @@ public class java.lang.Object {
                                 is_final: false,
                                 is_synchronized: false,
                                 is_native: false,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             args: [],
                             throws: [],
@@ -1461,6 +1577,9 @@ public class java.lang.Object {
                                 is_final: true,
                                 is_synchronized: false,
                                 is_native: true,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             name: Id {
                                 data: "getClass",
@@ -1492,6 +1611,9 @@ public class java.lang.Object {
                                 is_final: false,
                                 is_synchronized: false,
                                 is_native: true,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             name: Id {
                                 data: "hashCode",
@@ -1514,6 +1636,9 @@ public class java.lang.Object {
                                 is_final: false,
                                 is_synchronized: false,
                                 is_native: false,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             name: Id {
                                 data: "equals",
@@ -1547,6 +1672,9 @@ public class java.lang.Object {
                                 is_final: false,
                                 is_synchronized: false,
                                 is_native: false,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             name: Id {
                                 data: "toString",
@@ -1576,6 +1704,9 @@ public class java.lang.Object {
                                 is_final: true,
                                 is_synchronized: false,
                                 is_native: true,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             name: Id {
                                 data: "notify",
@@ -1594,6 +1725,9 @@ public class java.lang.Object {
                                 is_final: true,
                                 is_synchronized: false,
                                 is_native: true,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             name: Id {
                                 data: "notifyAll",
@@ -1612,6 +1746,9 @@ public class java.lang.Object {
                                 is_final: true,
                                 is_synchronized: false,
                                 is_native: false,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             name: Id {
                                 data: "wait",
@@ -1637,6 +1774,9 @@ public class java.lang.Object {
                                 is_final: true,
                                 is_synchronized: false,
                                 is_native: false,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             name: Id {
                                 data: "wait",
@@ -1666,6 +1806,9 @@ public class java.lang.Object {
                                 is_final: true,
                                 is_synchronized: false,
                                 is_native: false,
+                                is_abstract: false,
+                                is_static: false,
+                                is_default: false,
                             },
                             name: Id {
                                 data: "wait",
