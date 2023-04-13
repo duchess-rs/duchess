@@ -3,8 +3,6 @@
 #[cfg(not(doc))]
 use crate as duchess;
 
-pub use crate::str::JavaString as String;
-
 use crate::java;
 
 duchess_macro::duchess_javap! {
@@ -117,6 +115,71 @@ r#"
 
         public int hashCode();
             descriptor: ()I
+        }
+    "#
+}
+
+duchess_macro::duchess_javap! {
+r#"
+        Compiled from "Class.java"
+        public final class java.lang.Class implements java.io.Serializable, java.lang.reflect.GenericDeclaration, java.lang.reflect.Type, java.lang.reflect.AnnotatedElement, java.lang.constant.Constable {
+        public java.lang.String toString();
+            descriptor: ()Ljava/lang/String;
+
+        public java.lang.String toGenericString();
+            descriptor: ()Ljava/lang/String;
+
+        public native boolean isInstance(java.lang.Object);
+            descriptor: (Ljava/lang/Object;)Z
+
+        public native boolean isAssignableFrom(java.lang.Class);
+            descriptor: (Ljava/lang/Class;)Z
+
+        public native boolean isInterface();
+            descriptor: ()Z
+
+        public native boolean isArray();
+            descriptor: ()Z
+
+        public native boolean isPrimitive();
+            descriptor: ()Z
+
+        public boolean isAnnotation();
+            descriptor: ()Z
+
+        public boolean isSynthetic();
+            descriptor: ()Z
+
+        public java.lang.String getName();
+            descriptor: ()Ljava/lang/String;
+
+        public native java.lang.Class getSuperclass();
+            descriptor: ()Ljava/lang/Class;
+
+        public java.lang.String getPackageName();
+            descriptor: ()Ljava/lang/String;
+
+        public java.lang.Class[] getInterfaces();
+            descriptor: ()[Ljava/lang/Class;
+
+        public java.lang.Class getComponentType();
+            descriptor: ()Ljava/lang/Class;
+        }
+    "#
+}
+
+duchess_macro::duchess_javap! {
+r#"
+        Compiled from "String.java"
+        public final class java.lang.String implements java.io.Serializable, java.lang.CharSequence, java.lang.constant.Constable, java.lang.constant.ConstantDesc {
+        public java.lang.String(byte[]);
+            descriptor: ([B)V
+
+        public int length();
+            descriptor: ()I
+
+        public boolean isEmpty();
+            descriptor: ()Z
         }
     "#
 }

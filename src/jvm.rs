@@ -1,6 +1,6 @@
 use crate::{
     inspect::{ArgOp, Inspect},
-    not_null::NotNull,
+    not_null::NotNull, catch::{Catch, ThrownOp}, java::lang::{Throwable, Class}, cast::{TryDowncast, Upcast, AsUpcast}, 
 };
 
 use std::{
@@ -40,6 +40,16 @@ pub trait JvmOp: Sized {
         Inspect::new(self, op)
     }
 
+    // XX
+    fn catch<K>(self, op: impl FnOnce(ThrownOp) -> K) -> Catch<Self, K> 
+    where
+        K: JvmOp,
+        for<'jvm> K: JvmOp<Input<'jvm> = Local<'jvm, Throwable>>,
+        for<'jvm> K::Output<'jvm>: Into<Self::Output<'jvm>>,
+    {
+        Catch::new(self, op)
+    }
+
     fn assert_not_null<T>(self) -> NotNull<Self>
     where
         T: JavaObject,
@@ -48,11 +58,30 @@ pub trait JvmOp: Sized {
         NotNull::new(self)
     }
 
+    fn try_downcast<From, To>(self) -> TryDowncast<Self, From, To> 
+    where
+        for<'jvm> Self::Output<'jvm>: AsRef<From>,
+        From: JavaObject,
+        To: JavaObject,
+    {
+        TryDowncast::new(self)
+    }
+
+    /// XX: not usually required due to AsRef<> impls for *Ext traits
+    fn upcast<From, To>(self) -> AsUpcast<Self, From, To> 
+    where
+        for<'jvm> Self::Output<'jvm>: AsRef<From>,
+        From: Upcast<To>,
+        To: JavaObject,
+    {
+        AsUpcast::new(self)
+    }
+    
     fn execute_with<'jvm>(
         self,
         jvm: &mut Jvm<'jvm>,
         arg: Self::Input<'jvm>,
-    ) -> crate::Result<Self::Output<'jvm>>;
+    ) -> crate::Result<'jvm, Self::Output<'jvm>>;
 }
 
 /// This trait is only implemented for `()`; it allows the `JvmOp::execute` method to only
@@ -77,7 +106,7 @@ pub struct Jvm<'jvm> {
 }
 
 impl<'jvm> Jvm<'jvm> {
-    pub fn with<R>(op: impl FnOnce(&mut Jvm<'_>) -> crate::Result<R>) -> crate::Result<R> {
+    pub fn with<R>(op: impl for<'a> FnOnce(&mut Jvm<'a>) -> crate::Result<'a, R>) -> crate::GlobalResult<R> {
         let guard = GLOBAL_JVM.attach_current_thread()?;
 
         // Safety condition: must not be used to create new references
@@ -88,7 +117,7 @@ impl<'jvm> Jvm<'jvm> {
         // keep the interface simpler.
         let env = unsafe { guard.unsafe_clone() };
 
-        op(&mut Jvm { env })
+        op(&mut Jvm { env }).map_err(|e| e.into_global(&mut Jvm { env: unsafe { guard.unsafe_clone() } }))
     }
 
     pub fn to_env(&mut self) -> &mut JNIEnv<'jvm> {
@@ -109,11 +138,18 @@ impl<'jvm> Jvm<'jvm> {
         }
     }
 
-    pub fn global<R>(&mut self, _r: &R) -> Global<R>
+    pub fn global<R>(&mut self, r: &R) -> Global<R>
     where
         R: JavaObject,
     {
-        todo!()
+        let env = self.to_env();
+        unsafe {
+            let raw = r.as_jobject();
+            assert!(!raw.is_null());
+            let new_global_ref = env.new_global_ref(&*raw).unwrap();
+            assert!(!new_global_ref.is_null());
+            Global::from_jni(new_global_ref)
+        }
     }
 }
 
@@ -138,7 +174,11 @@ impl<'jvm> Jvm<'jvm> {
 /// }
 /// unsafe impl JavaObject for BigDecimal {}
 /// ```
-pub unsafe trait JavaObject: 'static + Sized + JavaType {}
+pub unsafe trait JavaObject: 'static + Sized + JavaType {
+    // XX: can't be put on extension trait nor define a default because we want to cache the resolved 
+    // class in a static OnceCell.
+    fn class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, &'static Global<Class>>;
+}
 
 /// Extension trait for [JavaObject].
 pub trait JavaObjectExt: Sized {
@@ -302,16 +342,6 @@ where
 //         self.to_raw()
 //     }
 // }
-
-/// A trait to represent safe upcast operations for a [`JavaObject`].
-///
-/// # Safety
-///
-/// Inherits the rules of [`JavaObject`], but also `S` must be a valid superclass or implemented interface of `Self`.
-/// XX: would this actually allow unsafe behavior in a JNI call? or is it already checked/enforced?
-///
-/// XX: having to impl Upcast<T> for T on each struct is pretty annoying to get AsRef<T> to work without conflicts
-pub unsafe trait Upcast<S: JavaObject>: JavaObject {}
 
 impl<'a, R, S> AsRef<S> for Local<'a, R>
 where

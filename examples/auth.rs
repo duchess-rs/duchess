@@ -14,7 +14,7 @@ duchess::java_package! {
 
 use me::ferris::*;
 
-fn main() -> jni::errors::Result<()> {
+fn main() -> duchess::GlobalResult<()> {
     Jvm::with(|jvm| {
         let params = HashMap::new().execute(jvm)?;
         let values = ArrayList::new().execute(jvm)?;

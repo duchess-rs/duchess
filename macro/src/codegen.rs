@@ -60,7 +60,8 @@ impl SpannedClassInfo {
     pub fn into_tokens(self) -> Result<TokenStream, SpanError> {
         let struct_name = self.struct_name();
         let ext_trait_name = self.ext_trait_name();
-        let cached_class = self.cached_class();
+        let cached_class = self.cached_class(self.jni_class_name());
+        let cached_array_class = self.cached_class(self.jni_array_class_name());
         let this_ty = self.this_type();
         let java_class_generics = self.class_generic_names();
 
@@ -115,7 +116,7 @@ impl SpannedClassInfo {
                     prelude::*,
                 };
                 use jni::{
-                    objects::{AutoLocal, GlobalRef, JMethodID, JValue, JValueGen},
+                    objects::{AutoLocal, JMethodID, JClass, JValue, JValueGen},
                     signature::ReturnType,
                     sys::jvalue,
                 };
@@ -124,7 +125,20 @@ impl SpannedClassInfo {
                 unsafe impl<#(#java_class_generics,)*> JavaObject for #struct_name<#(#java_class_generics,)*>
                 where
                     #(#java_class_generics: JavaObject,)*
-                {}
+                {
+                    fn class<'jvm>(jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, &'static Global<java::lang::Class>> {
+                        #cached_class
+                    }
+                }
+
+                unsafe impl<#(#java_class_generics,)*> ArrayElement for #struct_name<#(#java_class_generics,)*>
+                where
+                    #(#java_class_generics: JavaObject,)*
+                {
+                    fn array_class<'jvm>(jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, &'static Global<java::lang::Class>> {
+                        #cached_array_class
+                    }
+                }
 
                 unsafe impl<#(#java_class_generics,)*> plumbing::Upcast<#struct_name<#(#java_class_generics,)*>> for #struct_name<#(#java_class_generics,)*>
                 where
@@ -132,8 +146,6 @@ impl SpannedClassInfo {
                 {}
 
                 #upcast_impls
-
-                #cached_class
 
                 #(#constructors)*
 
@@ -189,20 +201,18 @@ impl SpannedClassInfo {
             .collect()
     }
 
-    fn cached_class(&self) -> TokenStream {
-        let jni_class_name = self.jni_class_name();
+    fn cached_class(&self, jni_class_name: Literal) -> TokenStream {
         quote_spanned! {
             self.span =>
 
-            fn cached_class(jvm: &mut Jvm<'_>) -> duchess::Result<&'static GlobalRef> {
                 let env = jvm.to_env();
 
-                static CLASS: OnceCell<GlobalRef> = OnceCell::new();
+                static CLASS: OnceCell<Global<java::lang::Class>> = OnceCell::new();
                 CLASS.get_or_try_init(|| {
                     let class = env.find_class(#jni_class_name)?;
-                    env.new_global_ref(class)
+                    // env.find_class() internally calls check_exception!()
+                    Ok(unsafe { Global::from_jni(env.new_global_ref(class)?) })
                 })
-            }
         }
     }
 
@@ -267,20 +277,23 @@ impl SpannedClassInfo {
                             self,
                             jvm: &mut Jvm<'jvm>,
                             (): (),
-                        ) -> duchess::Result<Self::Output<'jvm>> {
+                        ) -> duchess::Result<'jvm, Self::Output<'jvm>> {
                             #(#prepare_inputs)*
 
-                            let class = cached_class(jvm)?;
+                            let class = #ty::class(jvm)?;
+                            // XX: safety
+                            let jclass = unsafe { JClass::from_raw(class.as_jobject().as_raw()) };
 
                             let env = jvm.to_env();
 
                             let o = env.new_object(
-                                class,
+                                jclass,
                                 #descriptor,
                                 &[
                                     #(JValue::from(#input_names),)*
                                 ]
                             )?;
+                            // env.new_object() internally calls check_exception!()
 
                             Ok(unsafe {
                                 Local::from_jni(AutoLocal::new(o, &env))
@@ -446,7 +459,7 @@ impl SpannedClassInfo {
                     self,
                     jvm: &mut Jvm<'jvm>,
                     input: This::Input<'jvm>,
-                ) -> duchess::Result<Self::Output<'jvm>> {
+                ) -> duchess::Result<'jvm, Self::Output<'jvm>> {
                     let this = self.this.execute_with(jvm, input)?;
                     let this: & #this_ty = this.as_ref();
                     let this = this.as_jobject();
@@ -457,6 +470,7 @@ impl SpannedClassInfo {
                     let result = env.call_method(this, #method_str, #descriptor, &[
                         #(JValue::from(#input_names),)*
                     ])?;
+                    // env.call_method() internall calls check_exception!()
 
                     Ok(FromJValue::from_jvalue(jvm, result))
                 }
@@ -506,6 +520,10 @@ impl SpannedClassInfo {
     /// Returns a class name with `/`, like `java/lang/Object`.
     fn jni_class_name(&self) -> Literal {
         self.info.name.to_jni_name(self.span)
+    }
+
+    fn jni_array_class_name(&self) -> Literal {
+        self.info.name.to_jni_array_name(self.span)
     }
 
     fn prepare_inputs(&self, input_names: &[Ident], input_types: &[Type]) -> Vec<TokenStream> {
@@ -710,13 +728,19 @@ impl Signature {
 
 trait IdExt {
     fn to_jni_name(&self, span: Span) -> Literal;
+    fn to_jni_array_name(&self, span: Span) -> Literal;
     fn to_module_name(&self, span: Span) -> TokenStream;
+
 }
 
 impl IdExt for Id {
     fn to_jni_name(&self, _span: Span) -> Literal {
         let s = self.replace('.', "/");
         Literal::string(&s)
+    }
+
+    fn to_jni_array_name(&self, _span: Span) -> Literal {
+        Literal::string(&format!("[L{};", self.replace(".", "/")))
     }
 
     fn to_module_name(&self, span: Span) -> TokenStream {

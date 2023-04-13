@@ -4,19 +4,11 @@ use jni::{
 };
 
 use crate::{
-    jvm::{JavaObjectExt, Upcast},
+    jvm::JavaObjectExt,
     ops::{IntoJava, IntoRust},
-    JavaObject, Jvm, JvmOp, Local,
+    Jvm, JvmOp, Local, 
+    java::lang::String as JavaString,
 };
-
-pub struct JavaString {
-    _private: (),
-}
-
-unsafe impl JavaObject for JavaString {}
-
-// Upcasts
-unsafe impl Upcast<JavaString> for JavaString {}
 
 pub trait ToJavaStringOp: JvmOp + Sized {
     fn to_java_string(self) -> JavaStringOp<Self>;
@@ -47,7 +39,7 @@ where
         self,
         jvm: &mut Jvm<'jvm>,
         input: Self::Input<'jvm>,
-    ) -> crate::Result<Self::Output<'jvm>> {
+    ) -> crate::Result<'jvm, Self::Output<'jvm>> {
         let data = self.op.execute_with(jvm, input)?;
         let env = jvm.to_env();
         let o = env.new_string(data)?;
@@ -59,7 +51,7 @@ where
 impl IntoJava<JavaString> for &str {
     type Output<'jvm> = Local<'jvm, JavaString>;
 
-    fn into_java<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<Local<'jvm, JavaString>> {
+    fn into_java<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Local<'jvm, JavaString>> {
         let env = jvm.to_env();
         let string = env.new_string(self)?;
         unsafe { Ok(Local::from_jni(AutoLocal::new(JObject::from(string), &env))) }
@@ -69,7 +61,7 @@ impl IntoJava<JavaString> for &str {
 impl IntoJava<JavaString> for String {
     type Output<'jvm> = Local<'jvm, JavaString>;
 
-    fn into_java<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<Local<'jvm, JavaString>> {
+    fn into_java<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Local<'jvm, JavaString>> {
         <&str as IntoJava<JavaString>>::into_java(&self, jvm)
     }
 }
@@ -79,7 +71,7 @@ where
     for<'jvm> J: JvmOp<Input<'jvm> = ()>,
     for<'jvm> J::Output<'jvm>: AsRef<JavaString>,
 {
-    fn into_rust(self, jvm: &mut Jvm<'_>) -> crate::Result<String> {
+    fn into_rust<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, String> {
         let object = self.execute_with(jvm, ())?;
         let env = jvm.to_env();
         // XX: safety? is this the right way to do this cast?
