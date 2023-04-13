@@ -1,30 +1,29 @@
 use std::marker::PhantomData;
 
 use crate::{
-    jvm::Upcast, ops::IntoJava, plumbing::JavaObjectExt, IntoRust, JavaObject, Jvm, JvmOp, Local,
+    jvm::{JavaType, Upcast},
+    ops::IntoJava,
+    plumbing::JavaObjectExt,
+    IntoRust, JavaObject, Jvm, JvmOp, Local,
 };
 use jni::{
     errors::{Error, JniError},
     objects::{AutoLocal, JObject, JPrimitiveArray},
 };
 
-pub struct JavaArray<T: ArrayElement> {
+pub struct JavaArray<T: JavaType> {
     _element: PhantomData<T>,
 }
 
-pub unsafe trait ArrayElement: 'static {}
-
-unsafe impl<T: ArrayElement> JavaObject for JavaArray<T> {}
+unsafe impl<T: JavaType> JavaObject for JavaArray<T> {}
 
 // Upcasts
 
-unsafe impl<T: ArrayElement> Upcast<JavaArray<T>> for JavaArray<T> {}
+unsafe impl<T: JavaType> Upcast<JavaArray<T>> for JavaArray<T> {}
 
 macro_rules! primivite_array {
     ($([$rust:ty]: $new_fn:ident $get_fn:ident $set_fn:ident,)*) => {
         $(
-            unsafe impl ArrayElement for $rust { }
-
             impl IntoJava<JavaArray<$rust>> for &[$rust] {
                 type Output<'jvm> = Local<'jvm, JavaArray<$rust>>;
 
@@ -66,7 +65,7 @@ macro_rules! primivite_array {
 primivite_array! {
     // [bool]: "[Z" new_boolean_array get_boolean_array_region get_boolean_array_region,
     [i8]: new_byte_array get_byte_array_region set_byte_array_region,
-    [u16]: new_char_array get_char_array_region set_char_array_region,
+    // [u16]: new_char_array get_char_array_region set_char_array_region,
     [i16]: new_short_array get_short_array_region set_short_array_region,
     [i32]: new_int_array get_int_array_region set_int_array_region,
     [i64]: new_long_array get_long_array_region set_long_array_region,
@@ -75,9 +74,6 @@ primivite_array! {
 }
 
 // Bool is represented as u8 in JNI
-
-unsafe impl ArrayElement for bool {}
-
 impl IntoJava<JavaArray<bool>> for &[bool] {
     type Output<'jvm> = Local<'jvm, JavaArray<bool>>;
 

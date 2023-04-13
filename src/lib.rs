@@ -13,6 +13,7 @@ pub use duchess_macro::java_package;
 pub use jni::errors::Result;
 pub use jvm::Global;
 pub use jvm::JavaObject;
+pub use jvm::JavaType;
 pub use jvm::Jvm;
 pub use jvm::Local;
 

@@ -12,9 +12,6 @@ r#"
             public java.lang.Object();
                 descriptor: ()V
 
-            public final native java.lang.Class<?> getClass();
-                descriptor: ()Ljava/lang/Class;
-
             public native int hashCode();
                 descriptor: ()I
 
