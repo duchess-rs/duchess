@@ -1,6 +1,7 @@
 use proc_macro2::{Literal, Span, TokenStream};
 use quote::quote_spanned;
 
+#[derive(Debug)]
 pub struct SpanError {
     pub span: Span,
     pub message: String,

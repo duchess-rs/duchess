@@ -1,9 +1,4 @@
-use std::marker::PhantomData;
-
-use jni::objects::{AutoLocal, GlobalRef, JMethodID};
-use once_cell::sync::OnceCell;
-
-use crate::{java, plumbing::Upcast, JavaObject, Jvm, JvmOp, Local};
+use crate::{java, JavaObject};
 
 #[cfg(not(doc))]
 use crate as duchess;
@@ -15,7 +10,7 @@ use crate as duchess;
 duchess_macro::duchess_javap! {
     r#"
 Compiled from "List.java"
-public interface java.util.List<E> extends java.util.Collection<E> {
+public interface java.util.List<E> {
   public abstract int size();
     descriptor: ()I
 
@@ -64,75 +59,63 @@ public interface java.util.List<E> extends java.util.Collection<E> {
     "#
 }
 
-pub struct ArrayList<T> {
-    _markers: PhantomData<T>,
+duchess_macro::duchess_javap! {
+    r#"
+    Compiled from "ArrayList.java"
+public class java.util.ArrayList<E> implements java.util.List<E> {
+  public java.util.ArrayList();
+    descriptor: ()V
+
+  public void trimToSize();
+    descriptor: ()V
+
+  public void ensureCapacity(int);
+    descriptor: (I)V
+
+  public int size();
+    descriptor: ()I
+
+  public boolean isEmpty();
+    descriptor: ()Z
+
+  public boolean contains(java.lang.Object);
+    descriptor: (Ljava/lang/Object;)Z
+
+  public int indexOf(java.lang.Object);
+    descriptor: (Ljava/lang/Object;)I
+
+  public int lastIndexOf(java.lang.Object);
+    descriptor: (Ljava/lang/Object;)I
+
+  public java.lang.Object clone();
+    descriptor: ()Ljava/lang/Object;
+
+  public java.lang.Object[] toArray();
+    descriptor: ()[Ljava/lang/Object;
+
+  public E get(int);
+    descriptor: (I)Ljava/lang/Object;
+
+  public E set(int, E);
+    descriptor: (ILjava/lang/Object;)Ljava/lang/Object;
+
+  public boolean add(E);
+    descriptor: (Ljava/lang/Object;)Z
+
+  public boolean equals(java.lang.Object);
+    descriptor: (Ljava/lang/Object;)Z
+
+  public int hashCode();
+    descriptor: ()I
+
+  public boolean remove(java.lang.Object);
+    descriptor: (Ljava/lang/Object;)Z
+
+  public void clear();
+    descriptor: ()V
+
+  public java.util.List<E> subList(int, int);
+    descriptor: (II)Ljava/util/List;
 }
-
-unsafe impl<T: JavaObject> JavaObject for ArrayList<T> {}
-
-// Upcasts
-unsafe impl<T: JavaObject> Upcast<ArrayList<T>> for ArrayList<T> {}
-unsafe impl<T: JavaObject> Upcast<List<T>> for ArrayList<T> {}
-// unsafe impl<T: JavaObject> Upcast<Collection<T>> for ArrayList<T> {}
-// unsafe impl<T: JavaObject> Upcast<Object> for ArrayList<T> {}
-
-impl<T> ArrayList<T>
-where
-    T: JavaObject + 'static,
-{
-    pub fn new() -> impl for<'jvm> JvmOp<Input<'jvm> = (), Output<'jvm> = Local<'jvm, ArrayList<T>>>
-    {
-        struct Impl<T> {
-            _markers: PhantomData<T>,
-        }
-
-        impl<T> Clone for Impl<T> {
-            fn clone(&self) -> Self {
-                Self {
-                    _markers: PhantomData,
-                }
-            }
-        }
-
-        impl<T> JvmOp for Impl<T>
-        where
-            T: JavaObject + 'static,
-        {
-            type Input<'jvm> = ();
-            type Output<'jvm> = Local<'jvm, ArrayList<T>>;
-
-            fn execute_with<'jvm>(
-                self,
-                jvm: &mut Jvm<'jvm>,
-                (): (),
-            ) -> crate::Result<Self::Output<'jvm>> {
-                let class = array_list_class(jvm)?;
-                let env = jvm.to_env();
-
-                static CONSTRUCTOR: OnceCell<JMethodID> = OnceCell::new();
-                let constructor =
-                    CONSTRUCTOR.get_or_try_init(|| env.get_method_id(class, "<init>", "()V"))?;
-
-                let object = unsafe { env.new_object_unchecked(class, *constructor, &[])? };
-
-                Ok(unsafe { Local::from_jni(AutoLocal::new(object, &env)) })
-            }
-        }
-
-        Impl {
-            _markers: PhantomData,
-        }
-    }
-}
-
-// XX: ideally these are wrapped as JavaClass<HashMap<?, ?>>
-
-fn array_list_class(jvm: &mut Jvm<'_>) -> crate::Result<&'static GlobalRef> {
-    let env = jvm.to_env();
-
-    static CLASS: OnceCell<GlobalRef> = OnceCell::new();
-    CLASS.get_or_try_init(|| {
-        let class = env.find_class("java/util/ArrayList")?;
-        env.new_global_ref(class)
-    })
+    "#
 }

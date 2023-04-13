@@ -88,6 +88,7 @@ impl SpannedClassInfo {
             .map(|m| &m.trait_impl_method)
             .collect();
         let jvm_op_impls: Vec<_> = object_methods.iter().map(|m| &m.jvm_op_impl).collect();
+        let upcast_impls = self.upcast_impls();
 
         let output = quote_spanned! {
             self.span =>
@@ -130,6 +131,8 @@ impl SpannedClassInfo {
                     #(#java_class_generics: JavaObject,)*
                 {}
 
+                #upcast_impls
+
                 #cached_class
 
                 #(#constructors)*
@@ -166,6 +169,26 @@ impl SpannedClassInfo {
         Ok(output)
     }
 
+    fn upcast_impls(&self) -> TokenStream {
+        let struct_name = self.struct_name();
+        let java_class_generics = self.class_generic_names();
+        self.info
+            .extends
+            .iter()
+            .chain(&self.info.implements)
+            .map(|r| {
+                let mut sig = Signature::new(&Id::from("supertrait"), self.span, &self.info.generics);
+                let tokens = sig.forbid_capture(|sig| sig.class_ref_ty(r)).unwrap();
+                quote_spanned!(self.span => 
+                    unsafe impl<#(#java_class_generics,)*> plumbing::Upcast<#tokens> for #struct_name<#(#java_class_generics,)*>
+                    where
+                        #(#java_class_generics: JavaObject,)*
+                    {}
+                )
+            })
+            .collect()
+    }
+
     fn cached_class(&self) -> TokenStream {
         let jni_class_name = self.jni_class_name();
         quote_spanned! {
@@ -199,7 +222,7 @@ impl SpannedClassInfo {
         let ty = self.this_type();
         let output_trait = quote_spanned!(self.span => IntoLocal<#ty>);
 
-        let generics = self.class_generic_names();
+        let java_class_generics = self.class_generic_names();
 
         let descriptor = Literal::string(&constructor.descriptor.string);
 
@@ -207,19 +230,34 @@ impl SpannedClassInfo {
         let prepare_inputs = self.prepare_inputs(&input_names, &constructor.args);
 
         let output = quote_spanned!(self.span =>
-            impl< #(#generics),* > #ty {
+            impl< #(#java_class_generics,)* > #ty
+            where
+                #(#java_class_generics: JavaObject,)*
+            {
                 pub fn new(
                     #(#input_names : impl #input_traits,)*
                 ) -> impl #output_trait {
-                    #[derive(Clone)]
                     #[allow(non_camel_case_types)]
-                    struct Impl< #(#input_names),* > {
-                        #(#input_names: #input_names),*
+                    struct Impl<
+                        #(#java_class_generics,)*
+                        #(#input_names),*
+                    > {
+                        #(#input_names: #input_names,)*
+                        phantom: std::marker::PhantomData<(
+                            #(#java_class_generics,)*
+                        )>,
                     }
 
                     #[allow(non_camel_case_types)]
-                    impl<#(#input_names),*> JvmOp for Impl<#(#input_names),*>
+                    impl<
+                        #(#java_class_generics,)*
+                        #(#input_names,)*
+                    > JvmOp for Impl<
+                        #(#java_class_generics,)*
+                        #(#input_names,)*
+                    >
                     where
+                        #(#java_class_generics: JavaObject,)*
                         #(#input_names : #input_traits,)*
                     {
                         type Input<'jvm> = ();
@@ -252,6 +290,7 @@ impl SpannedClassInfo {
 
                     Impl {
                         #(#input_names: #input_names,)*
+                        phantom: Default::default()
                     }
                 }
             }

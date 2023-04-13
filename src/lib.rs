@@ -40,6 +40,7 @@ pub mod java {
 
     pub mod lang {
         pub use crate::object::Object;
+        pub use crate::object::Record;
         pub use crate::str::JavaString as String;
     }
     pub mod util {
