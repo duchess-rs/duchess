@@ -11,10 +11,10 @@ use crate::{
 impl DuchessDeclaration {
     pub fn into_tokens(self) -> Result<TokenStream, SpanError> {
         let spanned_packages = self.to_spanned_packages()?;
-        Ok(spanned_packages
+        spanned_packages
             .into_values()
             .map(|p| p.into_tokens(0))
-            .collect())
+            .collect()
     }
 
     fn to_spanned_packages(&self) -> Result<BTreeMap<Id, SpannedPackageInfo>, SpanError> {

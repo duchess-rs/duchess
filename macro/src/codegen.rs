@@ -1,6 +1,9 @@
-use crate::class_info::{
-    ClassRef, Constructor, Id, Method, RefType, ScalarType, SpannedClassInfo, SpannedPackageInfo,
-    Type,
+use crate::{
+    class_info::{
+        ClassRef, Constructor, Id, Method, NonRepeatingType, RefType, ScalarType, SpannedClassInfo,
+        SpannedPackageInfo, Type,
+    },
+    span_error::SpanError,
 };
 use inflector::Inflector;
 use proc_macro2::{Ident, Literal, Span, TokenStream};
@@ -25,20 +28,20 @@ struct MethodOutput {
 }
 
 impl SpannedPackageInfo {
-    pub fn into_tokens(self, depth: usize) -> TokenStream {
+    pub fn into_tokens(self, depth: usize) -> Result<TokenStream, SpanError> {
         let name = Ident::new(&self.name, self.span);
         let inner: TokenStream = self
             .subpackages
             .into_values()
             .map(|p| p.into_tokens(depth + 1))
             .chain(self.classes.into_iter().map(|c| c.into_tokens()))
-            .collect();
+            .collect::<Result<_, _>>()?;
 
         let path: TokenStream = (1..depth)
             .map(|_| quote_spanned!(self.span => "::super"))
             .collect();
 
-        quote_spanned!(self.span =>
+        Ok(quote_spanned!(self.span =>
             #[allow(unused_imports)]
             pub mod #name {
                 // Import the contents of the parent module that we are created inside
@@ -49,49 +52,57 @@ impl SpannedPackageInfo {
 
                 #inner
             }
-        )
+        ))
     }
 }
 
 impl SpannedClassInfo {
-    pub fn into_tokens(self) -> TokenStream {
+    pub fn into_tokens(self) -> Result<TokenStream, SpanError> {
         let struct_name = self.struct_name();
         let ext_trait_name = self.ext_trait_name();
         let cached_class = self.cached_class();
         let this_ty = self.this_type();
-        let generics = self.generic_names();
+        let java_class_generics = self.class_generic_names();
 
-        // Ignore constructors with unsupported wildcards.
+        // Convert constructors
         let constructors: Vec<_> = self
             .info
             .constructors
             .iter()
-            .flat_map(|c| self.constructor(c).ok())
-            .collect();
+            .map(|c| self.constructor(c))
+            .collect::<Result<_, _>>()?;
 
-        // Ignore constructors with unsupported wildcards.
-        let methods: Vec<_> = self
+        // Convert class methods (not static methods, those are different)
+        let object_methods: Vec<_> = self
             .info
             .methods
             .iter()
-            .flat_map(|m| self.method(m).ok())
-            .collect();
+            .filter(|m| !m.flags.is_static)
+            .map(|m| self.method(m))
+            .collect::<Result<_, _>>()?;
 
-        let method_structs: Vec<_> = methods.iter().map(|m| &m.method_struct).collect();
-        let trait_methods: Vec<_> = methods.iter().map(|m| &m.trait_method).collect();
-        let trait_impl_methods: Vec<_> = methods.iter().map(|m| &m.trait_impl_method).collect();
-        let jvm_op_impls: Vec<_> = methods.iter().map(|m| &m.jvm_op_impl).collect();
+        let method_structs: Vec<_> = object_methods.iter().map(|m| &m.method_struct).collect();
+        let trait_methods: Vec<_> = object_methods.iter().map(|m| &m.trait_method).collect();
+        let trait_impl_methods: Vec<_> = object_methods
+            .iter()
+            .map(|m| &m.trait_impl_method)
+            .collect();
+        let jvm_op_impls: Vec<_> = object_methods.iter().map(|m| &m.jvm_op_impl).collect();
+        let upcast_impls = self.upcast_impls();
 
         let output = quote_spanned! {
             self.span =>
 
             #[allow(non_camel_case_types)]
-            pub struct #struct_name<#(#generics,)*> {
-                _dummy: std::marker::PhantomData<(#(#generics,)*)>
+            pub struct #struct_name<#(#java_class_generics,)*> {
+                _dummy: std::marker::PhantomData<(#(#java_class_generics,)*)>
             }
 
             #[allow(non_camel_case_types)]
-            pub trait #ext_trait_name : duchess::JvmOp {
+            pub trait #ext_trait_name<#(#java_class_generics,)*> : duchess::JvmOp
+            where
+                #(#java_class_generics : JavaObject,)*
+            {
                 #(#trait_methods)*
             }
 
@@ -110,9 +121,17 @@ impl SpannedClassInfo {
                 };
                 use once_cell::sync::OnceCell;
 
-                unsafe impl JavaObject for #struct_name {}
+                unsafe impl<#(#java_class_generics,)*> JavaObject for #struct_name<#(#java_class_generics,)*>
+                where
+                    #(#java_class_generics: JavaObject,)*
+                {}
 
-                unsafe impl plumbing::Upcast<#struct_name> for #struct_name {}
+                unsafe impl<#(#java_class_generics,)*> plumbing::Upcast<#struct_name<#(#java_class_generics,)*>> for #struct_name<#(#java_class_generics,)*>
+                where
+                    #(#java_class_generics: JavaObject,)*
+                {}
+
+                #upcast_impls
 
                 #cached_class
 
@@ -123,10 +142,11 @@ impl SpannedClassInfo {
                 #(#jvm_op_impls)*
 
                 #[allow(non_camel_case_types)]
-                impl<This, #(#generics,)*> #ext_trait_name for This
+                impl<This, #(#java_class_generics,)*> #ext_trait_name<#(#java_class_generics,)*> for This
                 where
                     This: JvmOp,
                     for<'jvm> This::Output<'jvm>: AsRef<#this_ty>,
+                    #(#java_class_generics: JavaObject,)*
                 {
                     #(#trait_impl_methods)*
                 }
@@ -146,7 +166,27 @@ impl SpannedClassInfo {
             }
         }
 
-        output
+        Ok(output)
+    }
+
+    fn upcast_impls(&self) -> TokenStream {
+        let struct_name = self.struct_name();
+        let java_class_generics = self.class_generic_names();
+        self.info
+            .extends
+            .iter()
+            .chain(&self.info.implements)
+            .map(|r| {
+                let mut sig = Signature::new(&Id::from("supertrait"), self.span, &self.info.generics);
+                let tokens = sig.forbid_capture(|sig| sig.class_ref_ty(r)).unwrap();
+                quote_spanned!(self.span => 
+                    unsafe impl<#(#java_class_generics,)*> plumbing::Upcast<#tokens> for #struct_name<#(#java_class_generics,)*>
+                    where
+                        #(#java_class_generics: JavaObject,)*
+                    {}
+                )
+            })
+            .collect()
     }
 
     fn cached_class(&self) -> TokenStream {
@@ -166,8 +206,8 @@ impl SpannedClassInfo {
         }
     }
 
-    fn constructor(&self, constructor: &Constructor) -> Result<TokenStream, UnsupportedWildcard> {
-        let mut sig = Signature::new(self.span, &self.info.generics);
+    fn constructor(&self, constructor: &Constructor) -> Result<TokenStream, SpanError> {
+        let mut sig = Signature::new(&self.info.name, self.span, &self.info.generics);
 
         let input_traits: Vec<_> = constructor
             .args
@@ -182,7 +222,7 @@ impl SpannedClassInfo {
         let ty = self.this_type();
         let output_trait = quote_spanned!(self.span => IntoLocal<#ty>);
 
-        let generics = self.generic_names();
+        let java_class_generics = self.class_generic_names();
 
         let descriptor = Literal::string(&constructor.descriptor.string);
 
@@ -190,19 +230,34 @@ impl SpannedClassInfo {
         let prepare_inputs = self.prepare_inputs(&input_names, &constructor.args);
 
         let output = quote_spanned!(self.span =>
-            impl< #(#generics),* > #ty {
+            impl< #(#java_class_generics,)* > #ty
+            where
+                #(#java_class_generics: JavaObject,)*
+            {
                 pub fn new(
                     #(#input_names : impl #input_traits,)*
                 ) -> impl #output_trait {
-                    #[derive(Clone)]
                     #[allow(non_camel_case_types)]
-                    struct Impl< #(#input_names),* > {
-                        #(#input_names: #input_names),*
+                    struct Impl<
+                        #(#java_class_generics,)*
+                        #(#input_names),*
+                    > {
+                        #(#input_names: #input_names,)*
+                        phantom: std::marker::PhantomData<(
+                            #(#java_class_generics,)*
+                        )>,
                     }
 
                     #[allow(non_camel_case_types)]
-                    impl<#(#input_names),*> JvmOp for Impl<#(#input_names),*>
+                    impl<
+                        #(#java_class_generics,)*
+                        #(#input_names,)*
+                    > JvmOp for Impl<
+                        #(#java_class_generics,)*
+                        #(#input_names,)*
+                    >
                     where
+                        #(#java_class_generics: JavaObject,)*
                         #(#input_names : #input_traits,)*
                     {
                         type Input<'jvm> = ();
@@ -235,6 +290,7 @@ impl SpannedClassInfo {
 
                     Impl {
                         #(#input_names: #input_names,)*
+                        phantom: Default::default()
                     }
                 }
             }
@@ -246,8 +302,12 @@ impl SpannedClassInfo {
         Ok(output)
     }
 
-    fn method(&self, method: &Method) -> Result<MethodOutput, UnsupportedWildcard> {
-        let mut sig = Signature::new(self.span, self.info.generics.iter().chain(&method.generics));
+    fn method(&self, method: &Method) -> Result<MethodOutput, SpanError> {
+        let mut sig = Signature::new(
+            &method.name,
+            self.span,
+            self.info.generics.iter().chain(&method.generics),
+        );
 
         let this_ty = self.this_type();
 
@@ -274,47 +334,94 @@ impl SpannedClassInfo {
         let rust_method_name = Ident::new(&method.name.to_snake_case(), self.span);
         let rust_method_type_name = Ident::new(&method.name.to_camel_case(), self.span);
 
+        // The generic parameters declared on the Java method.
+        let java_class_generics: Vec<_> = self.class_generic_names();
+        let java_method_generics: Vec<_> = method
+            .generics
+            .iter()
+            .map(|g| g.to_ident(self.span))
+            .collect();
+
+        // The generic parameters we need on the Rust method, these include:
+        //
+        // * a type parameter `a0` for each input
+        // * a type parameter for each java generic
+        // * any fresh generics we created to capture wildcards
+        let rust_method_generics: Vec<_> = input_names
+            .iter()
+            .chain(&java_method_generics)
+            .chain(sig.fresh_generics.iter())
+            .collect();
+
+        // The generic parameters we need on the *method struct* (which will implement the `JvmOp`).
+        // These include the class generics plus all the generics from the method.
+        let method_struct_generics: Vec<_> = java_class_generics
+            .iter()
+            .chain(rust_method_generics.iter().copied())
+            .collect();
+
         // For each method `m` in the Java type, we create a struct (named `m`)
         // that will implement the `JvmOp`.
-        let struct_output = quote_spanned!(self.span =>
+        let method_struct = quote_spanned!(self.span =>
             #[derive(Clone)]
             #[allow(non_camel_case_types)]
-            pub struct #rust_method_type_name<This, #(#input_names),*> {
+            pub struct #rust_method_type_name<
+                This,
+                #(#method_struct_generics,)*
+            > {
                 this: This,
                 #(#input_names : #input_names,)*
+                phantom: std::marker::PhantomData<(
+                    #(#method_struct_generics,)*
+                )>,
             }
         );
 
+        let sig_where_clauses = &sig.where_clauses;
+
         // The method signature for the extension trait.
         let trait_method = quote_spanned!(self.span =>
-            type #rust_method_type_name<#(#input_names),*>: #output_trait
+            type #rust_method_type_name<#(#rust_method_generics),*>: #output_trait
             where
-                #(#input_names: #input_traits,)*;
+                #(#input_names: #input_traits,)*
+                #(#java_method_generics: JavaObject,)*
+                #(#sig_where_clauses,)*
+                ;
 
-            fn #rust_method_name<#(#input_names),*>(
+            fn #rust_method_name<#(#rust_method_generics),*>(
                 self,
                 #(#input_names: #input_names),*
-            ) -> Self::#rust_method_type_name<#(#input_names),*>
+            ) -> Self::#rust_method_type_name<#(#rust_method_generics),*>
             where
-                #(#input_names: #input_traits,)*;
+                #(#input_names: #input_traits,)*
+                #(#java_method_generics: JavaObject,)*
+                #(#sig_where_clauses,)*
+                ;
         );
 
         // The method signature for the extension trait.
         let trait_impl_method = quote_spanned!(self.span =>
-            type #rust_method_type_name<#(#input_names),*> = #rust_method_type_name<Self, #(#input_names,)*>
-            where
-                #(#input_names: #input_traits,)*;
-
-            fn #rust_method_name<#(#input_names),*>(
-                self,
-                #(#input_names: #input_names),*
-            ) -> #rust_method_type_name<Self, #(#input_names),*>
+            type #rust_method_type_name<#(#rust_method_generics),*> =
+                #rust_method_type_name<Self, #(#method_struct_generics),*>
             where
                 #(#input_names: #input_traits,)*
+                #(#java_method_generics: JavaObject,)*
+                #(#sig_where_clauses,)*
+                ;
+
+            fn #rust_method_name<#(#rust_method_generics),*>(
+                self,
+                #(#input_names: #input_names),*
+            ) -> Self::#rust_method_type_name<#(#rust_method_generics),*>
+            where
+                #(#input_names: #input_traits,)*
+                #(#java_method_generics: JavaObject,)*
+                #(#sig_where_clauses,)*
             {
                 #rust_method_type_name {
                     this: self,
                     #(#input_names: #input_names,)*
+                    phantom: Default::default(),
                 }
             }
         );
@@ -323,11 +430,14 @@ impl SpannedClassInfo {
         // via JNI, after converting its arguments appropriately.
         let impl_output = quote_spanned!(self.span =>
             #[allow(non_camel_case_types)]
-            impl<This, #(#input_names),*> JvmOp for #rust_method_type_name<This, #(#input_names),*>
+            impl<This, #(#method_struct_generics),*> JvmOp
+            for #rust_method_type_name<This, #(#method_struct_generics),*>
             where
                 This: JvmOp,
                 for<'jvm> This::Output<'jvm>: AsRef<#this_ty>,
                 #(#input_names: #input_traits,)*
+                #(#java_class_generics: JavaObject,)*
+                #(#java_method_generics: JavaObject,)*
             {
                 type Input<'jvm> = This::Input<'jvm>;
                 type Output<'jvm> = #output_ty;
@@ -358,7 +468,7 @@ impl SpannedClassInfo {
         // eprintln!("{trait_impl_method}");
 
         Ok(MethodOutput {
-            method_struct: struct_output,
+            method_struct,
             trait_method,
             trait_impl_method,
             jvm_op_impl: impl_output,
@@ -375,11 +485,11 @@ impl SpannedClassInfo {
         Ident::new(&format!("{tail}Ext"), self.span)
     }
 
-    fn generic_names(&self) -> Vec<Ident> {
+    fn class_generic_names(&self) -> Vec<Ident> {
         self.info
             .generics
             .iter()
-            .map(|g| java_type_parameter_ident(self.span, g))
+            .map(|g| g.to_ident(self.span))
             .collect()
     }
 
@@ -388,7 +498,7 @@ impl SpannedClassInfo {
         if self.info.generics.is_empty() {
             quote_spanned!(self.span => #s)
         } else {
-            let g: Vec<Ident> = self.generic_names();
+            let g: Vec<Ident> = self.class_generic_names();
             quote_spanned!(self.span => #s < #(#g),* >)
         }
     }
@@ -402,11 +512,11 @@ impl SpannedClassInfo {
         input_names
             .iter()
             .zip(input_types)
-            .map(|(input_name, input_ty)| match input_ty {
-                Type::Scalar(_) => quote_spanned!(self.span =>
+            .map(|(input_name, input_ty)| match input_ty.to_non_repeating() {
+                NonRepeatingType::Scalar(_) => quote_spanned!(self.span =>
                     let #input_name = self.#input_name.execute(jvm)?;
                 ),
-                Type::Ref(_) => quote_spanned!(self.span =>
+                NonRepeatingType::Ref(_) => quote_spanned!(self.span =>
                     let #input_name = self.#input_name.into_java(jvm)?;
                     let #input_name = #input_name.as_ref();
                     let #input_name = &#input_name.as_jobject();
@@ -417,38 +527,28 @@ impl SpannedClassInfo {
 }
 
 struct Signature {
+    method_name: Id,
     span: Span,
-    generics: Vec<Ident>,
-    where_bounds: Vec<TokenStream>,
+    in_scope_generics: Vec<Id>,
+    fresh_generics: Vec<Ident>,
+    where_clauses: Vec<TokenStream>,
     capture_generics: bool,
 }
 
-/// We translate Java wildcards to Rust generics, but there are
-/// limits to what we can do with this technique. For example,
-/// an input `ArrayList<ArrayList<?>>` has no Rust equivalent,
-/// it would be something like `ArrayList<exists<T> ArrayList<T>>`,
-/// if we had `exists`. Similarly returning a type like
-/// `-> ArrayList<? extends Foo>` isn't possible today, though we
-/// could conceivably handle it via some kind of fresh struct or
-/// `impl Trait` return value.
-///
-/// When we encounter cases like this, we return
-/// `Err(UnsupportedWildcard)`.
-struct UnsupportedWildcard;
-
 impl Signature {
-    pub fn new<'i>(span: Span, generics: impl IntoIterator<Item = &'i Id>) -> Self {
-        let mut this = Signature {
+    pub fn new<'i>(
+        method_name: &Id,
+        span: Span,
+        in_scope_generics: impl IntoIterator<Item = &'i Id>,
+    ) -> Self {
+        Signature {
+            method_name: method_name.clone(),
             span,
-            generics: vec![],
-            where_bounds: vec![],
+            in_scope_generics: in_scope_generics.into_iter().cloned().collect(),
+            fresh_generics: vec![],
+            where_clauses: vec![],
             capture_generics: true,
-        };
-        for generic in generics {
-            let ident = this.java_type_parameter_ident(generic);
-            this.generics.push(ident);
         }
-        this
     }
 
     /// Set the `capture_generics` field to false while `op` executes,
@@ -466,14 +566,24 @@ impl Signature {
     /// translated to a Rust type like `ArrayList<Pi>` for some fresh `Pi`.
     ///
     /// See also `Self::push_where_bound`.
-    fn fresh_generic(&mut self) -> Result<Ident, UnsupportedWildcard> {
+    fn fresh_generic(&mut self) -> Result<Ident, SpanError> {
         if !self.capture_generics {
-            Err(UnsupportedWildcard)
+            Err(SpanError {
+                span: self.span,
+                message: format!("unsupported wildcards in `{}`", self.method_name),
+            })
         } else {
-            let i = self.generics.len();
-            let ident = Ident::new(&format!("P{}", i), self.span);
-            self.generics.push(ident.clone());
-            Ok(ident)
+            let mut i = self.fresh_generics.len();
+            loop {
+                let ident = Ident::new(&format!("Capture{}", i), self.span);
+                if !self.fresh_generics.contains(&ident) {
+                    self.fresh_generics.push(ident.clone());
+                    self.where_clauses
+                        .push(quote_spanned!(self.span => #ident : JavaObject));
+                    return Ok(ident);
+                }
+                i += 1;
+            }
         }
     }
 
@@ -484,34 +594,34 @@ impl Signature {
     ///
     /// See also `Self::fresh_generic`.
     fn push_where_bound(&mut self, t: TokenStream) {
-        self.where_bounds.push(t);
+        self.where_clauses.push(t);
     }
 
     /// Returns an appropriate `impl type` for a funtion that
     /// takes `ty` as input. Assumes objects are nullable.
-    fn input_trait(&mut self, ty: &Type) -> Result<TokenStream, UnsupportedWildcard> {
-        match ty {
-            Type::Ref(ty) => {
-                let t = self.java_ref_ty(ty)?;
+    fn input_trait(&mut self, ty: &Type) -> Result<TokenStream, SpanError> {
+        match ty.to_non_repeating() {
+            NonRepeatingType::Ref(ty) => {
+                let t = self.java_ref_ty(&ty)?;
                 Ok(quote_spanned!(self.span => duchess::IntoJava<#t>))
             }
-            Type::Scalar(ty) => {
-                let t = self.java_scalar_ty(ty);
+            NonRepeatingType::Scalar(ty) => {
+                let t = self.java_scalar_ty(&ty);
                 Ok(quote_spanned!(self.span => duchess::IntoScalar<#t>))
             }
         }
     }
 
-    /// Returnss an appropriate `impl type` for a funtion that
+    /// Returns an appropriate `impl type` for a funtion that
     /// returns `ty`. Assumes objects are nullable.
-    fn output_type(&mut self, ty: &Option<Type>) -> Result<TokenStream, UnsupportedWildcard> {
-        self.forbid_capture(|this| match ty {
-            Some(Type::Ref(ty)) => {
-                let t = this.java_ref_ty(ty)?;
+    fn output_type(&mut self, ty: &Option<Type>) -> Result<TokenStream, SpanError> {
+        self.forbid_capture(|this| match ty.as_ref().map(|ty| ty.to_non_repeating()) {
+            Some(NonRepeatingType::Ref(ty)) => {
+                let t = this.java_ref_ty(&ty)?;
                 Ok(quote_spanned!(this.span => Option<Local<'jvm, #t>>))
             }
-            Some(Type::Scalar(ty)) => {
-                let t = this.java_scalar_ty(ty);
+            Some(NonRepeatingType::Scalar(ty)) => {
+                let t = this.java_scalar_ty(&ty);
                 Ok(quote_spanned!(this.span => #t))
             }
             None => Ok(quote_spanned!(this.span => ())),
@@ -520,28 +630,28 @@ impl Signature {
 
     /// Returns an appropriate trait for a method that
     /// returns `ty`. Assumes objects are nullable.
-    fn method_trait(&mut self, ty: &Option<Type>) -> Result<TokenStream, UnsupportedWildcard> {
-        self.forbid_capture(|this| match ty {
-            Some(Type::Ref(ty)) => {
-                let t = this.java_ref_ty(ty)?;
+    fn method_trait(&mut self, ty: &Option<Type>) -> Result<TokenStream, SpanError> {
+        self.forbid_capture(|this| match ty.as_ref().map(|ty| ty.to_non_repeating()) {
+            Some(NonRepeatingType::Ref(ty)) => {
+                let t = this.java_ref_ty(&ty)?;
                 Ok(quote_spanned!(this.span => duchess::JavaMethod<Self, #t>))
             }
-            Some(Type::Scalar(ty)) => {
-                let t = this.java_scalar_ty(ty);
+            Some(NonRepeatingType::Scalar(ty)) => {
+                let t = this.java_scalar_ty(&ty);
                 Ok(quote_spanned!(this.span => duchess::ScalarMethod<Self, #t>))
             }
             None => Ok(quote_spanned!(this.span => duchess::VoidMethod<Self>)),
         })
     }
 
-    fn java_ty(&mut self, ty: &Type) -> Result<TokenStream, UnsupportedWildcard> {
-        match ty {
-            Type::Ref(ty) => self.java_ref_ty(ty),
-            Type::Scalar(ty) => Ok(self.java_scalar_ty(ty)),
+    fn java_ty(&mut self, ty: &Type) -> Result<TokenStream, SpanError> {
+        match &ty.to_non_repeating() {
+            NonRepeatingType::Ref(ty) => self.java_ref_ty(ty),
+            NonRepeatingType::Scalar(ty) => Ok(self.java_scalar_ty(ty)),
         }
     }
 
-    fn java_ref_ty(&mut self, ty: &RefType) -> Result<TokenStream, UnsupportedWildcard> {
+    fn java_ref_ty(&mut self, ty: &RefType) -> Result<TokenStream, SpanError> {
         match ty {
             RefType::Class(ty) => Ok(self.class_ref_ty(ty)?),
             RefType::Array(e) => {
@@ -549,9 +659,9 @@ impl Signature {
                 Ok(quote_spanned!(self.span => java::Array<#e>))
             }
             RefType::TypeParameter(t) => {
-                let ident = self.java_type_parameter_ident(t);
-                assert!(self.generics.contains(&ident));
-                Ok(quote_spanned!(self.span => #ident))
+                assert!(self.in_scope_generics.contains(&t));
+                let t = t.to_ident(self.span);
+                Ok(quote_spanned!(self.span => #t))
             }
             RefType::Extends(ty) => {
                 let g = self.fresh_generic()?;
@@ -571,7 +681,7 @@ impl Signature {
         }
     }
 
-    fn class_ref_ty(&mut self, ty: &ClassRef) -> Result<TokenStream, UnsupportedWildcard> {
+    fn class_ref_ty(&mut self, ty: &ClassRef) -> Result<TokenStream, SpanError> {
         let ClassRef { name, generics } = ty;
         let rust_name = name.to_module_name(self.span);
         if generics.len() == 0 {
@@ -585,10 +695,6 @@ impl Signature {
         }
     }
 
-    fn java_type_parameter_ident(&self, t: &Id) -> Ident {
-        java_type_parameter_ident(self.span, t)
-    }
-
     fn java_scalar_ty(&self, ty: &ScalarType) -> TokenStream {
         match ty {
             ScalarType::Int => quote_spanned!(self.span => i32),
@@ -600,10 +706,6 @@ impl Signature {
             ScalarType::Boolean => quote_spanned!(self.span => bool),
         }
     }
-}
-
-fn java_type_parameter_ident(span: Span, t: &Id) -> Ident {
-    Ident::new(&format!("J{}", t), span)
 }
 
 trait IdExt {

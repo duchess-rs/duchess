@@ -4,7 +4,7 @@ grammar;
 
 pub ClassInfo: ClassInfo = {
     Header? 
-    <l:Flags> "class" <n:DotId> 
+    <l:Flags> <k:ClassKind> <n:DotId> 
         <g:Generics>
         <e:("extends" <ClassRef>)?>
         <i:("implements" <Comma<ClassRef>>)?>
@@ -16,6 +16,7 @@ pub ClassInfo: ClassInfo = {
         ClassInfo {
             flags: l,
             name: n,
+            kind: k,
             generics: g,
             extends: e,
             implements: i.unwrap_or(vec![]),
@@ -24,6 +25,11 @@ pub ClassInfo: ClassInfo = {
             fields: f,
         }
     }
+};
+
+ClassKind: ClassKind = {
+    "class" => ClassKind::Class,
+    "interface" => ClassKind::Interface,
 };
 
 #[inline]
@@ -70,6 +76,9 @@ Flags: Flags = {
     <f:Flags> "final" => Flags { is_final: true, ..f },
     <f:Flags> "synchronized" => Flags { is_synchronized: true, ..f },
     <f:Flags> "native" => Flags { is_native: true, ..f },
+    <f:Flags> "abstract" => Flags { is_abstract: true, ..f },
+    <f:Flags> "static" => Flags { is_static: true, ..f },
+    <f:Flags> "default" => Flags { is_default: true, ..f },
 };
 
 Privacy: Privacy = {
@@ -98,6 +107,7 @@ ReturnType: Option<Type> = {
 Type: Type = {
     <ScalarType> => Type::Scalar(<>),
     <RefType> => Type::Ref(<>),
+    <Type> "..." => Type::Repeat(Arc::new(<>)),
 };
 
 ScalarType: ScalarType = {

@@ -39,10 +39,12 @@ pub fn java_package(input: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn duchess_javap(input: TokenStream) -> TokenStream {
     let input: proc_macro2::TokenStream = input.into();
-    let class_info = match Parser::from(input).parse::<SpannedClassInfo>() {
-        Ok(decl) => decl,
-        Err(err) => return err.into_tokens().into(),
-    };
 
-    class_info.into_tokens().into()
+    match Parser::from(input)
+        .parse::<SpannedClassInfo>()
+        .and_then(|class_info| class_info.into_tokens())
+    {
+        Ok(decl) => decl.into(),
+        Err(err) => err.into_tokens().into(),
+    }
 }

@@ -13,6 +13,7 @@ pub use duchess_macro::java_package;
 pub use jni::errors::Result;
 pub use jvm::Global;
 pub use jvm::JavaObject;
+pub use jvm::JavaType;
 pub use jvm::Jvm;
 pub use jvm::Local;
 
@@ -39,6 +40,7 @@ pub mod java {
 
     pub mod lang {
         pub use crate::object::Object;
+        pub use crate::object::Record;
         pub use crate::str::JavaString as String;
     }
     pub mod util {
