@@ -70,6 +70,7 @@ impl SpannedClassInfo {
             .info
             .constructors
             .iter()
+            .filter(|c| self.members.contains_constructor(&self.info, c))
             .map(|c| self.constructor(c))
             .collect::<Result<_, _>>()?;
 
@@ -79,6 +80,7 @@ impl SpannedClassInfo {
             .methods
             .iter()
             .filter(|m| !m.flags.is_static)
+            .filter(|m| self.members.contains_method(m))
             .map(|m| self.method(m))
             .collect::<Result<_, _>>()?;
 
@@ -227,7 +229,7 @@ impl SpannedClassInfo {
         let mut sig = Signature::new(&self.info.name, self.span, &self.info.generics);
 
         let input_traits: Vec<_> = constructor
-            .args
+            .argument_tys
             .iter()
             .map(|ty| sig.input_trait(ty))
             .collect::<Result<_, _>>()?;
@@ -244,7 +246,7 @@ impl SpannedClassInfo {
         let descriptor = Literal::string(&constructor.descriptor.string);
 
         // Code to convert each input appropriately
-        let prepare_inputs = self.prepare_inputs(&input_names, &constructor.args);
+        let prepare_inputs = self.prepare_inputs(&input_names, &constructor.argument_tys);
 
         let output = quote_spanned!(self.span =>
             impl< #(#java_class_generics,)* > #ty

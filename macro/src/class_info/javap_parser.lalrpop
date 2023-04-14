@@ -54,8 +54,14 @@ ID: &'input str = {
 }
 
 Constructor: Constructor = {
-    <f:Flags> <n:DotId> "(" <a:Comma<Type>> ")" <t:Throws> ";" <d:Descriptor> => {
-        Constructor { flags: f, args: a, throws: t, descriptor: d, }
+    <f:Flags> <g:Generics> <n:DotId> "(" <a:Comma<Type>> ")" <t:Throws> ";" <d:Descriptor> => {
+        Constructor { flags: f, generics: g, argument_tys: a, throws: t, descriptor: d, }
+    }
+};
+
+pub MethodSig: MethodSig = {
+    <g:Generics> <n:Id> "(" <a:Comma<Type>> ")" ";" => {
+        MethodSig { name: n, argument_tys: a, generics: g }
     }
 };
 

@@ -2,12 +2,19 @@ use std::fmt::Display;
 
 use lalrpop_util::{lalrpop_mod, lexer::Token};
 
-use super::ClassInfo;
+use super::{ClassInfo, MethodSig};
 
 lalrpop_mod!(pub javap_parser, "/class_info/javap_parser.rs"); // synthesized by LALRPOP
 
 pub(super) fn parse_class_info(input: &str) -> Result<ClassInfo, String> {
     match javap_parser::ClassInfoParser::new().parse(input) {
+        Ok(v) => Ok(v),
+        Err(error) => Err(format_lalrpop_error(input, error)),
+    }
+}
+
+pub(super) fn parse_method_sig(input: &str) -> Result<MethodSig, String> {
+    match javap_parser::MethodSigParser::new().parse(input) {
         Ok(v) => Ok(v),
         Err(error) => Err(format_lalrpop_error(input, error)),
     }
@@ -278,7 +285,8 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 is_static: false,
                                 is_default: false,
                             },
-                            args: [
+                            generics: [],
+                            argument_tys: [
                                 Scalar(
                                     Int,
                                 ),
@@ -298,7 +306,8 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 is_static: false,
                                 is_default: false,
                             },
-                            args: [],
+                            generics: [],
+                            argument_tys: [],
                             throws: [],
                             descriptor: Descriptor {
                                 string: "()V",
@@ -314,7 +323,8 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 is_static: false,
                                 is_default: false,
                             },
-                            args: [
+                            generics: [],
+                            argument_tys: [
                                 Ref(
                                     Class(
                                         ClassRef {
@@ -1562,7 +1572,8 @@ public class java.lang.Object {
                                 is_static: false,
                                 is_default: false,
                             },
-                            args: [],
+                            generics: [],
+                            argument_tys: [],
                             throws: [],
                             descriptor: Descriptor {
                                 string: "()V",
