@@ -13,7 +13,7 @@ use jni::{
     objects::{AutoLocal, GlobalRef, JObject, JValueOwned},
     sys, InitArgsBuilder, JNIEnv, JavaVM,
 };
-use once_cell::sync::Lazy;
+use once_cell::sync::{Lazy, OnceCell};
 
 /// A "jdk op" is a suspended operation that, when executed, will run
 /// on the jvm, producing a value of type `Output`. These ops typically
@@ -175,9 +175,11 @@ impl<'jvm> Jvm<'jvm> {
 /// unsafe impl JavaObject for BigDecimal {}
 /// ```
 pub unsafe trait JavaObject: 'static + Sized + JavaType {
+    type Class<'jvm>: AsRef<Class>;
+
     // XX: can't be put on extension trait nor define a default because we want to cache the resolved 
     // class in a static OnceCell.
-    fn class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, &'static Global<Class>>;
+    fn class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Class<'jvm>>;
 }
 
 /// Extension trait for [JavaObject].
@@ -216,24 +218,48 @@ impl<T: JavaObject> JavaObjectExt for T {
     }
 }
 
-pub unsafe trait JavaType: 'static {}
-unsafe impl<T: JavaObject> JavaType for T {}
-unsafe impl JavaType for i8 {}
-unsafe impl JavaType for i16 {}
-unsafe impl JavaType for i32 {}
-unsafe impl JavaType for i64 {}
-unsafe impl JavaType for bool {}
-unsafe impl JavaType for f32 {}
-unsafe impl JavaType for f64 {}
+pub unsafe trait JavaType: 'static {
+    type ArrayClass<'jvm>: AsRef<Class>;
+
+    /// All Java types can be elements of an array object
+    fn array_class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::ArrayClass<'jvm>>;
+}
 
 pub trait JavaScalar: JavaType {}
-impl JavaScalar for i8 {}
-impl JavaScalar for i16 {}
-impl JavaScalar for i32 {}
-impl JavaScalar for i64 {}
-impl JavaScalar for bool {}
-impl JavaScalar for f32 {}
-impl JavaScalar for f64 {}
+
+macro_rules! scalar {
+    ($($rust:ty: $array_class:literal,)*) => {
+        $(
+            unsafe impl JavaType for $rust { 
+                type ArrayClass<'jvm> = &'static Global<Class>;
+
+                fn array_class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::ArrayClass<'jvm>> {
+                    let env = jvm.to_env();
+            
+                    static CLASS: OnceCell<Global<crate::java::lang::Class>> = OnceCell::new();
+                    CLASS.get_or_try_init(|| {
+                        let class = env.find_class($array_class)?;
+                        // env.find_class() internally calls check_exception!()
+                        Ok(unsafe { Global::from_jni(env.new_global_ref(class)?) })
+                    })
+                }
+            }
+
+            impl JavaScalar for $rust {}
+        )*
+    };
+}
+
+scalar! {
+    bool: "[Z",
+    i8:   "[B",
+    i16:  "[S",
+    i32:  "[I",
+    i64:  "[J",
+    f32:  "[F",
+    f64:  "[D",
+}
+
 
 /// A wrapper for a [JObject] that only allows access by reference. This prevents passing the
 /// wrapped `JObject` to `JNIEnv::delete_local_ref`.

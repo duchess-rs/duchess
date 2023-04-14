@@ -126,16 +126,20 @@ impl SpannedClassInfo {
                 where
                     #(#java_class_generics: JavaObject,)*
                 {
-                    fn class<'jvm>(jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, &'static Global<java::lang::Class>> {
+                    type Class<'jvm> = &'static Global<java::lang::Class>;
+
+                    fn class<'jvm>(jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, Self::Class<'jvm>> {
                         #cached_class
                     }
                 }
 
-                unsafe impl<#(#java_class_generics,)*> ArrayElement for #struct_name<#(#java_class_generics,)*>
+                unsafe impl<#(#java_class_generics,)*> JavaType for #struct_name<#(#java_class_generics,)*>
                 where
                     #(#java_class_generics: JavaObject,)*
                 {
-                    fn array_class<'jvm>(jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, &'static Global<java::lang::Class>> {
+                    type ArrayClass<'jvm> = &'static Global<java::lang::Class>;
+
+                    fn array_class<'jvm>(jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, Self::ArrayClass<'jvm>> {
                         #cached_array_class
                     }
                 }

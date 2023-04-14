@@ -39,6 +39,5 @@ pub mod plumbing {
     pub use crate::cast::Upcast;
     pub use crate::str::ToJavaStringOp;
     pub use crate::catch::try_catch;
-    pub use crate::array::ArrayElement;
     pub use duchess_macro::duchess_javap;
 }

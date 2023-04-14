@@ -12,7 +12,7 @@ r#"
             public java.lang.Object();
                 descriptor: ()V
 
-            public final native java.lang.Class<?> getClass();
+            public final native java.lang.Class getClass();
                 descriptor: ()Ljava/lang/Class;
 
             public native int hashCode();
@@ -36,7 +36,7 @@ r#"
 duchess_macro::duchess_javap! {
 r#"
         Compiled from "Throwable.java"
-        public class java.lang.Throwable implements java.io.Serializable {
+        public class java.lang.Throwable {
         public java.lang.Throwable();
             descriptor: ()V
 
@@ -79,7 +79,7 @@ r#"
 duchess_macro::duchess_javap! {
 r#"
         Compiled from "StackTraceElement.java"
-        public final class java.lang.StackTraceElement implements java.io.Serializable {
+        public final class java.lang.StackTraceElement {
         public java.lang.StackTraceElement(java.lang.String, java.lang.String, java.lang.String, int);
             descriptor: (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)V
 
@@ -122,7 +122,7 @@ r#"
 duchess_macro::duchess_javap! {
 r#"
         Compiled from "Class.java"
-        public final class java.lang.Class implements java.io.Serializable, java.lang.reflect.GenericDeclaration, java.lang.reflect.Type, java.lang.reflect.AnnotatedElement, java.lang.constant.Constable {
+        public final class java.lang.Class {
         public java.lang.String toString();
             descriptor: ()Ljava/lang/String;
 
@@ -164,6 +164,9 @@ r#"
 
         public java.lang.Class getComponentType();
             descriptor: ()Ljava/lang/Class;
+
+        public java.lang.Class arrayType();
+            descriptor: ()Ljava/lang/Class;
         }
     "#
 }
@@ -171,7 +174,7 @@ r#"
 duchess_macro::duchess_javap! {
 r#"
         Compiled from "String.java"
-        public final class java.lang.String implements java.io.Serializable, java.lang.CharSequence, java.lang.constant.Constable, java.lang.constant.ConstantDesc {
+        public final class java.lang.String {
         public java.lang.String(byte[]);
             descriptor: ([B)V
 
@@ -181,5 +184,21 @@ r#"
         public boolean isEmpty();
             descriptor: ()Z
         }
+    "#
+}
+
+duchess_macro::duchess_javap! {
+r#"
+    Compiled from "Record.java"
+    public abstract class java.lang.Record {
+    public abstract boolean equals(java.lang.Object);
+        descriptor: (Ljava/lang/Object;)Z
+
+    public abstract int hashCode();
+        descriptor: ()I
+
+    public abstract java.lang.String toString();
+        descriptor: ()Ljava/lang/String;
+    }
     "#
 }

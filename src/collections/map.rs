@@ -9,7 +9,7 @@ use once_cell::sync::OnceCell;
 
 use crate::{
     plumbing::{JavaObjectExt, Upcast},
-    IntoJava, IntoLocal, JavaObject, Jvm, JvmOp, Local, Global,
+    IntoJava, IntoLocal, JavaObject, Jvm, JvmOp, Local, Global, JavaType, java::lang::Class,
 };
 
 // Ideally, we'd use duchess to derive these classes, but (a) we want to slap some nice interfaces to produce them from
@@ -20,8 +20,18 @@ pub struct Map<K, V> {
     _markers: PhantomData<(K, V)>,
 }
 
+unsafe impl<K: JavaObject, V: JavaObject> JavaType for Map<K, V> {
+    type ArrayClass<'jvm> = &'static Global<Class>;
+
+    fn array_class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::ArrayClass<'jvm>> {
+        unimplemented!()
+    }
+}
+
 unsafe impl<K: JavaObject, V: JavaObject> JavaObject for Map<K, V> {
-    fn class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, &'static crate::Global<crate::java::lang::Class>> {
+    type Class<'jvm> = &'static Global<Class>;
+
+    fn class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Class<'jvm>> {
         let env = jvm.to_env();
 
         static CLASS: OnceCell<Global<crate::java::lang::Class>> = OnceCell::new();
@@ -41,8 +51,18 @@ pub struct HashMap<K, V> {
     _markers: PhantomData<(K, V)>,
 }
 
+unsafe impl<K: JavaObject, V: JavaObject> JavaType for HashMap<K, V> {
+    type ArrayClass<'jvm> = &'static Global<Class>;
+
+    fn array_class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::ArrayClass<'jvm>> {
+        unimplemented!()
+    }
+}
+
 unsafe impl<K: JavaObject, V: JavaObject> JavaObject for HashMap<K, V> {
-    fn class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, &'static crate::Global<crate::java::lang::Class>> {
+    type Class<'jvm> = &'static Global<Class>;
+
+    fn class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Class<'jvm>> {
         let env = jvm.to_env();
 
         static CLASS: OnceCell<Global<crate::java::lang::Class>> = OnceCell::new();

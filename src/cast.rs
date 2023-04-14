@@ -68,7 +68,7 @@ where
         let instance = self.op.execute_with(jvm, input)?;
         let jobject = instance.as_ref().as_jobject();
         // XX: safety, find ways to avoid repeating?
-        let jclass = unsafe { JClass::from_raw(To::class(jvm)?.as_jobject().as_raw()) };
+        let jclass = unsafe { JClass::from_raw(To::class(jvm)?.as_ref().as_jobject().as_raw()) };
 
         let env = jvm.to_env();
         if env.is_instance_of(&jobject, jclass)? {
@@ -140,7 +140,7 @@ where
 
         if cfg!(debug_assertions) {
             // XX: safety, find ways to avoid repeating?
-            let to_jclass = unsafe { JClass::from_raw(To::class(jvm)?.as_jobject().as_raw()) };
+            let to_jclass = unsafe { JClass::from_raw(To::class(jvm)?.as_ref().as_jobject().as_raw()) };
 
             let env = jvm.to_env();
             assert!(!jobject.is_null());
