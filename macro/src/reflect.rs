@@ -102,6 +102,6 @@ impl JavaClass {
             }
         };
 
-        class_info::SpannedClassInfo::parse(&s, self.class_span)
+        class_info::SpannedClassInfo::parse(&s, self.class_span, self.members.clone())
     }
 }

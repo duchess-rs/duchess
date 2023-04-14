@@ -78,6 +78,7 @@ impl SpannedClassInfo {
             .methods
             .iter()
             .filter(|m| !m.flags.is_static)
+            .filter(|m| self.members.contains_method(m))
             .map(|m| self.method(m))
             .collect::<Result<_, _>>()?;
 

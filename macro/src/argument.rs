@@ -1,7 +1,7 @@
 use proc_macro2::{Delimiter, Span};
 
 use crate::{
-    class_info::Id,
+    class_info::{Id, Method},
     parse::{Parse, Parser},
     span_error::SpanError,
 };
@@ -89,14 +89,23 @@ impl Parse for JavaClass {
     }
 }
 
+#[derive(Clone)]
 pub enum MemberListing {
-    All,
+    Wildcard,
+}
+
+impl MemberListing {
+    pub fn contains_method(&self, _m: &Method) -> bool {
+        match self {
+            MemberListing::Wildcard => true,
+        }
+    }
 }
 
 impl Parse for MemberListing {
     fn parse(p: &mut Parser) -> Result<Option<Self>, SpanError> {
         if let Some(()) = p.eat_punct('*') {
-            return Ok(Some(MemberListing::All));
+            return Ok(Some(MemberListing::Wildcard));
         }
 
         Ok(None)

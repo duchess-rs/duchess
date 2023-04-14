@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, sync::Arc};
 
 use proc_macro2::{Ident, Span};
 
-use crate::{parse::Parse, span_error::SpanError};
+use crate::{argument::MemberListing, parse::Parse, span_error::SpanError};
 
 pub struct SpannedPackageInfo {
     pub name: Id,
@@ -14,12 +14,17 @@ pub struct SpannedPackageInfo {
 pub struct SpannedClassInfo {
     pub info: ClassInfo,
     pub span: Span,
+    pub members: MemberListing,
 }
 
 impl SpannedClassInfo {
-    pub fn parse(t: &str, span: Span) -> Result<Self, SpanError> {
+    pub fn parse(t: &str, span: Span, members: MemberListing) -> Result<Self, SpanError> {
         match javap::parse_class_info(&t) {
-            Ok(info) => Ok(SpannedClassInfo { span, info }),
+            Ok(info) => Ok(SpannedClassInfo {
+                span,
+                info,
+                members,
+            }),
             Err(message) => Err(SpanError { span, message }),
         }
     }
@@ -31,7 +36,7 @@ impl Parse for SpannedClassInfo {
             return Ok(None);
         };
         let span = p.last_span().unwrap();
-        let r = Self::parse(&t, span)?;
+        let r = Self::parse(&t, span, MemberListing::Wildcard)?;
         Ok(Some(r))
     }
 
