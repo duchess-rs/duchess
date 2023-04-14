@@ -1,4 +1,4 @@
-use duchess::prelude::*;
+use duchess::{java::lang::Throwable, prelude::*};
 
 duchess::java_package! {
     package me.ferris;
@@ -19,11 +19,10 @@ fn main() -> duchess::GlobalResult<()> {
             .inspect(|l| l.log_string("Hello again, Duchess!"))
             .execute(jvm)?;
 
-        l.throw_something().catch(|t| t.print_stack_trace()).execute(jvm)?;
+        l.throw_something()
+            .catch::<Throwable, _>(|t| t.print_stack_trace())
+            .execute(jvm)?;
         println!("all good, though!");
-
-        let res = me::ferris::Logger::new().try_downcast::<_, me::ferris::Logger>().execute(jvm)?;
-        assert!(res.is_ok());
 
         Ok(())
     })

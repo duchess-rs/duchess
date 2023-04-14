@@ -1,12 +1,12 @@
-use std::{result, fmt::Debug};
+use std::{fmt::Debug, result};
 
 use jni::objects::{AutoLocal, JObject};
 use thiserror::Error;
 
-use crate::{Local, Global, Jvm, java::lang::Throwable};
+use crate::{java::lang::Throwable, Global, Jvm, Local};
 
-pub type Result<'jvm, T> = result::Result<T, Error<Local<'jvm, Throwable>>>; 
-pub type GlobalResult<T> = result::Result<T, Error<Global<Throwable>>>; 
+pub type Result<'jvm, T> = result::Result<T, Error<Local<'jvm, Throwable>>>;
+pub type GlobalResult<T> = result::Result<T, Error<Global<Throwable>>>;
 
 #[derive(Error)]
 pub enum Error<T> {
@@ -21,7 +21,7 @@ impl<T> Debug for Error<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Thrown(_t) => f.debug_tuple("Thrown").finish(),
-            Self::Jni(e) => e.fmt(f)
+            Self::Jni(e) => e.fmt(f),
         }
     }
 }
@@ -29,7 +29,9 @@ impl<T> Debug for Error<T> {
 impl<'jvm> Error<Local<'jvm, Throwable>> {
     pub(crate) fn extract_thrown(self, jvm: &mut Jvm<'jvm>) -> Self {
         match &self {
-            Self::Jni(JniError(JniErrorInternal::CheckFailure(jni::errors::Error::JavaException))) => {
+            Self::Jni(JniError(JniErrorInternal::CheckFailure(
+                jni::errors::Error::JavaException,
+            ))) => {
                 let env = jvm.to_env();
                 let exception = match env.exception_occurred() {
                     Ok(e) => e,
@@ -39,7 +41,9 @@ impl<'jvm> Error<Local<'jvm, Throwable>> {
                 if let Err(e) = env.exception_clear() {
                     return e.into();
                 }
-                Self::Thrown(unsafe { Local::from_jni(AutoLocal::new(JObject::from(exception), &env)) })
+                Self::Thrown(unsafe {
+                    Local::from_jni(AutoLocal::new(JObject::from(exception), &env))
+                })
             }
             _ => self,
         }
@@ -62,7 +66,7 @@ pub(crate) enum JniErrorInternal {
     #[error(transparent)]
     CheckFailure(#[from] jni::errors::Error),
     #[error(transparent)]
-    Jni(#[from] jni::errors::JniError)
+    Jni(#[from] jni::errors::JniError),
 }
 
 impl<T> From<jni::errors::Error> for Error<T> {

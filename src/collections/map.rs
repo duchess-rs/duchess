@@ -1,15 +1,16 @@
 use std::marker::PhantomData;
 
 use jni::{
-    objects::{AutoLocal, JMethodID, JValueGen, JClass},
+    objects::{AutoLocal, JClass, JMethodID, JValueGen},
     signature::ReturnType,
     sys::jvalue,
 };
 use once_cell::sync::OnceCell;
 
 use crate::{
+    java::lang::{Class, Throwable},
     plumbing::{JavaObjectExt, Upcast},
-    IntoJava, IntoLocal, JavaObject, Jvm, JvmOp, Local, Global, JavaType, java::lang::Class,
+    Global, IntoJava, IntoLocal, JavaObject, Jvm, JvmOp, Local,
 };
 
 // Ideally, we'd use duchess to derive these classes, but (a) we want to slap some nice interfaces to produce them from
@@ -20,26 +21,17 @@ pub struct Map<K, V> {
     _markers: PhantomData<(K, V)>,
 }
 
-unsafe impl<K: JavaObject, V: JavaObject> JavaType for Map<K, V> {
-    type ArrayClass<'jvm> = &'static Global<Class>;
-
-    fn array_class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::ArrayClass<'jvm>> {
-        unimplemented!()
-    }
-}
-
 unsafe impl<K: JavaObject, V: JavaObject> JavaObject for Map<K, V> {
-    type Class<'jvm> = &'static Global<Class>;
-
-    fn class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Class<'jvm>> {
+    fn class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Local<'jvm, Class>> {
         let env = jvm.to_env();
 
         static CLASS: OnceCell<Global<crate::java::lang::Class>> = OnceCell::new();
-        CLASS.get_or_try_init(|| {
+        let global = CLASS.get_or_try_init::<_, crate::Error<Local<Throwable>>>(|| {
             let class = env.find_class("java/util/Map")?;
             // env.find_class() internally calls check_exception!()
             Ok(unsafe { Global::from_jni(env.new_global_ref(class)?) })
-        })
+        })?;
+        Ok(jvm.local(global))
     }
 }
 
@@ -51,26 +43,17 @@ pub struct HashMap<K, V> {
     _markers: PhantomData<(K, V)>,
 }
 
-unsafe impl<K: JavaObject, V: JavaObject> JavaType for HashMap<K, V> {
-    type ArrayClass<'jvm> = &'static Global<Class>;
-
-    fn array_class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::ArrayClass<'jvm>> {
-        unimplemented!()
-    }
-}
-
 unsafe impl<K: JavaObject, V: JavaObject> JavaObject for HashMap<K, V> {
-    type Class<'jvm> = &'static Global<Class>;
-
-    fn class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Class<'jvm>> {
+    fn class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Local<'jvm, Class>> {
         let env = jvm.to_env();
 
         static CLASS: OnceCell<Global<crate::java::lang::Class>> = OnceCell::new();
-        CLASS.get_or_try_init(|| {
+        let global = CLASS.get_or_try_init::<_, crate::Error<Local<Throwable>>>(|| {
             let class = env.find_class("java/util/HashMap")?;
             // env.find_class() internally calls check_exception!()
             Ok(unsafe { Global::from_jni(env.new_global_ref(class)?) })
-        })
+        })?;
+        Ok(jvm.local(global))
     }
 }
 

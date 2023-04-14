@@ -58,46 +58,64 @@ public interface java.util.List<E> {
 }
     "#
 }
+
 duchess_macro::duchess_javap! {
-  r#"
-  Compiled from "ArrayList.java"
+    r#"
+    Compiled from "ArrayList.java"
 public class java.util.ArrayList<E> implements java.util.List<E> {
-public java.util.ArrayList();
-  descriptor: ()V
-public void trimToSize();
-  descriptor: ()V
-public void ensureCapacity(int);
-  descriptor: (I)V
-public int size();
-  descriptor: ()I
-public boolean isEmpty();
-  descriptor: ()Z
-public boolean contains(java.lang.Object);
-  descriptor: (Ljava/lang/Object;)Z
-public int indexOf(java.lang.Object);
-  descriptor: (Ljava/lang/Object;)I
-public int lastIndexOf(java.lang.Object);
-  descriptor: (Ljava/lang/Object;)I
-public java.lang.Object clone();
-  descriptor: ()Ljava/lang/Object;
-public java.lang.Object[] toArray();
-  descriptor: ()[Ljava/lang/Object;
-public E get(int);
-  descriptor: (I)Ljava/lang/Object;
-public E set(int, E);
-  descriptor: (ILjava/lang/Object;)Ljava/lang/Object;
-public boolean add(E);
-  descriptor: (Ljava/lang/Object;)Z
-public boolean equals(java.lang.Object);
-  descriptor: (Ljava/lang/Object;)Z
-public int hashCode();
-  descriptor: ()I
-public boolean remove(java.lang.Object);
-  descriptor: (Ljava/lang/Object;)Z
-public void clear();
-  descriptor: ()V
-public java.util.List<E> subList(int, int);
-  descriptor: (II)Ljava/util/List;
+  public java.util.ArrayList();
+    descriptor: ()V
+
+  public void trimToSize();
+    descriptor: ()V
+
+  public void ensureCapacity(int);
+    descriptor: (I)V
+
+  public int size();
+    descriptor: ()I
+
+  public boolean isEmpty();
+    descriptor: ()Z
+
+  public boolean contains(java.lang.Object);
+    descriptor: (Ljava/lang/Object;)Z
+
+  public int indexOf(java.lang.Object);
+    descriptor: (Ljava/lang/Object;)I
+
+  public int lastIndexOf(java.lang.Object);
+    descriptor: (Ljava/lang/Object;)I
+
+  public java.lang.Object clone();
+    descriptor: ()Ljava/lang/Object;
+
+  public java.lang.Object[] toArray();
+    descriptor: ()[Ljava/lang/Object;
+
+  public E get(int);
+    descriptor: (I)Ljava/lang/Object;
+
+  public E set(int, E);
+    descriptor: (ILjava/lang/Object;)Ljava/lang/Object;
+
+  public boolean add(E);
+    descriptor: (Ljava/lang/Object;)Z
+
+  public boolean equals(java.lang.Object);
+    descriptor: (Ljava/lang/Object;)Z
+
+  public int hashCode();
+    descriptor: ()I
+
+  public boolean remove(java.lang.Object);
+    descriptor: (Ljava/lang/Object;)Z
+
+  public void clear();
+    descriptor: ()V
+
+  public java.util.List<E> subList(int, int);
+    descriptor: (II)Ljava/util/List;
 }
-  "#
+    "#
 }

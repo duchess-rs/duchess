@@ -1,8 +1,11 @@
 use std::marker::PhantomData;
 
-use jni::objects::JClass;
+use jni::objects::{JClass, JObject};
 
-use crate::{JavaObject, JvmOp, Local, jvm::JavaObjectExt, Jvm};
+use crate::{
+    jvm::{Jail, JavaObjectExt},
+    JavaObject, Jvm, JvmOp, Local,
+};
 
 /// A trait to represent safe upcast operations for a [`JavaObject`].
 ///
@@ -33,18 +36,21 @@ where
     J: JvmOp,
     for<'jvm> J::Output<'jvm>: AsRef<From>,
     From: JavaObject,
-    To: JavaObject,
+    To: Upcast<From>,
 {
     pub(crate) fn new(op: J) -> Self {
-        Self { 
+        Self {
             op,
             _marker: PhantomData,
         }
     }
 
-    pub fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Result<Local<'jvm, To>, J::Output<'jvm>>> 
+    pub fn execute<'jvm>(
+        self,
+        jvm: &mut Jvm<'jvm>,
+    ) -> crate::Result<'jvm, Result<Local<'jvm, To>, J::Output<'jvm>>>
     where
-        J: JvmOp<Input<'jvm> = ()>
+        J: JvmOp<Input<'jvm> = ()>,
     {
         self.execute_with(jvm, ())
     }
@@ -55,7 +61,7 @@ where
     J: JvmOp,
     for<'jvm> J::Output<'jvm>: AsRef<From>,
     From: JavaObject,
-    To: JavaObject,
+    To: Upcast<From>,
 {
     type Input<'jvm> = J::Input<'jvm>;
     type Output<'jvm> = Result<Local<'jvm, To>, J::Output<'jvm>>;
@@ -67,19 +73,21 @@ where
     ) -> crate::Result<'jvm, Self::Output<'jvm>> {
         let instance = self.op.execute_with(jvm, input)?;
         let jobject = instance.as_ref().as_jobject();
-        // XX: safety, find ways to avoid repeating?
-        let jclass = unsafe { JClass::from_raw(To::class(jvm)?.as_ref().as_jobject().as_raw()) };
+
+        let class = To::class(jvm)?;
+        let jclass = class.as_jobject();
+        // Safety: XX class is a Local<Class> which can only point to Java class objects
+        let jclass = unsafe { std::mem::transmute::<Jail<JObject>, Jail<JClass>>(jclass) };
 
         let env = jvm.to_env();
-        if env.is_instance_of(&jobject, jclass)? {
-            // Safety: just checked that instance is an instance of To
-            unsafe {
-                let casted = env.new_local_ref(jobject)?;
-                Ok(Ok(Local::from_jni(env.auto_local(casted))))
-            }
-        } else {
-            Ok(Err(instance))
+        if !env.is_instance_of(&jobject, &*jclass)? {
+            return Ok(Err(instance));
         }
+
+        let local = jvm.local(instance.as_ref());
+        // Safety: XX repr(transparent) + just checked that instance is an instance of To
+        let casted = unsafe { std::mem::transmute::<Local<From>, Local<To>>(local) };
+        Ok(Ok(casted))
     }
 }
 
@@ -105,7 +113,7 @@ where
     To: JavaObject,
 {
     pub(crate) fn new(op: J) -> Self {
-        Self { 
+        Self {
             op,
             _marker: PhantomData,
         }
@@ -113,7 +121,7 @@ where
 
     pub fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Local<'jvm, To>>
     where
-        J: JvmOp<Input<'jvm> = ()>
+        J: JvmOp<Input<'jvm> = ()>,
     {
         self.execute_with(jvm, ())
     }
@@ -137,10 +145,10 @@ where
         let instance = self.op.execute_with(jvm, input)?;
         let jobject = instance.as_ref().as_jobject();
 
-
         if cfg!(debug_assertions) {
             // XX: safety, find ways to avoid repeating?
-            let to_jclass = unsafe { JClass::from_raw(To::class(jvm)?.as_ref().as_jobject().as_raw()) };
+            let to_jclass =
+                unsafe { JClass::from_raw(To::class(jvm)?.as_ref().as_jobject().as_raw()) };
 
             let env = jvm.to_env();
             assert!(!jobject.is_null());

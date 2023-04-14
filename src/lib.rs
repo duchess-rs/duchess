@@ -15,7 +15,7 @@ mod str;
 pub mod java;
 
 pub use duchess_macro::java_package;
-pub use error::{Error, Result, GlobalResult};
+pub use error::{Error, GlobalResult, Result};
 pub use jvm::Global;
 pub use jvm::JavaObject;
 pub use jvm::JavaType;
@@ -35,9 +35,9 @@ pub mod prelude {
 /// Internal module containing non-semver protected
 /// names used by generated code.
 pub mod plumbing {
-    pub use crate::jvm::{FromJValue, JavaObjectExt};
     pub use crate::cast::Upcast;
-    pub use crate::str::ToJavaStringOp;
     pub use crate::catch::try_catch;
+    pub use crate::jvm::{FromJValue, JavaObjectExt};
+    pub use crate::str::ToJavaStringOp;
     pub use duchess_macro::duchess_javap;
 }

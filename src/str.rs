@@ -4,10 +4,10 @@ use jni::{
 };
 
 use crate::{
+    java::lang::String as JavaString,
     jvm::JavaObjectExt,
     ops::{IntoJava, IntoRust},
-    Jvm, JvmOp, Local, 
-    java::lang::String as JavaString,
+    Jvm, JvmOp, Local,
 };
 
 pub trait ToJavaStringOp: JvmOp + Sized {

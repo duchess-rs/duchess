@@ -1,7 +1,8 @@
 use std::marker::PhantomData;
 
 use crate::{
-    cast::Upcast, ops::IntoJava, plumbing::JavaObjectExt, IntoRust, JavaObject, Jvm, JvmOp, Local, Global, java::lang::{ClassExt, Class}, IntoOptLocal, JavaType,
+    cast::Upcast, java::lang::Class, ops::IntoJava, plumbing::JavaObjectExt, IntoRust, JavaObject,
+    JavaType, Jvm, JvmOp, Local,
 };
 use jni::{
     errors::{Error, JniError},
@@ -12,20 +13,8 @@ pub struct JavaArray<T: JavaType> {
     _element: PhantomData<T>,
 }
 
-unsafe impl<T: JavaType> JavaType for JavaArray<T> {
-    type ArrayClass<'jvm> = Local<'jvm, Class>;
-
-    fn array_class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::ArrayClass<'jvm>> {
-        let class = Self::class(jvm);
-        let env = jvm.to_env();
-        todo!()
-    }
-}
-
 unsafe impl<T: JavaType> JavaObject for JavaArray<T> {
-    type Class<'jvm> = T::ArrayClass<'jvm>;
-
-    fn class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Class<'jvm>> {
+    fn class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Local<'jvm, Class>> {
         T::array_class(jvm)
     }
 }
@@ -33,7 +22,6 @@ unsafe impl<T: JavaType> JavaObject for JavaArray<T> {
 // Upcasts
 
 unsafe impl<T: JavaType> Upcast<JavaArray<T>> for JavaArray<T> {}
-
 
 macro_rules! primivite_array {
     ($([$rust:ty]: $new_fn:ident $get_fn:ident $set_fn:ident,)*) => {

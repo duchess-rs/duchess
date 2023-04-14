@@ -60,8 +60,7 @@ impl SpannedClassInfo {
     pub fn into_tokens(self) -> Result<TokenStream, SpanError> {
         let struct_name = self.struct_name();
         let ext_trait_name = self.ext_trait_name();
-        let cached_class = self.cached_class(self.jni_class_name());
-        let cached_array_class = self.cached_class(self.jni_array_class_name());
+        let cached_class = self.cached_class();
         let this_ty = self.this_type();
         let java_class_generics = self.class_generic_names();
 
@@ -126,22 +125,7 @@ impl SpannedClassInfo {
                 where
                     #(#java_class_generics: JavaObject,)*
                 {
-                    type Class<'jvm> = &'static Global<java::lang::Class>;
-
-                    fn class<'jvm>(jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, Self::Class<'jvm>> {
-                        #cached_class
-                    }
-                }
-
-                unsafe impl<#(#java_class_generics,)*> JavaType for #struct_name<#(#java_class_generics,)*>
-                where
-                    #(#java_class_generics: JavaObject,)*
-                {
-                    type ArrayClass<'jvm> = &'static Global<java::lang::Class>;
-
-                    fn array_class<'jvm>(jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, Self::ArrayClass<'jvm>> {
-                        #cached_array_class
-                    }
+                    #cached_class
                 }
 
                 unsafe impl<#(#java_class_generics,)*> plumbing::Upcast<#struct_name<#(#java_class_generics,)*>> for #struct_name<#(#java_class_generics,)*>
@@ -195,7 +179,7 @@ impl SpannedClassInfo {
             .map(|r| {
                 let mut sig = Signature::new(&Id::from("supertrait"), self.span, &self.info.generics);
                 let tokens = sig.forbid_capture(|sig| sig.class_ref_ty(r)).unwrap();
-                quote_spanned!(self.span => 
+                quote_spanned!(self.span =>
                     unsafe impl<#(#java_class_generics,)*> plumbing::Upcast<#tokens> for #struct_name<#(#java_class_generics,)*>
                     where
                         #(#java_class_generics: JavaObject,)*
@@ -205,18 +189,22 @@ impl SpannedClassInfo {
             .collect()
     }
 
-    fn cached_class(&self, jni_class_name: Literal) -> TokenStream {
+    fn cached_class(&self) -> TokenStream {
+        let jni_class_name = self.jni_class_name();
+
         quote_spanned! {
             self.span =>
+                fn class<'jvm>(jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, Local<'jvm, java::lang::Class>> {
+                    let env = jvm.to_env();
 
-                let env = jvm.to_env();
-
-                static CLASS: OnceCell<Global<java::lang::Class>> = OnceCell::new();
-                CLASS.get_or_try_init(|| {
-                    let class = env.find_class(#jni_class_name)?;
-                    // env.find_class() internally calls check_exception!()
-                    Ok(unsafe { Global::from_jni(env.new_global_ref(class)?) })
-                })
+                    static CLASS: OnceCell<Global<java::lang::Class>> = OnceCell::new();
+                    let global = CLASS.get_or_try_init::<_, duchess::Error<Local<java::lang::Throwable>>>(|| {
+                        let class = env.find_class(#jni_class_name)?;
+                        // env.find_class() internally calls check_exception!()
+                        Ok(unsafe { Global::from_jni(env.new_global_ref(class)?) })
+                    })?;
+                    Ok(jvm.local(global))
+                }
         }
     }
 
@@ -284,7 +272,7 @@ impl SpannedClassInfo {
                         ) -> duchess::Result<'jvm, Self::Output<'jvm>> {
                             #(#prepare_inputs)*
 
-                            let class = #ty::class(jvm)?;
+                            let class = <#ty>::class(jvm)?;
                             // XX: safety
                             let jclass = unsafe { JClass::from_raw(class.as_jobject().as_raw()) };
 
@@ -526,10 +514,6 @@ impl SpannedClassInfo {
         self.info.name.to_jni_name(self.span)
     }
 
-    fn jni_array_class_name(&self) -> Literal {
-        self.info.name.to_jni_array_name(self.span)
-    }
-
     fn prepare_inputs(&self, input_names: &[Ident], input_types: &[Type]) -> Vec<TokenStream> {
         input_names
             .iter()
@@ -732,19 +716,13 @@ impl Signature {
 
 trait IdExt {
     fn to_jni_name(&self, span: Span) -> Literal;
-    fn to_jni_array_name(&self, span: Span) -> Literal;
     fn to_module_name(&self, span: Span) -> TokenStream;
-
 }
 
 impl IdExt for Id {
     fn to_jni_name(&self, _span: Span) -> Literal {
         let s = self.replace('.', "/");
         Literal::string(&s)
-    }
-
-    fn to_jni_array_name(&self, _span: Span) -> Literal {
-        Literal::string(&format!("[L{};", self.replace(".", "/")))
     }
 
     fn to_module_name(&self, span: Span) -> TokenStream {
