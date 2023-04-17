@@ -116,7 +116,7 @@ impl SpannedClassInfo {
                 };
                 use jni::{
                     objects::{AutoLocal, JMethodID, JClass, JValue, JValueGen},
-                    signature::ReturnType,
+                    signature::{ReturnType, Primitive},
                     sys::jvalue,
                 };
                 use once_cell::sync::OnceCell;
@@ -194,17 +194,17 @@ impl SpannedClassInfo {
 
         quote_spanned! {
             self.span =>
-                fn class<'jvm>(jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, Local<'jvm, java::lang::Class>> {
-                    let env = jvm.to_env();
+            fn class<'jvm>(jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, Local<'jvm, java::lang::Class>> {
+                let env = jvm.to_env();
 
-                    static CLASS: OnceCell<Global<java::lang::Class>> = OnceCell::new();
-                    let global = CLASS.get_or_try_init::<_, duchess::Error<Local<java::lang::Throwable>>>(|| {
-                        let class = env.find_class(#jni_class_name)?;
-                        // env.find_class() internally calls check_exception!()
-                        Ok(unsafe { Global::from_jni(env.new_global_ref(class)?) })
-                    })?;
-                    Ok(jvm.local(global))
-                }
+                static CLASS: OnceCell<Global<java::lang::Class>> = OnceCell::new();
+                let global = CLASS.get_or_try_init::<_, duchess::Error<Local<java::lang::Throwable>>>(|| {
+                    let class = env.find_class(#jni_class_name)?;
+                    // env.find_class() internally calls check_exception!()
+                    Ok(unsafe { Global::from_jni(env.new_global_ref(class)?) })
+                })?;
+                Ok(jvm.local(global))
+            }
         }
     }
 
@@ -273,19 +273,24 @@ impl SpannedClassInfo {
                             #(#prepare_inputs)*
 
                             let class = <#ty>::class(jvm)?;
-                            // XX: safety
-                            let jclass = unsafe { JClass::from_raw(class.as_jobject().as_raw()) };
+                            let class = class.as_jobject();
+                            let class: &JClass = (&*class).into();
 
                             let env = jvm.to_env();
 
-                            let o = env.new_object(
-                                jclass,
-                                #descriptor,
-                                &[
-                                    #(JValue::from(#input_names),)*
-                                ]
-                            )?;
-                            // env.new_object() internally calls check_exception!()
+                            // Cache the method id for the constructor -- note that we only have one cache
+                            // no matter how many generic monomorphizations there are. This makes sense
+                            // given Java's erased-based generics system.
+                            static CONSTRUCTOR: OnceCell<JMethodID> = OnceCell::new();
+                            let constructor =
+                                CONSTRUCTOR.get_or_try_init(|| env.get_method_id(class, "<init>", #descriptor))?;
+
+                            let o = unsafe {
+                                env.new_object_unchecked(class, *constructor, &[
+                                    #(JValue::from(#input_names).as_jni(),)*
+                                ])?
+                            };
+                            // env.new_object_unchecked() internally calls check_exception!()
 
                             Ok(unsafe {
                                 Local::from_jni(AutoLocal::new(o, &env))
@@ -328,6 +333,7 @@ impl SpannedClassInfo {
 
         let output_ty = sig.output_type(&method.return_ty)?;
         let output_trait = sig.method_trait(&method.return_ty)?;
+        let jni_return_ty = sig.jni_return_ty(&method.return_ty)?;
 
         let descriptor = Literal::string(&method.descriptor.string);
 
@@ -458,11 +464,25 @@ impl SpannedClassInfo {
 
                     #(#prepare_inputs)*
 
+                    // Cache the method id for this method -- note that we only have one cache
+                    // no matter how many generic monomorphizations there are. This makes sense
+                    // given Java's erased-based generics system.
+                    static METHOD: OnceCell<JMethodID> = OnceCell::new();
+                    let method = METHOD.get_or_try_init::<_, duchess::Error<Local<java::lang::Throwable>>>(|| {
+                        let class = <#this_ty>::class(jvm)?;
+                        let class = class.as_jobject();
+                        let class: &JClass = (&*class).into();
+                        Ok(jvm.to_env().get_method_id(class, #method_str, #descriptor)?)
+                    })?;
+
                     let env = jvm.to_env();
-                    let result = env.call_method(this, #method_str, #descriptor, &[
-                        #(JValue::from(#input_names),)*
-                    ])?;
-                    // env.call_method() internall calls check_exception!()
+
+                    let result = unsafe {
+                        env.call_method_unchecked(this, *method, #jni_return_ty, &[
+                            #(JValue::from(#input_names).as_jni(),)*
+                        ])?
+                    };
+                    // env.call_method_unchecked internally calls check_exception!()
 
                     Ok(FromJValue::from_jvalue(jvm, result))
                 }
@@ -621,6 +641,7 @@ impl Signature {
     /// Returns an appropriate `impl type` for a funtion that
     /// returns `ty`. Assumes objects are nullable.
     fn output_type(&mut self, ty: &Option<Type>) -> Result<TokenStream, SpanError> {
+        // XX: do we need the non_repeating transform here? Shouldn't be allowed in return position
         self.forbid_capture(|this| match ty.as_ref().map(|ty| ty.to_non_repeating()) {
             Some(NonRepeatingType::Ref(ty)) => {
                 let t = this.java_ref_ty(&ty)?;
@@ -632,6 +653,32 @@ impl Signature {
             }
             None => Ok(quote_spanned!(this.span => ())),
         })
+    }
+
+    fn jni_return_ty(&mut self, ty: &Option<Type>) -> Result<TokenStream, SpanError> {
+        match ty {
+            Some(Type::Ref(_)) => Ok(quote_spanned!(self.span => ReturnType::Object)),
+            Some(Type::Repeat(_)) => Err(SpanError {
+                span: self.span,
+                message: format!(
+                    "unsupported repeating method return type in `{}`",
+                    self.method_name
+                ),
+            }),
+            Some(Type::Scalar(scalar)) => {
+                let primitive = match scalar {
+                    ScalarType::Int => quote_spanned!(self.span => Primitive::Int),
+                    ScalarType::Long => quote_spanned!(self.span => Primitive::Long),
+                    ScalarType::Short => quote_spanned!(self.span => Primitive::Short),
+                    ScalarType::Byte => quote_spanned!(self.span => Primitive::Byte),
+                    ScalarType::F64 => quote_spanned!(self.span => Primitive::Double),
+                    ScalarType::F32 => quote_spanned!(self.span => Primitive::Float),
+                    ScalarType::Boolean => quote_spanned!(self.span => Primitive::Boolean),
+                };
+                Ok(quote_spanned!(self.span => ReturnType::Primitive(#primitive)))
+            }
+            None => Ok(quote_spanned!(self.span => ReturnType::Primitive(Primitive::Void))),
+        }
     }
 
     /// Returns an appropriate trait for a method that
