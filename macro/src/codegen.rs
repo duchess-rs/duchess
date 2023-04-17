@@ -278,6 +278,9 @@ impl SpannedClassInfo {
 
                             let env = jvm.to_env();
 
+                            // Cache the method id for the constructor -- note that we only have one cache
+                            // no matter how many generic monomorphizations there are. This makes sense
+                            // given Java's erased-based generics system.
                             static CONSTRUCTOR: OnceCell<JMethodID> = OnceCell::new();
                             let constructor =
                                 CONSTRUCTOR.get_or_try_init(|| env.get_method_id(class, "<init>", #descriptor))?;
