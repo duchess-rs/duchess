@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, process::Command};
+use std::{collections::BTreeMap, env, process::Command};
 
 use proc_macro2::TokenStream;
 
@@ -63,11 +63,17 @@ impl JavaClass {
     fn parse_javap(&self, package_name: &JavaPath) -> Result<SpannedClassInfo, SpanError> {
         let mut command = Command::new("javap");
 
+        let classpath = match env::var("CLASSPATH") {
+            Ok(val) => val,
+            Err(e) => panic!("duchess cannot read the CLASSPATH environment variable: {e}"),
+        };
+
         command
+            .arg("-cp")
+            .arg(classpath)
             .arg("-public")
             .arg("-s")
             .arg(format!("{}.{}", package_name, self.class_name))
-            .env("CLASSPATH", "java") // FIXME: HACK
             ;
 
         let output_or_err = command.output();
