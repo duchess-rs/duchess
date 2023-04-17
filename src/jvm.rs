@@ -49,7 +49,7 @@ pub trait JvmOp: Sized {
     ///
     /// Note that chaining multiple `catch` calls together is *not* the same as
     /// multiple catch arms in Java! Subsecquent `catch` calls can catch exceptions
-    /// thrown from previous catch operations! Use XX instead to handle multiple
+    /// thrown from previous catch operations! Use [`crate::by_type`] instead to handle multiple
     /// different exception types at once.
     ///
     /// # Example
@@ -209,7 +209,7 @@ impl<'jvm> Jvm<'jvm> {
 ///
 /// # Example
 ///
-/// ```
+/// ```ignore
 /// # use duchess::JavaObject;
 /// pub struct BigDecimal {
 ///     _private: (), // prevent construction
