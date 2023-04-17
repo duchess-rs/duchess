@@ -461,6 +461,9 @@ impl SpannedClassInfo {
 
                     #(#prepare_inputs)*
 
+                    // Cache the method id for this method -- note that we only have one cache
+                    // no matter how many generic monomorphizations there are. This makes sense
+                    // given Java's erased-based generics system.
                     static METHOD: OnceCell<JMethodID> = OnceCell::new();
                     let method = METHOD.get_or_try_init::<_, duchess::Error<Local<java::lang::Throwable>>>(|| {
                         let class = <#this_ty>::class(jvm)?;
