@@ -16,7 +16,9 @@ where
     for<'jvm> K: JvmOp<Input<'jvm> = J::Output<'jvm>, Output<'jvm> = ()>,
 {
     pub(crate) fn new(j: J, op: impl FnOnce(ArgOp<J>) -> K) -> Inspect<J, K> {
-        let k = op(ArgOp::arg());
+        let k = op(ArgOp {
+            phantom: PhantomData,
+        });
         Inspect { j, k }
     }
 }
@@ -48,14 +50,6 @@ where
 #[derive(Clone)]
 pub struct ArgOp<J: JvmOp> {
     phantom: PhantomData<J>,
-}
-
-impl<J: JvmOp> ArgOp<J> {
-    pub(crate) fn arg() -> Self {
-        Self {
-            phantom: PhantomData,
-        }
-    }
 }
 
 impl<J> JvmOp for ArgOp<J>
