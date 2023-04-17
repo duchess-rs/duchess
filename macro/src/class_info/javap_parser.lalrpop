@@ -59,6 +59,12 @@ Constructor: Constructor = {
     }
 };
 
+pub MethodSig: MethodSig = {
+    <g:Generics> <r:ReturnType> <n:Id> "(" <a:Comma<Type>> ")" ";" => {
+        MethodSig { name: n, argument_tys: a, return_ty: r, generics: g }
+    }
+};
+
 Method: Method = {
     <f:Flags> <g:Generics> <r:ReturnType> <n:Id> "(" <a:Comma<Type>> ")" <t:Throws> ";" <d:Descriptor> => {
         Method { flags: f, name: n, argument_tys: a, return_ty: r, throws: t, descriptor: d, generics: g }

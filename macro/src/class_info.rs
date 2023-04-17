@@ -1,8 +1,13 @@
 use std::{collections::BTreeMap, sync::Arc};
 
-use proc_macro2::{Ident, Span};
+use proc_macro2::{Ident, Span, TokenTree};
 
-use crate::{argument::MemberListing, parse::Parse, span_error::SpanError};
+use crate::{
+    argument::MemberListing,
+    class_info::{self},
+    parse::Parse,
+    span_error::SpanError,
+};
 
 pub struct SpannedPackageInfo {
     pub name: Id,
@@ -36,7 +41,7 @@ impl Parse for SpannedClassInfo {
             return Ok(None);
         };
         let span = p.last_span().unwrap();
-        let r = Self::parse(&t, span, MemberListing::Wildcard)?;
+        let r = Self::parse(&t, span, MemberListing::all())?;
         Ok(Some(r))
     }
 
@@ -120,6 +125,76 @@ pub struct Method {
     pub return_ty: Option<Type>,
     pub throws: Vec<ClassRef>,
     pub descriptor: Descriptor,
+}
+
+#[derive(Clone, Debug)]
+pub struct SpannedMethodSig {
+    pub method_sig: MethodSig,
+    pub span: Span,
+}
+
+impl Parse for SpannedMethodSig {
+    fn parse(p: &mut crate::parse::Parser) -> Result<Option<Self>, SpanError> {
+        // Parse an individual method. For this, we hackily consume all tokens until a `;`
+        // and make a string out of it, then pass to the lalrpop parser.
+        //
+        // FIXME: clean this up.
+        let Some(t0) = p.eat_token() else {
+            return Ok(None);
+        };
+
+        let mut text: String = t0.to_string();
+        let mut span = t0.span();
+
+        if !is_semi(&t0) {
+            while let Some(t1) = p.eat_token() {
+                text.push_str(&t1.to_string());
+                span = span.join(t1.span()).unwrap_or(span);
+                if is_semi(&t1) {
+                    break;
+                }
+            }
+        }
+
+        return match class_info::javap::parse_method_sig(&text) {
+            Ok(ms) => Ok(Some(SpannedMethodSig {
+                method_sig: ms,
+                span,
+            })),
+            Err(message) => return Err(SpanError { span, message }),
+        };
+
+        fn is_semi(t: &TokenTree) -> bool {
+            match t {
+                TokenTree::Punct(p) => p.as_char() == ';',
+                _ => false,
+            }
+        }
+    }
+
+    fn description() -> String {
+        format!("java method signature")
+    }
+}
+
+/// Signature of a single method in a class;
+/// identifies the method precisely enough
+/// to select from one of many overloaded methods.
+#[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
+pub struct MethodSig {
+    pub name: Id,
+    pub generics: Vec<Id>,
+    pub argument_tys: Vec<Type>,
+    pub return_ty: Option<Type>,
+}
+
+impl MethodSig {
+    pub fn matches(&self, m: &Method) -> bool {
+        m.name == self.name
+            && m.generics == self.generics
+            && m.argument_tys == self.argument_tys
+            && m.return_ty == self.return_ty
+    }
 }
 
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
