@@ -1,6 +1,6 @@
 use crate::{
     cast::{AsUpcast, TryDowncast, Upcast},
-    catch::{CatchNone, CatchSome, Catching, ThrownOp},
+    catch::{CatchNone, Catching},
     inspect::{ArgOp, Inspect},
     java::lang::{Class, ClassExt, Throwable},
     not_null::NotNull,
@@ -42,38 +42,6 @@ pub trait JvmOp: Sized {
         for<'jvm> K: JvmOp<Input<'jvm> = Self::Output<'jvm>, Output<'jvm> = ()>,
     {
         Inspect::new(self, op)
-    }
-
-    /// Catch any unhandled exception thrown by this operation as long as its of
-    /// type `T`. Use [`Throwable`] as `T` to catch any exception.
-    ///
-    /// Note that chaining multiple `catch` calls together is *not* the same as
-    /// multiple catch arms in Java! Subsecquent `catch` calls can catch exceptions
-    /// thrown from previous catch operations! Use [`Self::catching()`] instead to handle
-    /// multiple different exception types at once.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// # use duchess::{java::{self, lang::{ObjectExt, ThrowableExt}}, JvmOp, IntoVoid};
-    /// duchess::Jvm::with(|jvm| {
-    ///     java::lang::Object::new()
-    ///         .notify()
-    ///         .catch::<java::lang::Throwable, _>(|t| t.print_stack_trace())
-    ///         .execute(jvm)
-    /// });
-    /// ```
-    fn catch<T, K>(
-        self,
-        op: impl FnOnce(ThrownOp<T>) -> K,
-    ) -> Catching<Self, CatchSome<CatchNone, T, K>>
-    where
-        T: Upcast<Throwable>,
-        K: JvmOp,
-        for<'jvm> K: JvmOp<Input<'jvm> = Local<'jvm, T>>,
-        for<'jvm> K::Output<'jvm>: Into<Self::Output<'jvm>>,
-    {
-        Catching::new(self).catch(op)
     }
 
     /// Start a set of catch blocks that can handle exceptions thrown by `self`. Multiple
