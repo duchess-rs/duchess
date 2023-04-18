@@ -1,6 +1,6 @@
 use crate::{
     cast::{AsUpcast, TryDowncast, Upcast},
-    catch::{Catch, ThrownOp},
+    catch::{CatchNone, CatchSome, Catching, ThrownOp},
     inspect::{ArgOp, Inspect},
     java::lang::{Class, ClassExt, Throwable},
     not_null::NotNull,
@@ -49,8 +49,8 @@ pub trait JvmOp: Sized {
     ///
     /// Note that chaining multiple `catch` calls together is *not* the same as
     /// multiple catch arms in Java! Subsecquent `catch` calls can catch exceptions
-    /// thrown from previous catch operations! Use [`crate::by_type`] instead to handle multiple
-    /// different exception types at once.
+    /// thrown from previous catch operations! Use [`Self::catching()`] instead to handle
+    /// multiple different exception types at once.
     ///
     /// # Example
     ///
@@ -63,14 +63,24 @@ pub trait JvmOp: Sized {
     ///         .execute(jvm)
     /// });
     /// ```
-    fn catch<T, K>(self, op: impl FnOnce(ThrownOp<T>) -> K) -> Catch<Self, K>
+    fn catch<T, K>(
+        self,
+        op: impl FnOnce(ThrownOp<T>) -> K,
+    ) -> Catching<Self, CatchSome<CatchNone, T, K>>
     where
         T: Upcast<Throwable>,
         K: JvmOp,
         for<'jvm> K: JvmOp<Input<'jvm> = Local<'jvm, T>>,
         for<'jvm> K::Output<'jvm>: Into<Self::Output<'jvm>>,
     {
-        Catch::new(self, op)
+        Catching::new(self).catch(op)
+    }
+
+    /// Start a set of catch blocks that can handle exceptions thrown by `self`. Multiple
+    /// blocks can be added via [`Catching::catch`] for different exception classes, as well as
+    /// a finally block.
+    fn catching(self) -> Catching<Self, CatchNone> {
+        Catching::new(self)
     }
 
     fn assert_not_null<T>(self) -> NotNull<Self>
