@@ -1,7 +1,5 @@
 use std::{collections::BTreeMap, process::Command};
 
-use proc_macro2::TokenStream;
-
 use crate::{
     argument::{DuchessDeclaration, Ident, JavaClass, JavaPackage, JavaPath},
     class_info::{self, Id, RootMap, SpannedClassInfo, SpannedPackageInfo},
@@ -9,13 +7,7 @@ use crate::{
 };
 
 impl DuchessDeclaration {
-    pub fn into_tokens(self) -> Result<TokenStream, SpanError> {
-        let root_map = self.to_root_map()?;
-
-        root_map.into_packages().map(|p| p.into_tokens(0)).collect()
-    }
-
-    fn to_root_map(&self) -> Result<RootMap, SpanError> {
+    pub fn to_root_map(&self) -> Result<RootMap, SpanError> {
         let mut subpackages = BTreeMap::new();
         for package in &self.packages {
             package.to_spanned_packages(&package.package_name.ids, &mut subpackages)?;
