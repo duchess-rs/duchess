@@ -69,6 +69,7 @@ impl SpannedClassInfo {
             .info
             .constructors
             .iter()
+            .filter(|c| self.members.contains_constructor(&self.info, c))
             .map(|c| self.constructor(c))
             .collect::<Result<_, _>>()?;
 

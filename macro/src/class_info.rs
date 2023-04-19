@@ -116,8 +116,13 @@ impl SpannedPackageInfo {
 }
 
 pub struct SpannedClassInfo {
+    /// The complete class info loaded from javap
     pub info: ClassInfo,
+
+    /// The span where user declared interest in this class
     pub span: Span,
+
+    /// The listing of members user wants to include
     pub members: MemberListing,
 }
 

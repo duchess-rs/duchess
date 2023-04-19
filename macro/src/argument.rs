@@ -1,7 +1,7 @@
 use proc_macro2::{Delimiter, Span};
 
 use crate::{
-    class_info::{Id, Method, SpannedMethodSig},
+    class_info::{ClassInfo, Constructor, Id, Method, SpannedMethodSig},
     parse::{Parse, Parser},
     span_error::SpanError,
 };
@@ -108,6 +108,12 @@ impl MemberListing {
         self.elements.iter().any(|e| e.contains_method(m))
     }
 
+    pub fn contains_constructor(&self, class: &ClassInfo, ctor: &Constructor) -> bool {
+        self.elements
+            .iter()
+            .any(|e| e.contains_constructor(class, ctor))
+    }
+
     pub fn all() -> Self {
         MemberListing {
             elements: vec![MemberListingElement::Wildcard(MemberListing::none())],
@@ -124,6 +130,13 @@ impl MemberListingElement {
         match self {
             MemberListingElement::Wildcard(ml) => !ml.contains_method(m),
             MemberListingElement::Named(n) => n.method_sig.matches(m),
+        }
+    }
+
+    pub fn contains_constructor(&self, class: &ClassInfo, ctor: &Constructor) -> bool {
+        match self {
+            MemberListingElement::Wildcard(ml) => !ml.contains_constructor(class, ctor),
+            MemberListingElement::Named(n) => n.method_sig.matches_constructor(class, ctor),
         }
     }
 }
