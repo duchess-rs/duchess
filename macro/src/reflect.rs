@@ -4,25 +4,23 @@ use proc_macro2::TokenStream;
 
 use crate::{
     argument::{DuchessDeclaration, Ident, JavaClass, JavaPackage, JavaPath},
-    class_info::{self, Id, SpannedClassInfo, SpannedPackageInfo},
+    class_info::{self, Id, RootMap, SpannedClassInfo, SpannedPackageInfo},
     span_error::SpanError,
 };
 
 impl DuchessDeclaration {
     pub fn into_tokens(self) -> Result<TokenStream, SpanError> {
-        let spanned_packages = self.to_spanned_packages()?;
-        spanned_packages
-            .into_values()
-            .map(|p| p.into_tokens(0))
-            .collect()
+        let root_map = self.to_root_map()?;
+
+        root_map.into_packages().map(|p| p.into_tokens(0)).collect()
     }
 
-    fn to_spanned_packages(&self) -> Result<BTreeMap<Id, SpannedPackageInfo>, SpanError> {
-        let mut result = BTreeMap::new();
+    fn to_root_map(&self) -> Result<RootMap, SpanError> {
+        let mut subpackages = BTreeMap::new();
         for package in &self.packages {
-            package.to_spanned_packages(&package.package_name.ids, &mut result)?;
+            package.to_spanned_packages(&package.package_name.ids, &mut subpackages)?;
         }
-        Ok(result)
+        Ok(RootMap { subpackages })
     }
 }
 

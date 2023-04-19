@@ -211,7 +211,7 @@ impl SpannedClassInfo {
         let mut sig = Signature::new(&self.info.name, self.span, &self.info.generics);
 
         let input_traits: Vec<_> = constructor
-            .args
+            .argument_tys
             .iter()
             .map(|ty| sig.input_trait(ty))
             .collect::<Result<_, _>>()?;
@@ -228,7 +228,7 @@ impl SpannedClassInfo {
         let descriptor = Literal::string(&constructor.descriptor.string);
 
         // Code to convert each input appropriately
-        let prepare_inputs = self.prepare_inputs(&input_names, &constructor.args);
+        let prepare_inputs = self.prepare_inputs(&input_names, &constructor.argument_tys);
 
         let output = quote_spanned!(self.span =>
             impl< #(#java_class_generics,)* > #ty
@@ -660,7 +660,12 @@ impl Signature {
                 Ok(quote_spanned!(self.span => java::Array<#e>))
             }
             RefType::TypeParameter(t) => {
-                assert!(self.in_scope_generics.contains(&t));
+                assert!(
+                    self.in_scope_generics.contains(&t),
+                    "generic type parameter `{:?}` not among in-scope parameters: {:?}",
+                    t, 
+                    self.in_scope_generics,
+                );
                 let t = t.to_ident(self.span);
                 Ok(quote_spanned!(self.span => #t))
             }
@@ -698,6 +703,7 @@ impl Signature {
 
     fn java_scalar_ty(&self, ty: &ScalarType) -> TokenStream {
         match ty {
+            ScalarType::Char => quote_spanned!(self.span => u16),
             ScalarType::Int => quote_spanned!(self.span => i32),
             ScalarType::Long => quote_spanned!(self.span => i64),
             ScalarType::Short => quote_spanned!(self.span => i16),

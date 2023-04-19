@@ -9,11 +9,110 @@ use crate::{
     span_error::SpanError,
 };
 
+pub struct RootMap {
+    pub subpackages: BTreeMap<Id, SpannedPackageInfo>,
+}
+
+impl RootMap {
+    /// Finds the class with the given name (if present).
+    pub fn find_class(&self, cn: &ClassName) -> Option<&SpannedClassInfo> {
+        let (package, class_name) = cn.split();
+        let package_info = self.find_package(package)?;
+        package_info.find_class(class_name)
+    }
+
+    /// Finds the package with the given name (if present).
+    pub fn find_package(&self, ids: &[Id]) -> Option<&SpannedPackageInfo> {
+        let (p0, ps) = ids.split_first().unwrap();
+        self.subpackages.get(p0)?.find_subpackage(ps)
+    }
+
+    pub fn into_packages(self) -> impl Iterator<Item = SpannedPackageInfo> {
+        self.subpackages.into_values()
+    }
+
+    /// Find the names of all classes contained within.
+    pub fn class_names(&self) -> Vec<ClassName> {
+        self.subpackages
+            .values()
+            .flat_map(|pkg| pkg.class_names(&[]))
+            .collect()
+    }
+}
+
+/// Absolute name of a class (including Java package)
+pub struct ClassName {
+    pub ids: Vec<Id>,
+}
+
+impl ClassName {
+    pub fn new(package_name: &[Id], class_name: &Id) -> Self {
+        ClassName {
+            ids: package_name
+                .iter()
+                .chain(std::iter::once(class_name))
+                .cloned()
+                .collect(),
+        }
+    }
+
+    /// Split and return the (package name, class name) pair.
+    pub fn split(&self) -> (&[Id], &Id) {
+        let (name, package) = self.ids.split_last().unwrap();
+        (package, name)
+    }
+
+    /// Split the package name.
+    pub fn package(&self) -> &[Id] {
+        self.split().0
+    }
+}
+
 pub struct SpannedPackageInfo {
     pub name: Id,
     pub span: Span,
     pub subpackages: BTreeMap<Id, SpannedPackageInfo>,
     pub classes: Vec<SpannedClassInfo>,
+}
+
+impl SpannedPackageInfo {
+    /// Find a (sub)package given its relative name
+    pub fn find_subpackage(&self, ids: &[Id]) -> Option<&SpannedPackageInfo> {
+        let Some((p0, ps)) = ids.split_first() else {
+            return Some(self);
+        };
+
+        self.subpackages.get(p0)?.find_subpackage(ps)
+    }
+
+    /// Find a class in this package
+    pub fn find_class(&self, id: &Id) -> Option<&SpannedClassInfo> {
+        self.classes.iter().find(|c| c.info.name == *id)
+    }
+
+    /// Find the names of all classes contained within self
+    pub fn class_names(&self, parent_package: &[Id]) -> Vec<ClassName> {
+        // Name of this package
+        let package_name: Vec<Id> = parent_package
+            .iter()
+            .chain(std::iter::once(&self.name))
+            .cloned()
+            .collect();
+
+        let classes_from_subpackages = self
+            .subpackages
+            .values()
+            .flat_map(|pkg| pkg.class_names(&package_name));
+
+        let classes_from_this_package = self
+            .classes
+            .iter()
+            .map(|c| ClassName::new(&package_name, &c.info.name));
+
+        classes_from_subpackages
+            .chain(classes_from_this_package)
+            .collect()
+    }
 }
 
 pub struct SpannedClassInfo {
@@ -104,7 +203,8 @@ pub enum Privacy {
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
 pub struct Constructor {
     pub flags: Flags,
-    pub args: Vec<Type>,
+    pub generics: Vec<Id>,
+    pub argument_tys: Vec<Type>,
     pub throws: Vec<ClassRef>,
     pub descriptor: Descriptor,
 }
@@ -114,6 +214,7 @@ pub struct Field {
     pub flags: Flags,
     pub name: Id,
     pub ty: Type,
+    pub descriptor: Descriptor,
 }
 
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
@@ -185,15 +286,17 @@ pub struct MethodSig {
     pub name: Id,
     pub generics: Vec<Id>,
     pub argument_tys: Vec<Type>,
-    pub return_ty: Option<Type>,
 }
 
 impl MethodSig {
     pub fn matches(&self, m: &Method) -> bool {
-        m.name == self.name
-            && m.generics == self.generics
-            && m.argument_tys == self.argument_tys
-            && m.return_ty == self.return_ty
+        m.name == self.name && m.generics == self.generics && m.argument_tys == self.argument_tys
+    }
+
+    pub fn matches_constructor(&self, class: &ClassInfo, ctor: &Constructor) -> bool {
+        class.name == self.name
+            && ctor.generics == self.generics
+            && ctor.argument_tys == self.argument_tys
     }
 }
 
@@ -248,6 +351,7 @@ pub enum ScalarType {
     F64,
     F32,
     Boolean,
+    Char,
 }
 
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
