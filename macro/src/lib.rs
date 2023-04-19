@@ -4,6 +4,7 @@ use parse::Parser;
 use proc_macro::TokenStream;
 
 mod argument;
+mod check;
 mod class_info;
 mod codegen;
 mod parse;

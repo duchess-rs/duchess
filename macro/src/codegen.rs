@@ -13,7 +13,7 @@ use rust_format::Formatter;
 impl DuchessDeclaration {
     pub fn into_tokens(self) -> Result<TokenStream, SpanError> {
         let root_map = self.to_root_map()?;
-
+        let () = root_map.check()?;
         root_map.into_tokens()
     }
 }
@@ -79,21 +79,13 @@ impl SpannedClassInfo {
         let java_class_generics = self.class_generic_names();
 
         // Convert constructors
-        let constructors: Vec<_> = self
-            .info
-            .constructors
-            .iter()
-            .filter(|c| self.members.contains_constructor(&self.info, c))
+        let constructors: Vec<_> = self.selected_constructors()
             .map(|c| self.constructor(c))
             .collect::<Result<_, _>>()?;
 
         // Convert class methods (not static methods, those are different)
-        let object_methods: Vec<_> = self
-            .info
-            .methods
-            .iter()
+        let object_methods: Vec<_> = self.selected_methods()
             .filter(|m| !m.flags.is_static)
-            .filter(|m| self.members.contains_method(m))
             .map(|m| self.method(m))
             .collect::<Result<_, _>>()?;
 

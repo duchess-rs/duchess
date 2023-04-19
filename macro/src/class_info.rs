@@ -45,6 +45,13 @@ pub struct ClassName {
     pub ids: Vec<Id>,
 }
 
+impl From<&Id> for ClassName {
+    fn from(value: &Id) -> Self {
+        let ids: Vec<Id> = value.split('.').map(|s| Id::from(s)).collect();
+        ClassName { ids }
+    }
+}
+
 impl ClassName {
     pub fn new(package_name: &[Id], class_name: &Id) -> Self {
         ClassName {
@@ -61,10 +68,21 @@ impl ClassName {
         let (name, package) = self.ids.split_last().unwrap();
         (package, name)
     }
+}
 
-    /// Split the package name.
-    pub fn package(&self) -> &[Id] {
-        self.split().0
+impl std::fmt::Display for ClassName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Some((last, first)) = self.ids.split_last() else {
+            return Ok(());
+        };
+
+        for id in first {
+            write!(f, "{id}.")?;
+        }
+
+        write!(f, "{last}")?;
+
+        Ok(())
     }
 }
 
@@ -136,6 +154,22 @@ impl SpannedClassInfo {
             }),
             Err(message) => Err(SpanError { span, message }),
         }
+    }
+
+    /// Constructors selected by the user for codegen
+    pub fn selected_constructors(&self) -> impl Iterator<Item = &Constructor> {
+        self.info
+            .constructors
+            .iter()
+            .filter(|c| self.members.contains_constructor(&self.info, c))
+    }
+
+    /// Methods selected by the user for codegen (note: some may be static)
+    pub fn selected_methods(&self) -> impl Iterator<Item = &Method> {
+        self.info
+            .methods
+            .iter()
+            .filter(|m| self.members.contains_method(m))
     }
 }
 
@@ -214,6 +248,16 @@ pub struct Constructor {
     pub descriptor: Descriptor,
 }
 
+impl Constructor {
+    pub fn to_method_sig(&self, class: &ClassInfo) -> MethodSig {
+        MethodSig {
+            name: class.name.clone(),
+            generics: self.generics.clone(),
+            argument_tys: self.argument_tys.clone(),
+        }
+    }
+}
+
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
 pub struct Field {
     pub flags: Flags,
@@ -231,6 +275,16 @@ pub struct Method {
     pub return_ty: Option<Type>,
     pub throws: Vec<ClassRef>,
     pub descriptor: Descriptor,
+}
+
+impl Method {
+    pub fn to_method_sig(&self) -> MethodSig {
+        MethodSig {
+            name: self.name.clone(),
+            generics: self.generics.clone(),
+            argument_tys: self.argument_tys.clone(),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -305,10 +359,45 @@ impl MethodSig {
     }
 }
 
+impl std::fmt::Display for MethodSig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some((generic_id0, generic_ids)) = self.generics.split_first() {
+            write!(f, "<{generic_id0}")?;
+            for id in generic_ids {
+                write!(f, ", {id}")?;
+            }
+            write!(f, "> ")?;
+        }
+        write!(f, "{}(", self.name)?;
+        if let Some((ty0, tys)) = self.argument_tys.split_first() {
+            write!(f, "{ty0}")?;
+            for ty in tys {
+                write!(f, ", {ty}")?;
+            }
+        }
+        write!(f, ")")?;
+        Ok(())
+    }
+}
+
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
 pub struct ClassRef {
     pub name: Id,
     pub generics: Vec<RefType>,
+}
+
+impl std::fmt::Display for ClassRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.name)?;
+        if let Some((ty0, tys)) = self.generics.split_first() {
+            write!(f, "<{ty0}")?;
+            for ty in tys {
+                write!(f, ", {ty}")?;
+            }
+            write!(f, ">")?;
+        }
+        Ok(())
+    }
 }
 
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
@@ -316,6 +405,16 @@ pub enum Type {
     Ref(RefType),
     Scalar(ScalarType),
     Repeat(Arc<Type>),
+}
+
+impl std::fmt::Display for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Type::Ref(t) => write!(f, "{t}"),
+            Type::Scalar(t) => write!(f, "{t}"),
+            Type::Repeat(t) => write!(f, "{t}..."),
+        }
+    }
 }
 
 impl Type {
@@ -347,6 +446,19 @@ pub enum RefType {
     Wildcard,
 }
 
+impl std::fmt::Display for RefType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RefType::Class(c) => write!(f, "{c}"),
+            RefType::Array(e) => write!(f, "{e}[]"),
+            RefType::TypeParameter(id) => write!(f, "{id}"),
+            RefType::Extends(t) => write!(f, "? extends {t}"),
+            RefType::Super(t) => write!(f, "? super {t}"),
+            RefType::Wildcard => write!(f, "?"),
+        }
+    }
+}
+
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
 pub enum ScalarType {
     Int,
@@ -357,6 +469,21 @@ pub enum ScalarType {
     F32,
     Boolean,
     Char,
+}
+
+impl std::fmt::Display for ScalarType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ScalarType::Int => write!(f, "int"),
+            ScalarType::Long => write!(f, "long"),
+            ScalarType::Short => write!(f, "long"),
+            ScalarType::Byte => write!(f, "byte"),
+            ScalarType::F64 => write!(f, "double"),
+            ScalarType::F32 => write!(f, "float"),
+            ScalarType::Boolean => write!(f, "boolean"),
+            ScalarType::Char => write!(f, "char"),
+        }
+    }
 }
 
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
