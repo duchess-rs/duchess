@@ -15,13 +15,28 @@ impl DuchessDeclaration {
     pub fn into_tokens(self) -> Result<TokenStream, SpanError> {
         let root_map = self.to_root_map()?;
         let () = root_map.check()?;
-        root_map.into_tokens()
+        let output = root_map.into_tokens()?;
+
+        if let Ok(f) = std::env::var("DUCHESS_DEBUG") {
+            if f == "1" {
+                match rust_format::RustFmt::default().format_tokens(output.clone()) {
+                    Ok(v) => {
+                        eprintln!("{v}");
+                    }
+                    Err(_) => {
+                        eprintln!("{output:?}");
+                    }
+                }
+            }
+        }
+
+        Ok(output)
     }
 }
 
 impl RootMap {
     fn into_tokens(self) -> Result<TokenStream, SpanError> {
-        self.into_packages().map(|p| p.into_tokens(0)).collect()
+        self.into_packages().map(|p| p.into_tokens(1)).collect()
     }
 }
 
@@ -52,15 +67,15 @@ impl SpannedPackageInfo {
             .chain(self.classes.into_iter().map(|c| c.into_tokens()))
             .collect::<Result<_, _>>()?;
 
-        let path: TokenStream = (1..depth)
-            .map(|_| quote_spanned!(self.span => "::super"))
+        let path: Vec<TokenStream> = (0..depth)
+            .map(|_| quote_spanned!(self.span => super))
             .collect();
 
         Ok(quote_spanned!(self.span =>
             #[allow(unused_imports)]
             pub mod #name {
                 // Import the contents of the parent module that we are created inside
-                use super #path :: *;
+                use #(#path ::)* *;
 
                 // Import the java package provided by duchess
                 use duchess::java;
@@ -110,7 +125,7 @@ impl SpannedClassInfo {
             #[allow(non_camel_case_types)]
             pub trait #ext_trait_name<#(#java_class_generics,)*> : duchess::JvmOp
             where
-                #(#java_class_generics : JavaObject,)*
+                #(#java_class_generics : duchess::JavaObject,)*
             {
                 #(#trait_methods)*
             }
@@ -132,12 +147,12 @@ impl SpannedClassInfo {
 
                 unsafe impl<#(#java_class_generics,)*> JavaObject for #struct_name<#(#java_class_generics,)*>
                 where
-                    #(#java_class_generics: JavaObject,)*
+                    #(#java_class_generics: duchess::JavaObject,)*
                 {}
 
                 unsafe impl<#(#java_class_generics,)*> plumbing::Upcast<#struct_name<#(#java_class_generics,)*>> for #struct_name<#(#java_class_generics,)*>
                 where
-                    #(#java_class_generics: JavaObject,)*
+                    #(#java_class_generics: duchess::JavaObject,)*
                 {}
 
                 #upcast_impls
@@ -155,7 +170,7 @@ impl SpannedClassInfo {
                 where
                     This: JvmOp,
                     for<'jvm> This::Output<'jvm>: AsRef<#this_ty>,
-                    #(#java_class_generics: JavaObject,)*
+                    #(#java_class_generics: duchess::JavaObject,)*
                 {
                     #(#trait_impl_methods)*
                 }
@@ -163,7 +178,7 @@ impl SpannedClassInfo {
         };
 
         if let Ok(f) = std::env::var("DUCHESS_DEBUG") {
-            if f == "*" || f == "1" || self.info.name.to_string().starts_with(&f) {
+            if self.info.name.to_string().starts_with(&f) {
                 match rust_format::RustFmt::default().format_tokens(output.clone()) {
                     Ok(v) => {
                         eprintln!("{v}");
@@ -191,7 +206,7 @@ impl SpannedClassInfo {
                 quote_spanned!(self.span => 
                     unsafe impl<#(#java_class_generics,)*> plumbing::Upcast<#tokens> for #struct_name<#(#java_class_generics,)*>
                     where
-                        #(#java_class_generics: JavaObject,)*
+                        #(#java_class_generics: duchess::JavaObject,)*
                     {}
                 )
             })
@@ -241,7 +256,7 @@ impl SpannedClassInfo {
         let output = quote_spanned!(self.span =>
             impl< #(#java_class_generics,)* > #ty
             where
-                #(#java_class_generics: JavaObject,)*
+                #(#java_class_generics: duchess::JavaObject,)*
             {
                 pub fn new(
                     #(#input_names : impl #input_traits,)*
@@ -266,7 +281,7 @@ impl SpannedClassInfo {
                         #(#input_names,)*
                     >
                     where
-                        #(#java_class_generics: JavaObject,)*
+                        #(#java_class_generics: duchess::JavaObject,)*
                         #(#input_names : #input_traits,)*
                     {
                         type Input<'jvm> = ();
@@ -393,7 +408,7 @@ impl SpannedClassInfo {
             type #rust_method_type_name<#(#rust_method_generics),*>: #output_trait
             where
                 #(#input_names: #input_traits,)*
-                #(#java_method_generics: JavaObject,)*
+                #(#java_method_generics: duchess::JavaObject,)*
                 #(#sig_where_clauses,)*
                 ;
 
@@ -403,7 +418,7 @@ impl SpannedClassInfo {
             ) -> Self::#rust_method_type_name<#(#rust_method_generics),*>
             where
                 #(#input_names: #input_traits,)*
-                #(#java_method_generics: JavaObject,)*
+                #(#java_method_generics: duchess::JavaObject,)*
                 #(#sig_where_clauses,)*
                 ;
         );
@@ -414,7 +429,7 @@ impl SpannedClassInfo {
                 #rust_method_type_name<Self, #(#method_struct_generics),*>
             where
                 #(#input_names: #input_traits,)*
-                #(#java_method_generics: JavaObject,)*
+                #(#java_method_generics: duchess::JavaObject,)*
                 #(#sig_where_clauses,)*
                 ;
 
@@ -424,7 +439,7 @@ impl SpannedClassInfo {
             ) -> Self::#rust_method_type_name<#(#rust_method_generics),*>
             where
                 #(#input_names: #input_traits,)*
-                #(#java_method_generics: JavaObject,)*
+                #(#java_method_generics: duchess::JavaObject,)*
                 #(#sig_where_clauses,)*
             {
                 #rust_method_type_name {
@@ -445,8 +460,8 @@ impl SpannedClassInfo {
                 This: JvmOp,
                 for<'jvm> This::Output<'jvm>: AsRef<#this_ty>,
                 #(#input_names: #input_traits,)*
-                #(#java_class_generics: JavaObject,)*
-                #(#java_method_generics: JavaObject,)*
+                #(#java_class_generics: duchess::JavaObject,)*
+                #(#java_method_generics: duchess::JavaObject,)*
             {
                 type Input<'jvm> = This::Input<'jvm>;
                 type Output<'jvm> = #output_ty;
@@ -588,7 +603,7 @@ impl Signature {
                 if !self.fresh_generics.contains(&ident) {
                     self.fresh_generics.push(ident.clone());
                     self.where_clauses
-                        .push(quote_spanned!(self.span => #ident : JavaObject));
+                        .push(quote_spanned!(self.span => #ident : duchess::JavaObject));
                     return Ok(ident);
                 }
                 i += 1;

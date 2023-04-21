@@ -94,7 +94,7 @@ Privacy: Privacy = {
 };
 
 MethodDescriptor: Descriptor = {
-    r"descriptor: \([\[\]a-zA-Z0-9$_/;]*\)[\[\]a-zA-Z0-9_/;]+" => {
+    r"descriptor: \([\[\]a-zA-Z0-9$_/;]*\)[\[\]a-zA-Z0-9$_/;]+" => {
         Descriptor::from(&<>["descriptor: ".len()..])
     }
 };
