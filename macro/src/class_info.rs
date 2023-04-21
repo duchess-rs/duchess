@@ -58,7 +58,7 @@ impl Parse for SpannedClassInfo {
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
 pub struct ClassInfo {
     pub flags: Flags,
-    pub name: Id,
+    pub name: DotId,
     pub kind: ClassKind,
     pub generics: Vec<Id>,
     pub extends: Option<ClassRef>,
@@ -200,7 +200,7 @@ impl MethodSig {
     }
 
     pub fn matches_constructor(&self, class: &ClassInfo, ctor: &Constructor) -> bool {
-        class.name == self.name
+        class.name.is_class(&self.name)
             && ctor.generics == self.generics
             && ctor.argument_tys == self.argument_tys
     }
@@ -208,7 +208,7 @@ impl MethodSig {
 
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
 pub struct ClassRef {
-    pub name: Id,
+    pub name: DotId,
     pub generics: Vec<RefType>,
 }
 
@@ -273,9 +273,10 @@ impl From<&str> for Descriptor {
     }
 }
 
+/// A single identifier
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
 pub struct Id {
-    pub data: Arc<String>,
+    pub data: String,
 }
 
 impl std::ops::Deref for Id {
@@ -288,23 +289,21 @@ impl std::ops::Deref for Id {
 
 impl From<String> for Id {
     fn from(value: String) -> Self {
-        Id {
-            data: Arc::new(value),
-        }
+        Id { data: value }
     }
 }
 
 impl From<&str> for Id {
     fn from(value: &str) -> Self {
         Id {
-            data: Arc::new(value.to_owned()),
+            data: value.to_owned(),
         }
     }
 }
 
 impl Id {
-    pub fn dot(&self, s: &str) -> Id {
-        Id::from(format!("{self}.{s}"))
+    pub fn dot(self, s: &str) -> DotId {
+        DotId::from(self).dot(s)
     }
 
     pub fn to_ident(&self, span: Span) -> Ident {
@@ -315,6 +314,66 @@ impl Id {
 impl std::fmt::Display for Id {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.data)
+    }
+}
+
+/// A dotted identifier
+#[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
+pub struct DotId {
+    /// Dotted components. Invariant: len >= 1.
+    ids: Vec<Id>,
+}
+
+impl From<Id> for DotId {
+    fn from(value: Id) -> Self {
+        DotId { ids: vec![value] }
+    }
+}
+
+impl From<&Id> for DotId {
+    fn from(value: &Id) -> Self {
+        DotId {
+            ids: vec![value.clone()],
+        }
+    }
+}
+
+impl DotId {
+    pub fn parse(s: impl AsRef<str>) -> DotId {
+        let s: &str = s.as_ref();
+        let ids: Vec<Id> = s.split(".").map(Id::from).collect();
+        assert!(ids.len() > 1, "bad input to DotId::parse: {s:?}");
+        DotId { ids }
+    }
+
+    pub fn dot(mut self, s: &str) -> DotId {
+        self.ids.push(Id::from(s));
+        self
+    }
+
+    pub fn is_class(&self, s: &Id) -> bool {
+        self.split().1 == s
+    }
+
+    pub fn class_name(&self) -> &Id {
+        self.split().1
+    }
+
+    /// Split and return the (package name, class name) pair.
+    pub fn split(&self) -> (&[Id], &Id) {
+        let (name, package) = self.ids.split_last().unwrap();
+        (package, name)
+    }
+}
+
+impl std::fmt::Display for DotId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let (package, class) = self.split();
+        for id in package {
+            write!(f, "{id}.")?;
+        }
+        write!(f, "{class}")?;
+        Ok(())
     }
 }
 

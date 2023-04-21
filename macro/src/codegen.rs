@@ -1,7 +1,7 @@
 use crate::{
     class_info::{
-        ClassRef, Constructor, Id, Method, NonRepeatingType, RefType, ScalarType, SpannedClassInfo,
-        SpannedPackageInfo, Type,
+        ClassRef, Constructor, DotId, Id, Method, NonRepeatingType, RefType, ScalarType,
+        SpannedClassInfo, SpannedPackageInfo, Type,
     },
     span_error::SpanError,
 };
@@ -157,7 +157,7 @@ impl SpannedClassInfo {
         };
 
         if let Ok(f) = std::env::var("DUCHESS_DEBUG") {
-            if f == "*" || f == "1" || self.info.name.starts_with(&f) {
+            if f == "*" || f == "1" || self.info.name.to_string().starts_with(&f) {
                 match rust_format::RustFmt::default().format_tokens(output.clone()) {
                     Ok(v) => {
                         eprintln!("{v}");
@@ -195,7 +195,7 @@ impl SpannedClassInfo {
     fn resolve_upcasts(&self) -> impl Iterator<Item = &'_ ClassRef> {
         static OBJECT: OnceCell<ClassRef> = OnceCell::new();
         let object = OBJECT.get_or_init(|| ClassRef {
-            name: "java.lang.Object".into(),
+            name: DotId::parse("java.lang.Object"),
             generics: vec![],
         });
 
@@ -226,7 +226,7 @@ impl SpannedClassInfo {
     }
 
     fn constructor(&self, constructor: &Constructor) -> Result<TokenStream, SpanError> {
-        let mut sig = Signature::new(&self.info.name, self.span, &self.info.generics);
+        let mut sig = Signature::new(self.info.name.class_name(), self.span, &self.info.generics);
 
         let input_traits: Vec<_> = constructor
             .argument_tys
@@ -519,12 +519,12 @@ impl SpannedClassInfo {
     }
 
     fn struct_name(&self) -> Ident {
-        let tail = self.info.name.split('.').last().unwrap();
+        let tail = self.info.name.class_name();
         Ident::new(&tail, self.span)
     }
 
     fn ext_trait_name(&self) -> Ident {
-        let tail = self.info.name.split('.').last().unwrap();
+        let tail = self.info.name.class_name();
         Ident::new(&format!("{tail}Ext"), self.span)
     }
 
@@ -785,20 +785,25 @@ impl Signature {
     }
 }
 
-trait IdExt {
+trait DotIdExt {
     fn to_jni_name(&self, span: Span) -> Literal;
     fn to_module_name(&self, span: Span) -> TokenStream;
 }
 
-impl IdExt for Id {
+impl DotIdExt for DotId {
     fn to_jni_name(&self, _span: Span) -> Literal {
-        let s = self.replace('.', "/");
-        Literal::string(&s)
+        let (package_names, struct_name) = self.split();
+        let mut output = String::new();
+        for p in package_names {
+            output.push_str(p);
+            output.push_str("/");
+        }
+        output.push_str(struct_name);
+        Literal::string(&output)
     }
 
     fn to_module_name(&self, span: Span) -> TokenStream {
-        let rust_name: Vec<&str> = self.split('.').collect();
-        let (struct_name, package_names) = rust_name.split_last().unwrap();
+        let (package_names, struct_name) = self.split();
         let struct_ident = Ident::new(struct_name, span);
         let package_idents: Vec<Ident> =
             package_names.iter().map(|n| Ident::new(n, span)).collect();
