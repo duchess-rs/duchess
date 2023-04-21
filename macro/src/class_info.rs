@@ -9,6 +9,7 @@ use crate::{
     span_error::SpanError,
 };
 
+#[derive(Debug)]
 pub struct RootMap {
     pub subpackages: BTreeMap<Id, SpannedPackageInfo>,
 }
@@ -86,6 +87,7 @@ impl std::fmt::Display for ClassName {
     }
 }
 
+#[derive(Debug)]
 pub struct SpannedPackageInfo {
     pub name: Id,
     pub span: Span,
@@ -133,6 +135,7 @@ impl SpannedPackageInfo {
     }
 }
 
+#[derive(Debug)]
 pub struct SpannedClassInfo {
     /// The complete class info loaded from javap
     pub info: ClassInfo,

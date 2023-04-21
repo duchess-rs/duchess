@@ -89,12 +89,12 @@ impl Parse for JavaClass {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MemberListing {
     pub elements: Vec<MemberListingElement>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum MemberListingElement {
     /// `* - <ML>`
     Wildcard(MemberListing),
