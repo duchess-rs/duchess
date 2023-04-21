@@ -30,7 +30,6 @@ pub mod prelude {
 pub mod plumbing {
     pub use crate::jvm::{FromJValue, JavaObjectExt, Upcast};
     pub use crate::str::ToJavaStringOp;
-    pub use duchess_macro::duchess_javap;
 }
 
 mod jdk;

@@ -114,12 +114,6 @@ impl MemberListing {
             .any(|e| e.contains_constructor(class, ctor))
     }
 
-    pub fn all() -> Self {
-        MemberListing {
-            elements: vec![MemberListingElement::Wildcard(MemberListing::none())],
-        }
-    }
-
     pub fn none() -> Self {
         MemberListing { elements: vec![] }
     }

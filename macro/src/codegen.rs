@@ -12,10 +12,10 @@ use quote::quote_spanned;
 use rust_format::Formatter;
 
 impl DuchessDeclaration {
-    pub fn into_tokens(self) -> Result<TokenStream, SpanError> {
+    pub fn to_tokens(&self) -> Result<TokenStream, SpanError> {
         let root_map = self.to_root_map()?;
         let () = root_map.check()?;
-        let output = root_map.into_tokens()?;
+        let output = root_map.to_tokens()?;
 
         if let Ok(f) = std::env::var("DUCHESS_DEBUG") {
             if f == "1" {
@@ -35,8 +35,8 @@ impl DuchessDeclaration {
 }
 
 impl RootMap {
-    fn into_tokens(self) -> Result<TokenStream, SpanError> {
-        self.into_packages().map(|p| p.into_tokens(1)).collect()
+    fn to_tokens(&self) -> Result<TokenStream, SpanError> {
+        self.to_packages().map(|p| p.to_tokens(1)).collect()
     }
 }
 
@@ -58,13 +58,13 @@ struct MethodOutput {
 }
 
 impl SpannedPackageInfo {
-    fn into_tokens(self, depth: usize) -> Result<TokenStream, SpanError> {
+    fn to_tokens(&self, depth: usize) -> Result<TokenStream, SpanError> {
         let name = Ident::new(&self.name, self.span);
         let inner: TokenStream = self
             .subpackages
-            .into_values()
-            .map(|p| p.into_tokens(depth + 1))
-            .chain(self.classes.into_iter().map(|c| c.into_tokens()))
+            .values()
+            .map(|p| p.to_tokens(depth + 1))
+            .chain(self.classes.iter().map(|c| c.to_tokens()))
             .collect::<Result<_, _>>()?;
 
         let path: Vec<TokenStream> = (0..depth)
@@ -87,7 +87,7 @@ impl SpannedPackageInfo {
 }
 
 impl SpannedClassInfo {
-    pub fn into_tokens(self) -> Result<TokenStream, SpanError> {
+    pub fn to_tokens(&self) -> Result<TokenStream, SpanError> {
         let struct_name = self.struct_name();
         let ext_trait_name = self.ext_trait_name();
         let cached_class = self.cached_class();

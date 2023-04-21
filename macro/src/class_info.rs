@@ -28,8 +28,8 @@ impl RootMap {
         self.subpackages.get(p0)?.find_subpackage(ps)
     }
 
-    pub fn into_packages(self) -> impl Iterator<Item = SpannedPackageInfo> {
-        self.subpackages.into_values()
+    pub fn to_packages(&self) -> impl Iterator<Item = &SpannedPackageInfo> {
+        self.subpackages.values()
     }
 
     /// Find the names of all classes contained within.
@@ -124,21 +124,6 @@ impl SpannedClassInfo {
             .methods
             .iter()
             .filter(|m| self.members.contains_method(m))
-    }
-}
-
-impl Parse for SpannedClassInfo {
-    fn parse(p: &mut crate::parse::Parser) -> Result<Option<Self>, SpanError> {
-        let Some(t) = p.eat_string_literal() else {
-            return Ok(None);
-        };
-        let span = p.last_span().unwrap();
-        let r = Self::parse(&t, span, MemberListing::all())?;
-        Ok(Some(r))
-    }
-
-    fn description() -> String {
-        format!("output from `javap -public -s`")
     }
 }
 
