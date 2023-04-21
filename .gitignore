@@ -1,2 +1,4 @@
 /target
 /Cargo.lock
+/test-crates/target
+/test-crates/Cargo.lock
