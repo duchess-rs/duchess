@@ -12,4 +12,8 @@ class Logger {
     public void logString(String data) {
         System.out.println("logString(" + data + ")");
     }
+
+    public void throwSomething() {
+        throw new RuntimeException("catch me if you can!");
+    }
 }

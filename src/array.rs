@@ -1,10 +1,8 @@
 use std::marker::PhantomData;
 
 use crate::{
-    jvm::{JavaType, Upcast},
-    ops::IntoJava,
-    plumbing::JavaObjectExt,
-    IntoRust, JavaObject, Jvm, JvmOp, Local,
+    cast::Upcast, java::lang::Class, ops::IntoJava, plumbing::JavaObjectExt, IntoRust, JavaObject,
+    JavaType, Jvm, JvmOp, Local,
 };
 use jni::{
     errors::{Error, JniError},
@@ -15,7 +13,11 @@ pub struct JavaArray<T: JavaType> {
     _element: PhantomData<T>,
 }
 
-unsafe impl<T: JavaType> JavaObject for JavaArray<T> {}
+unsafe impl<T: JavaType> JavaObject for JavaArray<T> {
+    fn class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Local<'jvm, Class>> {
+        T::array_class(jvm)
+    }
+}
 
 // Upcasts
 
@@ -27,10 +29,10 @@ macro_rules! primivite_array {
             impl IntoJava<JavaArray<$rust>> for &[$rust] {
                 type Output<'jvm> = Local<'jvm, JavaArray<$rust>>;
 
-                fn into_java<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<Self::Output<'jvm>> {
+                fn into_java<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
                     let env = jvm.to_env();
                     let Ok(len) = self.len().try_into() else {
-                        return Err(Error::JniCall(JniError::InvalidArguments))
+                        return Err(Error::JniCall(JniError::InvalidArguments).into())
                     };
                     let array = env.$new_fn(len)?;
                     env.$set_fn(&array, 0, self)?;
@@ -43,7 +45,7 @@ macro_rules! primivite_array {
                 for<'jvm> J: JvmOp<Input<'jvm> = ()>,
                 for<'jvm> J::Output<'jvm>: AsRef<JavaArray<$rust>>,
             {
-                fn into_rust(self, jvm: &mut Jvm<'_>) -> $crate::Result<Vec<$rust>> {
+                fn into_rust<'jvm>(self, jvm: &mut Jvm<'jvm>) -> $crate::Result<'jvm, Vec<$rust>> {
                     let object = self.execute_with(jvm, ())?;
 
                     let env = jvm.to_env();
@@ -62,10 +64,9 @@ macro_rules! primivite_array {
     };
 }
 
+// Bool is represented as u8 in JNI
 primivite_array! {
-    // [bool]: "[Z" new_boolean_array get_boolean_array_region get_boolean_array_region,
     [i8]: new_byte_array get_byte_array_region set_byte_array_region,
-    // [u16]: new_char_array get_char_array_region set_char_array_region,
     [i16]: new_short_array get_short_array_region set_short_array_region,
     [i32]: new_int_array get_int_array_region set_int_array_region,
     [i64]: new_long_array get_long_array_region set_long_array_region,
@@ -77,10 +78,10 @@ primivite_array! {
 impl IntoJava<JavaArray<bool>> for &[bool] {
     type Output<'jvm> = Local<'jvm, JavaArray<bool>>;
 
-    fn into_java<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<Self::Output<'jvm>> {
+    fn into_java<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
         let env = jvm.to_env();
         let Ok(len) = self.len().try_into() else {
-            return Err(Error::JniCall(JniError::InvalidArguments))
+            return Err(Error::JniCall(JniError::InvalidArguments).into())
         };
         let array = env.new_boolean_array(len)?;
         // XX: is it possible to avoid this copy if we can make assumptions about bool repr?
@@ -95,7 +96,7 @@ where
     for<'jvm> J: JvmOp<Input<'jvm> = ()>,
     for<'jvm> J::Output<'jvm>: AsRef<JavaArray<bool>>,
 {
-    fn into_rust(self, jvm: &mut Jvm<'_>) -> crate::Result<Vec<bool>> {
+    fn into_rust<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Vec<bool>> {
         let object = self.execute_with(jvm, ())?;
 
         let env = jvm.to_env();

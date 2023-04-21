@@ -1,6 +1,10 @@
 use crate::{
+    cast::{AsUpcast, TryDowncast, Upcast},
+    catch::{CatchNone, Catching},
     inspect::{ArgOp, Inspect},
+    java::lang::{Class, ClassExt, Throwable},
     not_null::NotNull,
+    IntoLocal,
 };
 
 use std::{
@@ -13,7 +17,7 @@ use jni::{
     objects::{AutoLocal, GlobalRef, JObject, JValueOwned},
     sys, InitArgsBuilder, JNIEnv, JavaVM,
 };
-use once_cell::sync::Lazy;
+use once_cell::sync::{Lazy, OnceCell};
 
 /// A "jdk op" is a suspended operation that, when executed, will run
 /// on the jvm, producing a value of type `Output`. These ops typically
@@ -40,6 +44,13 @@ pub trait JvmOp: Sized {
         Inspect::new(self, op)
     }
 
+    /// Start a set of catch blocks that can handle exceptions thrown by `self`. Multiple
+    /// blocks can be added via [`Catching::catch`] for different exception classes, as well as
+    /// a finally block.
+    fn catching(self) -> Catching<Self, CatchNone> {
+        Catching::new(self)
+    }
+
     fn assert_not_null<T>(self) -> NotNull<Self>
     where
         T: JavaObject,
@@ -48,11 +59,43 @@ pub trait JvmOp: Sized {
         NotNull::new(self)
     }
 
+    /// Tries to downcast output of this operation to `To`, otherwise returning
+    /// the output as is. Equivalent to
+    /// ```java
+    /// From x;
+    /// if (x instanceof To) {
+    ///    return Ok((To) x);
+    /// } else {
+    ///    return Err(x);
+    /// }
+    /// ```
+    fn try_downcast<From, To>(self) -> TryDowncast<Self, From, To>
+    where
+        for<'jvm> Self::Output<'jvm>: AsRef<From>,
+        From: JavaObject,
+        To: Upcast<From>,
+    {
+        TryDowncast::new(self)
+    }
+
+    /// Most duchess-wrapped Java objects will automatically be able to call all
+    /// methods defined on any of its super classes or interfaces it implements,
+    /// but this can be used to "force" the output of the operation to be typed
+    /// as an explicit super type `To`.
+    fn upcast<From, To>(self) -> AsUpcast<Self, From, To>
+    where
+        for<'jvm> Self::Output<'jvm>: AsRef<From>,
+        From: Upcast<To>,
+        To: JavaObject,
+    {
+        AsUpcast::new(self)
+    }
+
     fn execute_with<'jvm>(
         self,
         jvm: &mut Jvm<'jvm>,
         arg: Self::Input<'jvm>,
-    ) -> crate::Result<Self::Output<'jvm>>;
+    ) -> crate::Result<'jvm, Self::Output<'jvm>>;
 }
 
 /// This trait is only implemented for `()`; it allows the `JvmOp::execute` method to only
@@ -77,7 +120,9 @@ pub struct Jvm<'jvm> {
 }
 
 impl<'jvm> Jvm<'jvm> {
-    pub fn with<R>(op: impl FnOnce(&mut Jvm<'_>) -> crate::Result<R>) -> crate::Result<R> {
+    pub fn with<R>(
+        op: impl for<'a> FnOnce(&mut Jvm<'a>) -> crate::Result<'a, R>,
+    ) -> crate::GlobalResult<R> {
         let guard = GLOBAL_JVM.attach_current_thread()?;
 
         // Safety condition: must not be used to create new references
@@ -88,7 +133,11 @@ impl<'jvm> Jvm<'jvm> {
         // keep the interface simpler.
         let env = unsafe { guard.unsafe_clone() };
 
-        op(&mut Jvm { env })
+        op(&mut Jvm { env }).map_err(|e| {
+            e.into_global(&mut Jvm {
+                env: unsafe { guard.unsafe_clone() },
+            })
+        })
     }
 
     pub fn to_env(&mut self) -> &mut JNIEnv<'jvm> {
@@ -109,11 +158,18 @@ impl<'jvm> Jvm<'jvm> {
         }
     }
 
-    pub fn global<R>(&mut self, _r: &R) -> Global<R>
+    pub fn global<R>(&mut self, r: &R) -> Global<R>
     where
         R: JavaObject,
     {
-        todo!()
+        let env = self.to_env();
+        unsafe {
+            let raw = r.as_jobject();
+            assert!(!raw.is_null());
+            let new_global_ref = env.new_global_ref(&*raw).unwrap();
+            assert!(!new_global_ref.is_null());
+            Global::from_jni(new_global_ref)
+        }
     }
 }
 
@@ -131,14 +187,19 @@ impl<'jvm> Jvm<'jvm> {
 ///
 /// # Example
 ///
-/// ```
+/// ```ignore
 /// # use duchess::JavaObject;
 /// pub struct BigDecimal {
 ///     _private: (), // prevent construction
 /// }
 /// unsafe impl JavaObject for BigDecimal {}
 /// ```
-pub unsafe trait JavaObject: 'static + Sized + JavaType {}
+pub unsafe trait JavaObject: 'static + Sized + JavaType {
+    // XX: can't be put on extension trait nor define a default because we want to cache the resolved
+    // class in a static OnceCell.
+    /// Returns Java Class object for this type.
+    fn class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Local<'jvm, Class>>;
+}
 
 /// Extension trait for [JavaObject].
 pub trait JavaObjectExt: Sized {
@@ -176,24 +237,51 @@ impl<T: JavaObject> JavaObjectExt for T {
     }
 }
 
-pub unsafe trait JavaType: 'static {}
-unsafe impl<T: JavaObject> JavaType for T {}
-unsafe impl JavaType for i8 {}
-unsafe impl JavaType for i16 {}
-unsafe impl JavaType for i32 {}
-unsafe impl JavaType for i64 {}
-unsafe impl JavaType for bool {}
-unsafe impl JavaType for f32 {}
-unsafe impl JavaType for f64 {}
+pub unsafe trait JavaType: 'static {
+    /// Returns the Java Class object for a Java array containing elements of
+    /// `Self`. All Java types, even scalars can be elements of an array object.
+    fn array_class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Local<'jvm, Class>>;
+}
+
+unsafe impl<T: JavaObject> JavaType for T {
+    fn array_class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Local<'jvm, Class>> {
+        T::class(jvm)?.array_type().assert_not_null().execute(jvm)
+    }
+}
 
 pub trait JavaScalar: JavaType {}
-impl JavaScalar for i8 {}
-impl JavaScalar for i16 {}
-impl JavaScalar for i32 {}
-impl JavaScalar for i64 {}
-impl JavaScalar for bool {}
-impl JavaScalar for f32 {}
-impl JavaScalar for f64 {}
+
+macro_rules! scalar {
+    ($($rust:ty: $array_class:literal,)*) => {
+        $(
+            unsafe impl JavaType for $rust {
+                fn array_class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Local<'jvm, Class>> {
+                    let env = jvm.to_env();
+
+                    static CLASS: OnceCell<Global<crate::java::lang::Class>> = OnceCell::new();
+                    let global = CLASS.get_or_try_init::<_, crate::Error<Local<Throwable>>>(|| {
+                        let class = env.find_class($array_class)?;
+                        // env.find_class() internally calls check_exception!()
+                        Ok(unsafe { Global::from_jni(env.new_global_ref(class)?) })
+                    })?;
+                    Ok(jvm.local(global))
+                }
+            }
+
+            impl JavaScalar for $rust {}
+        )*
+    };
+}
+
+scalar! {
+    bool: "[Z",
+    i8:   "[B",
+    i16:  "[S",
+    i32:  "[I",
+    i64:  "[J",
+    f32:  "[F",
+    f64:  "[D",
+}
 
 /// A wrapper for a [JObject] that only allows access by reference. This prevents passing the
 /// wrapped `JObject` to `JNIEnv::delete_local_ref`.
@@ -302,16 +390,6 @@ where
 //         self.to_raw()
 //     }
 // }
-
-/// A trait to represent safe upcast operations for a [`JavaObject`].
-///
-/// # Safety
-///
-/// Inherits the rules of [`JavaObject`], but also `S` must be a valid superclass or implemented interface of `Self`.
-/// XX: would this actually allow unsafe behavior in a JNI call? or is it already checked/enforced?
-///
-/// XX: having to impl Upcast<T> for T on each struct is pretty annoying to get AsRef<T> to work without conflicts
-pub unsafe trait Upcast<S: JavaObject>: JavaObject {}
 
 impl<'a, R, S> AsRef<S> for Local<'a, R>
 where
