@@ -25,6 +25,7 @@ pub use jvm::Local;
 pub use prelude::*;
 
 pub mod prelude {
+    pub use crate::cast::by_type;
     pub use crate::jvm::JvmOp;
     pub use crate::ops::{
         IntoJava, IntoLocal, IntoOptLocal, IntoRust, IntoScalar, IntoVoid, JavaMethod,

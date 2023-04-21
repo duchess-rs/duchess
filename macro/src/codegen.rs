@@ -6,6 +6,7 @@ use crate::{
     span_error::SpanError,
 };
 use inflector::Inflector;
+use once_cell::sync::OnceCell;
 use proc_macro2::{Ident, Literal, Span, TokenStream};
 use quote::quote_spanned;
 use rust_format::Formatter;
@@ -172,10 +173,8 @@ impl SpannedClassInfo {
     fn upcast_impls(&self) -> TokenStream {
         let struct_name = self.struct_name();
         let java_class_generics = self.class_generic_names();
-        self.info
-            .extends
-            .iter()
-            .chain(&self.info.implements)
+        self
+            .resolve_upcasts()
             .map(|r| {
                 let mut sig = Signature::new(&Id::from("supertrait"), self.span, &self.info.generics);
                 let tokens = sig.forbid_capture(|sig| sig.class_ref_ty(r)).unwrap();
@@ -187,6 +186,22 @@ impl SpannedClassInfo {
                 )
             })
             .collect()
+    }
+
+    // XX: Clearly, we'll need more sophisticated resolution of what types we descend from, but for now we can at least
+    // inject the "everything is an Object" root.
+    fn resolve_upcasts(&self) -> impl Iterator<Item = &'_ ClassRef> {
+        static OBJECT: OnceCell<ClassRef> = OnceCell::new();
+        let object = OBJECT.get_or_init(|| ClassRef {
+            name: "java.lang.Object".into(),
+            generics: vec![],
+        });
+
+        self.info.extends.iter().chain(&self.info.implements).chain(
+            Some(object)
+                .filter(|obj| obj.name != self.info.name)
+                .into_iter(),
+        )
     }
 
     fn cached_class(&self) -> TokenStream {

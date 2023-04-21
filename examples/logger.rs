@@ -20,7 +20,9 @@ fn main() -> duchess::GlobalResult<()> {
             .execute(jvm)?;
 
         l.throw_something()
+            .catching()
             .catch::<Throwable, _>(|t| t.print_stack_trace())
+            .finally(l.log_int(42))
             .execute(jvm)?;
         println!("all good, though!");
 
