@@ -27,11 +27,11 @@ where
         self,
         jvm: &mut crate::Jvm<'jvm>,
         input: J::Input<'jvm>,
-    ) -> crate::Result<Self::Output<'jvm>> {
+    ) -> crate::Result<'jvm, Self::Output<'jvm>> {
         let j = self.j.execute_with(jvm, input)?;
         match j {
             Some(v) => Ok(v),
-            None => Err(jni::errors::Error::NullDeref("not_null()")),
+            None => Err(jni::errors::Error::NullDeref("not_null()").into()),
         }
     }
 }

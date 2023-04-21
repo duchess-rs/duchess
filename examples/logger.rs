@@ -1,4 +1,4 @@
-use duchess::prelude::*;
+use duchess::{java::lang::Throwable, prelude::*};
 
 duchess::java_package! {
     package me.ferris;
@@ -6,8 +6,9 @@ duchess::java_package! {
     class Logger { * }
 }
 
-fn main() -> jni::errors::Result<()> {
+fn main() -> duchess::GlobalResult<()> {
     use crate::me::ferris::LoggerExt;
+    use duchess::java::lang::ThrowableExt;
     duchess::Jvm::with(|jvm| {
         let l = me::ferris::Logger::new().execute(jvm)?;
         l.log_int(22).execute(jvm)?;
@@ -17,6 +18,13 @@ fn main() -> jni::errors::Result<()> {
             .inspect(|l| l.log_int(23))
             .inspect(|l| l.log_string("Hello again, Duchess!"))
             .execute(jvm)?;
+
+        l.throw_something()
+            .catching()
+            .catch::<Throwable, _>(|t| t.print_stack_trace())
+            .finally(l.log_int(42))
+            .execute(jvm)?;
+        println!("all good, though!");
 
         Ok(())
     })

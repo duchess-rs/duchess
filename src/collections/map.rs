@@ -1,15 +1,16 @@
 use std::marker::PhantomData;
 
 use jni::{
-    objects::{AutoLocal, GlobalRef, JMethodID, JValueGen},
+    objects::{AutoLocal, JClass, JMethodID, JValueGen},
     signature::ReturnType,
     sys::jvalue,
 };
 use once_cell::sync::OnceCell;
 
 use crate::{
+    java::lang::{Class, Throwable},
     plumbing::{JavaObjectExt, Upcast},
-    IntoJava, IntoLocal, JavaObject, Jvm, JvmOp, Local,
+    Global, IntoJava, IntoLocal, JavaObject, Jvm, JvmOp, Local,
 };
 
 // Ideally, we'd use duchess to derive these classes, but (a) we want to slap some nice interfaces to produce them from
@@ -20,7 +21,19 @@ pub struct Map<K, V> {
     _markers: PhantomData<(K, V)>,
 }
 
-unsafe impl<K: JavaObject, V: JavaObject> JavaObject for Map<K, V> {}
+unsafe impl<K: JavaObject, V: JavaObject> JavaObject for Map<K, V> {
+    fn class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Local<'jvm, Class>> {
+        let env = jvm.to_env();
+
+        static CLASS: OnceCell<Global<crate::java::lang::Class>> = OnceCell::new();
+        let global = CLASS.get_or_try_init::<_, crate::Error<Local<Throwable>>>(|| {
+            let class = env.find_class("java/util/Map")?;
+            // env.find_class() internally calls check_exception!()
+            Ok(unsafe { Global::from_jni(env.new_global_ref(class)?) })
+        })?;
+        Ok(jvm.local(global))
+    }
+}
 
 // Upcasts
 unsafe impl<K: JavaObject, V: JavaObject> Upcast<Map<K, V>> for Map<K, V> {}
@@ -30,7 +43,19 @@ pub struct HashMap<K, V> {
     _markers: PhantomData<(K, V)>,
 }
 
-unsafe impl<K: JavaObject, V: JavaObject> JavaObject for HashMap<K, V> {}
+unsafe impl<K: JavaObject, V: JavaObject> JavaObject for HashMap<K, V> {
+    fn class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Local<'jvm, Class>> {
+        let env = jvm.to_env();
+
+        static CLASS: OnceCell<Global<crate::java::lang::Class>> = OnceCell::new();
+        let global = CLASS.get_or_try_init::<_, crate::Error<Local<Throwable>>>(|| {
+            let class = env.find_class("java/util/HashMap")?;
+            // env.find_class() internally calls check_exception!()
+            Ok(unsafe { Global::from_jni(env.new_global_ref(class)?) })
+        })?;
+        Ok(jvm.local(global))
+    }
+}
 
 // Upcasts
 unsafe impl<K: JavaObject, V: JavaObject> Upcast<HashMap<K, V>> for HashMap<K, V> {}
@@ -68,15 +93,16 @@ where
                 self,
                 jvm: &mut Jvm<'jvm>,
                 (): (),
-            ) -> crate::Result<Self::Output<'jvm>> {
-                let class = hash_map_class(jvm)?;
+            ) -> crate::Result<'jvm, Self::Output<'jvm>> {
+                let class = HashMap::<K, V>::class(jvm)?;
+                let jclass = unsafe { JClass::from_raw(class.as_jobject().as_raw()) };
                 let env = jvm.to_env();
 
                 static CONSTRUCTOR: OnceCell<JMethodID> = OnceCell::new();
                 let constructor =
-                    CONSTRUCTOR.get_or_try_init(|| env.get_method_id(class, "<init>", "()V"))?;
+                    CONSTRUCTOR.get_or_try_init(|| env.get_method_id(&jclass, "<init>", "()V"))?;
 
-                let object = unsafe { env.new_object_unchecked(class, *constructor, &[])? };
+                let object = unsafe { env.new_object_unchecked(jclass, *constructor, &[])? };
 
                 Ok(unsafe { Local::from_jni(AutoLocal::new(object, &env)) })
             }
@@ -86,28 +112,6 @@ where
             _markers: PhantomData,
         }
     }
-}
-
-// XX: ideally these are wrapped as JavaClass<HashMap<?, ?>>
-
-fn hash_map_class(jvm: &mut Jvm<'_>) -> crate::Result<&'static GlobalRef> {
-    let env = jvm.to_env();
-
-    static CLASS: OnceCell<GlobalRef> = OnceCell::new();
-    CLASS.get_or_try_init(|| {
-        let class = env.find_class("java/util/HashMap")?;
-        env.new_global_ref(class)
-    })
-}
-
-fn map_class(jvm: &mut Jvm<'_>) -> crate::Result<&'static GlobalRef> {
-    let env = jvm.to_env();
-
-    static CLASS: OnceCell<GlobalRef> = OnceCell::new();
-    CLASS.get_or_try_init(|| {
-        let class = env.find_class("java/util/Map")?;
-        env.new_global_ref(class)
-    })
 }
 
 pub trait MapExt<K: JavaObject, V: JavaObject>: JvmOp + Sized {
@@ -164,18 +168,19 @@ where
         self,
         jvm: &mut Jvm<'jvm>,
         input: Self::Input<'jvm>,
-    ) -> crate::Result<Self::Output<'jvm>> {
+    ) -> crate::Result<'jvm, Self::Output<'jvm>> {
         let this = self.this.execute_with(jvm, input)?;
         let key = self.key.into_java(jvm)?;
         let value = self.value.into_java(jvm)?;
-        let class = map_class(jvm)?;
+        let class = Map::<K, V>::class(jvm)?;
+        let jclass = unsafe { JClass::from_raw(class.as_jobject().as_raw()) };
 
         let env = jvm.to_env();
 
         static METHOD: OnceCell<JMethodID> = OnceCell::new();
         let method = METHOD.get_or_try_init(|| {
             env.get_method_id(
-                class,
+                jclass,
                 "put",
                 "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
             )

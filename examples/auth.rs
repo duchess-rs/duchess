@@ -14,7 +14,7 @@ duchess::java_package! {
 
 use me::ferris::*;
 
-fn perform_auth_request() -> jni::errors::Result<String> {
+fn perform_auth_request() -> duchess::GlobalResult<String> {
     Jvm::with(|jvm| {
         let params = HashMap::new().execute(jvm)?;
         let values = ArrayList::new().execute(jvm)?;
@@ -29,7 +29,7 @@ fn perform_auth_request() -> jni::errors::Result<String> {
     })
 }
 
-fn main() -> jni::errors::Result<()> {
+fn main() -> duchess::GlobalResult<()> {
     let s = perform_auth_request()?;
     println!("{s}");
     Ok(())

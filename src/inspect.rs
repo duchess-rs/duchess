@@ -37,7 +37,7 @@ where
         self,
         jvm: &mut crate::Jvm<'jvm>,
         input: J::Input<'jvm>,
-    ) -> crate::Result<Self::Output<'jvm>> {
+    ) -> crate::Result<'jvm, Self::Output<'jvm>> {
         let j = self.j.execute_with(jvm, input)?;
 
         let j1 = j.clone_in(jvm);
@@ -63,7 +63,7 @@ where
         self,
         _jvm: &mut crate::Jvm<'jvm>,
         arg: Self::Input<'jvm>,
-    ) -> crate::Result<Self::Output<'jvm>> {
+    ) -> crate::Result<'jvm, Self::Output<'jvm>> {
         Ok(arg)
     }
 }
