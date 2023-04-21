@@ -1,6 +1,6 @@
 //! Exports common parts of the JDK.
 
-#[cfg(not(doc))]
+#[cfg(not(doctest))]
 use crate as duchess;
 
 duchess_macro::java_package! {
