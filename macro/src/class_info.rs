@@ -16,7 +16,7 @@ pub struct RootMap {
 
 impl RootMap {
     /// Finds the class with the given name (if present).
-    pub fn find_class(&self, cn: &ClassName) -> Option<&SpannedClassInfo> {
+    pub fn find_class(&self, cn: &DotId) -> Option<&SpannedClassInfo> {
         let (package, class_name) = cn.split();
         let package_info = self.find_package(package)?;
         package_info.find_class(class_name)
@@ -33,57 +33,11 @@ impl RootMap {
     }
 
     /// Find the names of all classes contained within.
-    pub fn class_names(&self) -> Vec<ClassName> {
+    pub fn class_names(&self) -> Vec<DotId> {
         self.subpackages
             .values()
             .flat_map(|pkg| pkg.class_names(&[]))
             .collect()
-    }
-}
-
-/// Absolute name of a class (including Java package)
-pub struct ClassName {
-    pub ids: Vec<Id>,
-}
-
-impl From<&Id> for ClassName {
-    fn from(value: &Id) -> Self {
-        let ids: Vec<Id> = value.split('.').map(|s| Id::from(s)).collect();
-        ClassName { ids }
-    }
-}
-
-impl ClassName {
-    pub fn new(package_name: &[Id], class_name: &Id) -> Self {
-        ClassName {
-            ids: package_name
-                .iter()
-                .chain(std::iter::once(class_name))
-                .cloned()
-                .collect(),
-        }
-    }
-
-    /// Split and return the (package name, class name) pair.
-    pub fn split(&self) -> (&[Id], &Id) {
-        let (name, package) = self.ids.split_last().unwrap();
-        (package, name)
-    }
-}
-
-impl std::fmt::Display for ClassName {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let Some((last, first)) = self.ids.split_last() else {
-            return Ok(());
-        };
-
-        for id in first {
-            write!(f, "{id}.")?;
-        }
-
-        write!(f, "{last}")?;
-
-        Ok(())
     }
 }
 
@@ -107,11 +61,11 @@ impl SpannedPackageInfo {
 
     /// Find a class in this package
     pub fn find_class(&self, id: &Id) -> Option<&SpannedClassInfo> {
-        self.classes.iter().find(|c| c.info.name == *id)
+        self.classes.iter().find(|c| c.info.name.is_class(id))
     }
 
     /// Find the names of all classes contained within self
-    pub fn class_names(&self, parent_package: &[Id]) -> Vec<ClassName> {
+    pub fn class_names(&self, parent_package: &[Id]) -> Vec<DotId> {
         // Name of this package
         let package_name: Vec<Id> = parent_package
             .iter()
@@ -124,10 +78,7 @@ impl SpannedPackageInfo {
             .values()
             .flat_map(|pkg| pkg.class_names(&package_name));
 
-        let classes_from_this_package = self
-            .classes
-            .iter()
-            .map(|c| ClassName::new(&package_name, &c.info.name));
+        let classes_from_this_package = self.classes.iter().map(|c| c.info.name.clone());
 
         classes_from_subpackages
             .chain(classes_from_this_package)
@@ -194,7 +145,7 @@ impl Parse for SpannedClassInfo {
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
 pub struct ClassInfo {
     pub flags: Flags,
-    pub name: Id,
+    pub name: DotId,
     pub kind: ClassKind,
     pub generics: Vec<Id>,
     pub extends: Option<ClassRef>,
@@ -254,7 +205,7 @@ pub struct Constructor {
 impl Constructor {
     pub fn to_method_sig(&self, class: &ClassInfo) -> MethodSig {
         MethodSig {
-            name: class.name.clone(),
+            name: class.name.class_name().clone(),
             generics: self.generics.clone(),
             argument_tys: self.argument_tys.clone(),
         }
@@ -356,7 +307,7 @@ impl MethodSig {
     }
 
     pub fn matches_constructor(&self, class: &ClassInfo, ctor: &Constructor) -> bool {
-        class.name == self.name
+        class.name.is_class(&self.name)
             && ctor.generics == self.generics
             && ctor.argument_tys == self.argument_tys
     }
@@ -385,7 +336,7 @@ impl std::fmt::Display for MethodSig {
 
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
 pub struct ClassRef {
-    pub name: Id,
+    pub name: DotId,
     pub generics: Vec<RefType>,
 }
 
@@ -502,9 +453,10 @@ impl From<&str> for Descriptor {
     }
 }
 
+/// A single identifier
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
 pub struct Id {
-    pub data: Arc<String>,
+    pub data: String,
 }
 
 impl std::ops::Deref for Id {
@@ -517,23 +469,21 @@ impl std::ops::Deref for Id {
 
 impl From<String> for Id {
     fn from(value: String) -> Self {
-        Id {
-            data: Arc::new(value),
-        }
+        Id { data: value }
     }
 }
 
 impl From<&str> for Id {
     fn from(value: &str) -> Self {
         Id {
-            data: Arc::new(value.to_owned()),
+            data: value.to_owned(),
         }
     }
 }
 
 impl Id {
-    pub fn dot(&self, s: &str) -> Id {
-        Id::from(format!("{self}.{s}"))
+    pub fn dot(self, s: &str) -> DotId {
+        DotId::from(self).dot(s)
     }
 
     pub fn to_ident(&self, span: Span) -> Ident {
@@ -544,6 +494,59 @@ impl Id {
 impl std::fmt::Display for Id {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.data)
+    }
+}
+
+/// A dotted identifier
+#[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
+pub struct DotId {
+    /// Dotted components. Invariant: len >= 1.
+    ids: Vec<Id>,
+}
+
+impl From<Id> for DotId {
+    fn from(value: Id) -> Self {
+        DotId { ids: vec![value] }
+    }
+}
+
+impl From<&Id> for DotId {
+    fn from(value: &Id) -> Self {
+        DotId {
+            ids: vec![value.clone()],
+        }
+    }
+}
+
+impl DotId {
+    pub fn dot(mut self, s: &str) -> DotId {
+        self.ids.push(Id::from(s));
+        self
+    }
+
+    pub fn is_class(&self, s: &Id) -> bool {
+        self.split().1 == s
+    }
+
+    pub fn class_name(&self) -> &Id {
+        self.split().1
+    }
+
+    /// Split and return the (package name, class name) pair.
+    pub fn split(&self) -> (&[Id], &Id) {
+        let (name, package) = self.ids.split_last().unwrap();
+        (package, name)
+    }
+}
+
+impl std::fmt::Display for DotId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let (package, class) = self.split();
+        for id in package {
+            write!(f, "{id}.")?;
+        }
+        write!(f, "{class}")?;
+        Ok(())
     }
 }
 

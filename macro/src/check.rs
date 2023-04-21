@@ -1,8 +1,7 @@
 use crate::{
     argument::{MemberListing, MemberListingElement},
     class_info::{
-        ClassInfo, ClassName, ClassRef, Constructor, Method, RefType, RootMap, SpannedClassInfo,
-        Type,
+        ClassInfo, ClassRef, Constructor, Method, RefType, RootMap, SpannedClassInfo, Type,
     },
     span_error::SpanError,
 };
@@ -71,13 +70,12 @@ impl SpannedClassInfo {
 
 impl ClassRef {
     fn check(&self, root_map: &RootMap, push_error: &mut impl FnMut(String)) {
-        let class_name = ClassName::from(&self.name);
-
-        let (package_name, class_id) = class_name.split();
+        let (package_name, class_id) = self.name.split();
         if let Some(package) = root_map.find_package(package_name) {
             if let None = package.find_class(&class_id) {
                 push_error(format!(
-                    "class `{class_name}` not in list of classes to be translated"
+                    "class `{}` not in list of classes to be translated",
+                    self.name,
                 ))
             }
         }

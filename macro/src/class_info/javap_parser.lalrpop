@@ -40,7 +40,7 @@ Generics: Vec<Id> = {
 
 Header: () = r#"Compiled from "[a-zA-Z.]+""#;
 
-DotId: Id = {
+DotId: DotId = {
     <a:Id> "." <b:ID> => a.dot(b),
     <i:DotId> "." <s:ID> => i.dot(s),
 };
