@@ -53,9 +53,10 @@ impl Parse for JavaPackage {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct JavaClass {
     pub class_span: Span,
-    pub class_name: String,
+    pub class_name: Id,
     pub members: MemberListing,
 }
 
@@ -79,7 +80,7 @@ impl Parse for JavaClass {
 
         Ok(Some(JavaClass {
             class_span,
-            class_name,
+            class_name: Id::from(class_name),
             members,
         }))
     }

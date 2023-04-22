@@ -3,7 +3,7 @@ use std::{collections::BTreeMap, sync::Arc};
 use proc_macro2::{Ident, Span, TokenTree};
 
 use crate::{
-    argument::MemberListing,
+    argument::{JavaClass, MemberListing},
     class_info::{self},
     parse::Parse,
     span_error::SpanError,
@@ -18,7 +18,7 @@ pub struct RootMap {
 
 impl RootMap {
     /// Finds the class with the given name (if present).
-    pub fn find_class(&self, cn: &DotId) -> Option<&SpannedClassInfo> {
+    pub fn find_class(&self, cn: &DotId) -> Option<&JavaClass> {
         let (package, class_name) = cn.split();
         let package_info = self.find_package(package)?;
         package_info.find_class(class_name)
@@ -48,7 +48,7 @@ pub struct SpannedPackageInfo {
     pub name: Id,
     pub span: Span,
     pub subpackages: BTreeMap<Id, SpannedPackageInfo>,
-    pub classes: Vec<SpannedClassInfo>,
+    pub classes: Vec<JavaClass>,
 }
 
 impl SpannedPackageInfo {
@@ -61,9 +61,9 @@ impl SpannedPackageInfo {
         self.subpackages.get(p0)?.find_subpackage(ps)
     }
 
-    /// Find a class in this package
-    pub fn find_class(&self, id: &Id) -> Option<&SpannedClassInfo> {
-        self.classes.iter().find(|c| c.info.name.is_class(id))
+    /// Finds a class in this package with the given name (if any)
+    pub fn find_class(&self, cn: &Id) -> Option<&JavaClass> {
+        self.classes.iter().find(|c| c.class_name == *cn)
     }
 
     /// Find the names of all classes contained within self
@@ -80,7 +80,10 @@ impl SpannedPackageInfo {
             .values()
             .flat_map(|pkg| pkg.class_names(&package_name));
 
-        let classes_from_this_package = self.classes.iter().map(|c| c.info.name.clone());
+        let classes_from_this_package = self
+            .classes
+            .iter()
+            .map(|c| DotId::new(&package_name, &c.class_name));
 
         classes_from_subpackages
             .chain(classes_from_this_package)
@@ -551,6 +554,16 @@ impl From<&Id> for DotId {
 }
 
 impl DotId {
+    pub fn new(package: &[Id], class: &Id) -> Self {
+        DotId {
+            ids: package
+                .iter()
+                .chain(std::iter::once(class))
+                .cloned()
+                .collect(),
+        }
+    }
+
     pub fn parse(s: impl AsRef<str>) -> DotId {
         let s: &str = s.as_ref();
         let ids: Vec<Id> = s.split(".").map(Id::from).collect();
@@ -579,6 +592,14 @@ impl DotId {
 
     pub fn object() -> Self {
         Self::parse("java.lang.Object")
+    }
+}
+
+impl std::ops::Deref for DotId {
+    type Target = [Id];
+
+    fn deref(&self) -> &Self::Target {
+        &self.ids
     }
 }
 

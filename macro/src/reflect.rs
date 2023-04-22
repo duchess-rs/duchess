@@ -5,6 +5,8 @@ use std::{
     sync::Arc,
 };
 
+use proc_macro2::Span;
+
 use crate::{
     argument::{DuchessDeclaration, Ident, JavaClass, JavaPackage, JavaPath},
     class_info::{ClassInfo, ClassRef, DotId, Id, RootMap, SpannedClassInfo, SpannedPackageInfo},
@@ -45,8 +47,7 @@ impl JavaPackage {
 
         if rest.is_empty() {
             for c in &self.classes {
-                let j = c.parse_javap(&self.package_name, reflector)?;
-                parent.classes.push(j);
+                parent.classes.push(c.clone());
             }
             Ok(())
         } else {
@@ -82,6 +83,15 @@ impl Reflector {
 
         self.extends.insert(class_name.clone(), Arc::new(result));
         Ok(&self.extends[class_name])
+    }
+
+    pub fn reflect_at(
+        &mut self,
+        class_name: &DotId,
+        span: Span,
+    ) -> Result<&Arc<ClassInfo>, SpanError> {
+        self.reflect(class_name)
+            .map_err(|message| SpanError { span, message })
     }
 
     /// Returns the (potentially cached) info about `class_name`;

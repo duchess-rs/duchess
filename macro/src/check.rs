@@ -1,18 +1,17 @@
 use crate::{
-    argument::{MemberListing, MemberListingElement},
-    class_info::{
-        ClassInfo, ClassRef, Constructor, Method, RefType, RootMap, SpannedClassInfo, Type,
-    },
+    argument::{JavaClass, MemberListing, MemberListingElement},
+    class_info::{ClassInfo, ClassRef, Constructor, DotId, Method, RefType, RootMap, Type},
+    reflect::Reflector,
     span_error::SpanError,
 };
 
 impl RootMap {
-    pub fn check(&self) -> Result<(), SpanError> {
+    pub fn check(&self, reflector: &mut Reflector) -> Result<(), SpanError> {
         let mut errors = vec![];
 
         for class_name in &self.class_names() {
             let ci = self.find_class(class_name).unwrap();
-            ci.check(self, &mut |e| errors.push(e));
+            ci.check(class_name, self, reflector, &mut |e| errors.push(e))?;
         }
 
         // FIXME: support multiple errors
@@ -24,37 +23,45 @@ impl RootMap {
     }
 }
 
-impl SpannedClassInfo {
-    fn check(&self, root_map: &RootMap, push_error: &mut impl FnMut(SpanError)) {
+impl JavaClass {
+    fn check(
+        &self,
+        class_name: &DotId,
+        root_map: &RootMap,
+        reflector: &mut Reflector,
+        push_error: &mut impl FnMut(SpanError),
+    ) -> Result<(), SpanError> {
+        let info = reflector.reflect_at(class_name, self.class_span)?;
+
         let mut push_error_message = |m: String| {
             push_error(SpanError {
-                span: self.span,
-                message: format!("error in class `{}`: {m}", self.info.name),
+                span: self.class_span,
+                message: format!("error in class `{}`: {m}", self.class_name),
             });
         };
 
-        for cref in &self.info.extends {
+        for cref in &info.extends {
             cref.check(root_map, &mut |m| {
-                push_error_message(format!("{m}, but is extended by `{}`", self.info.name))
+                push_error_message(format!("{m}, but is extended by `{}`", self.class_name))
             });
         }
 
-        for cref in &self.info.implements {
+        for cref in &info.implements {
             cref.check(root_map, &mut |m| {
-                push_error_message(format!("{m}, but is implemented by `{}`", self.info.name));
+                push_error_message(format!("{m}, but is implemented by `{}`", self.class_name));
             });
         }
 
-        for c in self.info.selected_constructors(&self.members) {
+        for c in info.selected_constructors(&self.members) {
             c.check(root_map, &mut |m| {
                 push_error_message(format!(
                     "{m}, which appears in constructor {}",
-                    c.to_method_sig(&self.info)
+                    c.to_method_sig(info)
                 ));
             });
         }
 
-        for c in self.info.selected_methods(&self.members) {
+        for c in info.selected_methods(&self.members) {
             c.check(root_map, &mut |m| {
                 push_error_message(format!(
                     "{m}, which appears in method {}",
@@ -64,7 +71,9 @@ impl SpannedClassInfo {
         }
 
         // Check that each of the method filters corresponds to an actual method that exists
-        self.members.check(root_map, &self.info, push_error);
+        self.members.check(root_map, info, push_error);
+
+        Ok(())
     }
 }
 

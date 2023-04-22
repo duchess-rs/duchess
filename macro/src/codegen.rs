@@ -15,16 +15,18 @@ use rust_format::Formatter;
 
 impl DuchessDeclaration {
     pub fn to_tokens(&self) -> Result<TokenStream, SpanError> {
-        let mut reflector = Reflector::default();
-        let root_map = self.to_root_map(&mut reflector)?;
-        let () = root_map.check()?;
-        root_map.to_tokens()
+        let reflector = &mut Reflector::default();
+        let root_map = self.to_root_map(reflector)?;
+        let () = root_map.check(reflector)?;
+        root_map.to_tokens(reflector)
     }
 }
 
 impl RootMap {
-    fn to_tokens(self) -> Result<TokenStream, SpanError> {
-        self.to_packages().map(|p| p.to_tokens(0)).collect()
+    fn to_tokens(self, reflector: &mut Reflector) -> Result<TokenStream, SpanError> {
+        self.to_packages()
+            .map(|p| p.to_tokens(&[], reflector))
+            .collect()
     }
 }
 
@@ -46,29 +48,46 @@ struct MethodOutput {
 }
 
 impl SpannedPackageInfo {
-    fn to_tokens(&self, depth: usize) -> Result<TokenStream, SpanError> {
+    fn to_tokens(
+        &self,
+        parents: &[Id],
+        reflector: &mut Reflector,
+    ) -> Result<TokenStream, SpanError> {
+        let package_id = DotId::new(parents, &self.name);
         let name = Ident::new(&self.name, self.span);
-        let inner: TokenStream = self
+
+        let subpackage_tokens: TokenStream = self
             .subpackages
             .values()
-            .map(|p| p.to_tokens(depth + 1))
-            .chain(self.classes.iter().map(|c| c.to_tokens()))
+            .map(|p| p.to_tokens(&package_id, reflector))
             .collect::<Result<_, _>>()?;
 
-        let path: TokenStream = (1..depth)
-            .map(|_| quote_spanned!(self.span => "::super"))
+        let class_tokens: TokenStream = self
+            .classes
+            .iter()
+            .map(|c| {
+                let class_id = DotId::new(&package_id, &c.class_name);
+                let info = reflector.reflect_at(&class_id, c.class_span)?;
+                ClassCodegen::from(info, c.class_span, &c.members).to_tokens()
+            })
+            .collect::<Result<_, _>>()?;
+
+        let supers: Vec<TokenStream> = package_id
+            .iter()
+            .map(|_| quote_spanned!(self.span => super))
             .collect();
 
         Ok(quote_spanned!(self.span =>
             #[allow(unused_imports)]
             pub mod #name {
                 // Import the contents of the parent module that we are created inside
-                use super #path :: *;
+                use #(#supers ::)* *;
 
                 // Import the java package provided by duchess
                 use duchess::java;
 
-                #inner
+                #subpackage_tokens
+                #class_tokens
             }
         ))
     }
