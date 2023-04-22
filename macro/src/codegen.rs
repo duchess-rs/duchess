@@ -691,6 +691,7 @@ impl Signature {
                     ScalarType::F64 => quote_spanned!(self.span => Primitive::Double),
                     ScalarType::F32 => quote_spanned!(self.span => Primitive::Float),
                     ScalarType::Boolean => quote_spanned!(self.span => Primitive::Boolean),
+                    ScalarType::Char => quote_spanned!(self.span => Primitive::Char),
                 };
                 Ok(quote_spanned!(self.span => ReturnType::Primitive(#primitive)))
             }
@@ -729,7 +730,12 @@ impl Signature {
                 Ok(quote_spanned!(self.span => java::Array<#e>))
             }
             RefType::TypeParameter(t) => {
-                assert!(self.in_scope_generics.contains(&t));
+                assert!(
+                    self.in_scope_generics.contains(&t),
+                    "generic type parameter `{:?}` not among in-scope parameters: {:?}",
+                    t,
+                    self.in_scope_generics,
+                );
                 let t = t.to_ident(self.span);
                 Ok(quote_spanned!(self.span => #t))
             }
@@ -767,6 +773,7 @@ impl Signature {
 
     fn java_scalar_ty(&self, ty: &ScalarType) -> TokenStream {
         match ty {
+            ScalarType::Char => quote_spanned!(self.span => u16),
             ScalarType::Int => quote_spanned!(self.span => i32),
             ScalarType::Long => quote_spanned!(self.span => i64),
             ScalarType::Short => quote_spanned!(self.span => i16),

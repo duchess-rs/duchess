@@ -120,6 +120,7 @@ pub struct Field {
     pub flags: Flags,
     pub name: Id,
     pub ty: Type,
+    pub descriptor: Descriptor,
 }
 
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
@@ -256,6 +257,7 @@ pub enum ScalarType {
     F64,
     F32,
     Boolean,
+    Char,
 }
 
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
