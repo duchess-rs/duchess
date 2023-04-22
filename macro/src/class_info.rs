@@ -9,6 +9,9 @@ use crate::{
     span_error::SpanError,
 };
 
+/// Stores all the data about the classes/packages to be translated
+/// as well as whatever we have learned from reflection.
+#[derive(Debug)]
 pub struct RootMap {
     pub subpackages: BTreeMap<Id, SpannedPackageInfo>,
 }
@@ -40,6 +43,7 @@ impl RootMap {
     }
 }
 
+#[derive(Debug)]
 pub struct SpannedPackageInfo {
     pub name: Id,
     pub span: Span,
@@ -84,6 +88,7 @@ impl SpannedPackageInfo {
     }
 }
 
+#[derive(Debug)]
 pub struct SpannedClassInfo {
     /// The complete class info loaded from javap
     pub info: ClassInfo,
