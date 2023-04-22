@@ -4,6 +4,7 @@ use parse::Parser;
 use proc_macro::TokenStream;
 
 mod argument;
+mod check;
 mod class_info;
 mod codegen;
 mod parse;
@@ -15,7 +16,7 @@ mod span_error;
 /// ```rust,ignore
 /// duchess::java_package! {
 ///     package some.pkg.name;
-///     class SomeClassName { * }
+///     class SomeDotId { * }
 /// }
 /// ```
 ///

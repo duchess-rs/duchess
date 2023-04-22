@@ -9,11 +9,79 @@ use crate::{
     span_error::SpanError,
 };
 
+pub struct RootMap {
+    pub subpackages: BTreeMap<Id, SpannedPackageInfo>,
+}
+
+impl RootMap {
+    /// Finds the class with the given name (if present).
+    pub fn find_class(&self, cn: &DotId) -> Option<&SpannedClassInfo> {
+        let (package, class_name) = cn.split();
+        let package_info = self.find_package(package)?;
+        package_info.find_class(class_name)
+    }
+
+    /// Finds the package with the given name (if present).
+    pub fn find_package(&self, ids: &[Id]) -> Option<&SpannedPackageInfo> {
+        let (p0, ps) = ids.split_first().unwrap();
+        self.subpackages.get(p0)?.find_subpackage(ps)
+    }
+
+    pub fn into_packages(self) -> impl Iterator<Item = SpannedPackageInfo> {
+        self.subpackages.into_values()
+    }
+
+    /// Find the names of all classes contained within.
+    pub fn class_names(&self) -> Vec<DotId> {
+        self.subpackages
+            .values()
+            .flat_map(|pkg| pkg.class_names(&[]))
+            .collect()
+    }
+}
+
 pub struct SpannedPackageInfo {
     pub name: Id,
     pub span: Span,
     pub subpackages: BTreeMap<Id, SpannedPackageInfo>,
     pub classes: Vec<SpannedClassInfo>,
+}
+
+impl SpannedPackageInfo {
+    /// Find a (sub)package given its relative name
+    pub fn find_subpackage(&self, ids: &[Id]) -> Option<&SpannedPackageInfo> {
+        let Some((p0, ps)) = ids.split_first() else {
+            return Some(self);
+        };
+
+        self.subpackages.get(p0)?.find_subpackage(ps)
+    }
+
+    /// Find a class in this package
+    pub fn find_class(&self, id: &Id) -> Option<&SpannedClassInfo> {
+        self.classes.iter().find(|c| c.info.name.is_class(id))
+    }
+
+    /// Find the names of all classes contained within self
+    pub fn class_names(&self, parent_package: &[Id]) -> Vec<DotId> {
+        // Name of this package
+        let package_name: Vec<Id> = parent_package
+            .iter()
+            .chain(std::iter::once(&self.name))
+            .cloned()
+            .collect();
+
+        let classes_from_subpackages = self
+            .subpackages
+            .values()
+            .flat_map(|pkg| pkg.class_names(&package_name));
+
+        let classes_from_this_package = self.classes.iter().map(|c| c.info.name.clone());
+
+        classes_from_subpackages
+            .chain(classes_from_this_package)
+            .collect()
+    }
 }
 
 pub struct SpannedClassInfo {
@@ -37,6 +105,22 @@ impl SpannedClassInfo {
             }),
             Err(message) => Err(SpanError { span, message }),
         }
+    }
+
+    /// Constructors selected by the user for codegen
+    pub fn selected_constructors(&self) -> impl Iterator<Item = &Constructor> {
+        self.info
+            .constructors
+            .iter()
+            .filter(|c| self.members.contains_constructor(&self.info, c))
+    }
+
+    /// Methods selected by the user for codegen (note: some may be static)
+    pub fn selected_methods(&self) -> impl Iterator<Item = &Method> {
+        self.info
+            .methods
+            .iter()
+            .filter(|m| self.members.contains_method(m))
     }
 }
 
@@ -115,6 +199,16 @@ pub struct Constructor {
     pub descriptor: Descriptor,
 }
 
+impl Constructor {
+    pub fn to_method_sig(&self, class: &ClassInfo) -> MethodSig {
+        MethodSig {
+            name: class.name.class_name().clone(),
+            generics: self.generics.clone(),
+            argument_tys: self.argument_tys.clone(),
+        }
+    }
+}
+
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
 pub struct Field {
     pub flags: Flags,
@@ -132,6 +226,16 @@ pub struct Method {
     pub return_ty: Option<Type>,
     pub throws: Vec<ClassRef>,
     pub descriptor: Descriptor,
+}
+
+impl Method {
+    pub fn to_method_sig(&self) -> MethodSig {
+        MethodSig {
+            name: self.name.clone(),
+            generics: self.generics.clone(),
+            argument_tys: self.argument_tys.clone(),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -206,10 +310,45 @@ impl MethodSig {
     }
 }
 
+impl std::fmt::Display for MethodSig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some((generic_id0, generic_ids)) = self.generics.split_first() {
+            write!(f, "<{generic_id0}")?;
+            for id in generic_ids {
+                write!(f, ", {id}")?;
+            }
+            write!(f, "> ")?;
+        }
+        write!(f, "{}(", self.name)?;
+        if let Some((ty0, tys)) = self.argument_tys.split_first() {
+            write!(f, "{ty0}")?;
+            for ty in tys {
+                write!(f, ", {ty}")?;
+            }
+        }
+        write!(f, ")")?;
+        Ok(())
+    }
+}
+
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
 pub struct ClassRef {
     pub name: DotId,
     pub generics: Vec<RefType>,
+}
+
+impl std::fmt::Display for ClassRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.name)?;
+        if let Some((ty0, tys)) = self.generics.split_first() {
+            write!(f, "<{ty0}")?;
+            for ty in tys {
+                write!(f, ", {ty}")?;
+            }
+            write!(f, ">")?;
+        }
+        Ok(())
+    }
 }
 
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
@@ -217,6 +356,16 @@ pub enum Type {
     Ref(RefType),
     Scalar(ScalarType),
     Repeat(Arc<Type>),
+}
+
+impl std::fmt::Display for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Type::Ref(t) => write!(f, "{t}"),
+            Type::Scalar(t) => write!(f, "{t}"),
+            Type::Repeat(t) => write!(f, "{t}..."),
+        }
+    }
 }
 
 impl Type {
@@ -248,6 +397,19 @@ pub enum RefType {
     Wildcard,
 }
 
+impl std::fmt::Display for RefType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RefType::Class(c) => write!(f, "{c}"),
+            RefType::Array(e) => write!(f, "{e}[]"),
+            RefType::TypeParameter(id) => write!(f, "{id}"),
+            RefType::Extends(t) => write!(f, "? extends {t}"),
+            RefType::Super(t) => write!(f, "? super {t}"),
+            RefType::Wildcard => write!(f, "?"),
+        }
+    }
+}
+
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
 pub enum ScalarType {
     Int,
@@ -258,6 +420,21 @@ pub enum ScalarType {
     F32,
     Boolean,
     Char,
+}
+
+impl std::fmt::Display for ScalarType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ScalarType::Int => write!(f, "int"),
+            ScalarType::Long => write!(f, "long"),
+            ScalarType::Short => write!(f, "long"),
+            ScalarType::Byte => write!(f, "byte"),
+            ScalarType::F64 => write!(f, "double"),
+            ScalarType::F32 => write!(f, "float"),
+            ScalarType::Boolean => write!(f, "boolean"),
+            ScalarType::Char => write!(f, "char"),
+        }
+    }
 }
 
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]

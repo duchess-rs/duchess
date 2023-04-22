@@ -91,7 +91,7 @@ impl Parse for JavaClass {
 
 #[derive(Clone, Debug)]
 pub struct MemberListing {
-    elements: Vec<MemberListingElement>,
+    pub elements: Vec<MemberListingElement>,
 }
 
 #[derive(Clone, Debug)]
