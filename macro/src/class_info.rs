@@ -111,22 +111,6 @@ impl SpannedClassInfo {
             Err(message) => Err(SpanError { span, message }),
         }
     }
-
-    /// Constructors selected by the user for codegen
-    pub fn selected_constructors(&self) -> impl Iterator<Item = &Constructor> {
-        self.info
-            .constructors
-            .iter()
-            .filter(|c| self.members.contains_constructor(&self.info, c))
-    }
-
-    /// Methods selected by the user for codegen (note: some may be static)
-    pub fn selected_methods(&self) -> impl Iterator<Item = &Method> {
-        self.info
-            .methods
-            .iter()
-            .filter(|m| self.members.contains_method(m))
-    }
 }
 
 impl Parse for SpannedClassInfo {
@@ -171,6 +155,26 @@ impl ClassInfo {
                 .map(|g| RefType::TypeParameter(g.clone()))
                 .collect(),
         }
+    }
+
+    /// Constructors selected by the user for codegen
+    pub fn selected_constructors<'m>(
+        &'m self,
+        members: &'m MemberListing,
+    ) -> impl Iterator<Item = &'m Constructor> {
+        self.constructors
+            .iter()
+            .filter(move |c| members.contains_constructor(self, c))
+    }
+
+    /// Methods selected by the user for codegen (note: some may be static)
+    pub fn selected_methods<'m>(
+        &'m self,
+        members: &'m MemberListing,
+    ) -> impl Iterator<Item = &'m Method> {
+        self.methods
+            .iter()
+            .filter(move |m| members.contains_method(m))
     }
 }
 

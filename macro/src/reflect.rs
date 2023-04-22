@@ -86,7 +86,7 @@ impl Reflector {
 
     /// Returns the (potentially cached) info about `class_name`;
     pub fn reflect(&mut self, class_name: &DotId) -> Result<&Arc<ClassInfo>, String> {
-        /// yields an error if we cannot reflect on that class.
+        // yields an error if we cannot reflect on that class.
         if self.classes.contains_key(class_name) {
             return Ok(&self.classes[class_name]);
         }

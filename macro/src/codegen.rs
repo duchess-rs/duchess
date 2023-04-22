@@ -1,8 +1,8 @@
 use crate::{
-    argument::DuchessDeclaration,
+    argument::{DuchessDeclaration, MemberListing},
     class_info::{
-        ClassRef, Constructor, DotId, Id, Method, NonRepeatingType, RefType, RootMap, ScalarType,
-        SpannedClassInfo, SpannedPackageInfo, Type,
+        ClassInfo, ClassRef, Constructor, DotId, Id, Method, NonRepeatingType, RefType, RootMap,
+        ScalarType, SpannedClassInfo, SpannedPackageInfo, Type,
     },
     reflect::Reflector,
     span_error::SpanError,
@@ -76,6 +76,32 @@ impl SpannedPackageInfo {
 
 impl SpannedClassInfo {
     pub fn to_tokens(&self) -> Result<TokenStream, SpanError> {
+        ClassCodegen::from(&self.info, self.span, &self.members).to_tokens()
+    }
+}
+
+#[derive(Debug)]
+pub struct ClassCodegen<'cx> {
+    /// The complete class info loaded from javap
+    info: &'cx ClassInfo,
+
+    /// The span where user declared interest in this class
+    span: Span,
+
+    /// The listing of members user wants to include
+    members: &'cx MemberListing,
+}
+
+impl<'cx> ClassCodegen<'cx> {
+    pub fn from(info: &'cx ClassInfo, span: Span, members: &'cx MemberListing) -> Self {
+        ClassCodegen {
+            info,
+            span,
+            members,
+        }
+    }
+
+    pub fn to_tokens(&self) -> Result<TokenStream, SpanError> {
         let struct_name = self.struct_name();
         let ext_trait_name = self.ext_trait_name();
         let cached_class = self.cached_class();
@@ -84,13 +110,15 @@ impl SpannedClassInfo {
 
         // Convert constructors
         let constructors: Vec<_> = self
-            .selected_constructors()
+            .info
+            .selected_constructors(&self.members)
             .map(|c| self.constructor(c))
             .collect::<Result<_, _>>()?;
 
         // Convert class methods (not static methods, those are different)
         let object_methods: Vec<_> = self
-            .selected_methods()
+            .info
+            .selected_methods(&self.members)
             .filter(|m| !m.flags.is_static)
             .map(|m| self.method(m))
             .collect::<Result<_, _>>()?;

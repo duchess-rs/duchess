@@ -45,7 +45,7 @@ impl SpannedClassInfo {
             });
         }
 
-        for c in self.selected_constructors() {
+        for c in self.info.selected_constructors(&self.members) {
             c.check(root_map, &mut |m| {
                 push_error_message(format!(
                     "{m}, which appears in constructor {}",
@@ -54,7 +54,7 @@ impl SpannedClassInfo {
             });
         }
 
-        for c in self.selected_methods() {
+        for c in self.info.selected_methods(&self.members) {
             c.check(root_map, &mut |m| {
                 push_error_message(format!(
                     "{m}, which appears in method {}",
