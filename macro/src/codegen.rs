@@ -1,8 +1,8 @@
 use crate::{
     argument::{DuchessDeclaration, MemberListing},
     class_info::{
-        ClassInfo, ClassRef, Constructor, DotId, Id, Method, NonRepeatingType, RefType, RootMap,
-        ScalarType, SpannedClassInfo, SpannedPackageInfo, Type,
+        ClassInfo, ClassRef, Constructor, DotId, Generic, Id, Method, NonRepeatingType, RefType,
+        RootMap, ScalarType, SpannedClassInfo, SpannedPackageInfo, Type,
     },
     reflect::Reflector,
     span_error::SpanError,
@@ -150,7 +150,7 @@ impl<'cx> ClassCodegen<'cx> {
             .map(|m| &m.trait_impl_method)
             .collect();
         let jvm_op_impls: Vec<_> = object_methods.iter().map(|m| &m.jvm_op_impl).collect();
-        let upcast_impls = self.upcast_impls();
+        let upcast_impls = self.upcast_impls()?;
 
         let output = quote_spanned! {
             self.span =>
@@ -233,20 +233,21 @@ impl<'cx> ClassCodegen<'cx> {
         Ok(output)
     }
 
-    fn upcast_impls(&self) -> TokenStream {
+    fn upcast_impls(&self) -> Result<TokenStream, SpanError> {
         let struct_name = self.struct_name();
         let java_class_generics = self.class_generic_names();
         self
             .resolve_upcasts()
             .map(|r| {
-                let mut sig = Signature::new(&Id::from("supertrait"), self.span, &self.info.generics);
+                let mut sig = Signature::new(&Id::from("supertrait"), self.span, &[])
+                .with_internal_generics(&self.info.generics)?;
                 let tokens = sig.forbid_capture(|sig| sig.class_ref_ty(r)).unwrap();
-                quote_spanned!(self.span =>
+                Ok(quote_spanned!(self.span =>
                     unsafe impl<#(#java_class_generics,)*> plumbing::Upcast<#tokens> for #struct_name<#(#java_class_generics,)*>
                     where
                         #(#java_class_generics: JavaObject,)*
                     {}
-                )
+                ))
             })
             .collect()
     }
@@ -391,11 +392,8 @@ impl<'cx> ClassCodegen<'cx> {
     }
 
     fn method(&self, method: &Method) -> Result<MethodOutput, SpanError> {
-        let mut sig = Signature::new(
-            &method.name,
-            self.span,
-            self.info.generics.iter().chain(&method.generics),
-        );
+        let mut sig = Signature::new(&method.name, self.span, &self.info.generics)
+            .with_internal_generics(&method.generics)?;
 
         let this_ty = self.this_type();
 
@@ -425,22 +423,13 @@ impl<'cx> ClassCodegen<'cx> {
 
         // The generic parameters declared on the Java method.
         let java_class_generics: Vec<_> = self.class_generic_names();
-        let java_method_generics: Vec<_> = method
-            .generics
-            .iter()
-            .map(|g| g.to_ident(self.span))
-            .collect();
 
         // The generic parameters we need on the Rust method, these include:
         //
         // * a type parameter `a0` for each input
         // * a type parameter for each java generic
         // * any fresh generics we created to capture wildcards
-        let rust_method_generics: Vec<_> = input_names
-            .iter()
-            .chain(&java_method_generics)
-            .chain(sig.fresh_generics.iter())
-            .collect();
+        let rust_method_generics: Vec<_> = input_names.iter().chain(&sig.rust_generics).collect();
 
         // The generic parameters we need on the *method struct* (which will implement the `JvmOp`).
         // These include the class generics plus all the generics from the method.
@@ -473,7 +462,6 @@ impl<'cx> ClassCodegen<'cx> {
             type #rust_method_type_name<#(#rust_method_generics),*>: #output_trait
             where
                 #(#input_names: #input_traits,)*
-                #(#java_method_generics: JavaObject,)*
                 #(#sig_where_clauses,)*
                 ;
 
@@ -483,7 +471,6 @@ impl<'cx> ClassCodegen<'cx> {
             ) -> Self::#rust_method_type_name<#(#rust_method_generics),*>
             where
                 #(#input_names: #input_traits,)*
-                #(#java_method_generics: JavaObject,)*
                 #(#sig_where_clauses,)*
                 ;
         );
@@ -494,7 +481,6 @@ impl<'cx> ClassCodegen<'cx> {
                 #rust_method_type_name<Self, #(#method_struct_generics),*>
             where
                 #(#input_names: #input_traits,)*
-                #(#java_method_generics: JavaObject,)*
                 #(#sig_where_clauses,)*
                 ;
 
@@ -504,7 +490,6 @@ impl<'cx> ClassCodegen<'cx> {
             ) -> Self::#rust_method_type_name<#(#rust_method_generics),*>
             where
                 #(#input_names: #input_traits,)*
-                #(#java_method_generics: JavaObject,)*
                 #(#sig_where_clauses,)*
             {
                 #rust_method_type_name {
@@ -525,8 +510,8 @@ impl<'cx> ClassCodegen<'cx> {
                 This: JvmOp,
                 for<'jvm> This::Output<'jvm>: AsRef<#this_ty>,
                 #(#input_names: #input_traits,)*
-                #(#java_class_generics: JavaObject,)*
-                #(#java_method_generics: JavaObject,)*
+                #(#java_class_generics: duchess::JavaObject,)*
+                #(#sig_where_clauses,)*
             {
                 type Input<'jvm> = This::Input<'jvm>;
                 type Output<'jvm> = #output_ty;
@@ -633,25 +618,57 @@ struct Signature {
     method_name: Id,
     span: Span,
     in_scope_generics: Vec<Id>,
-    fresh_generics: Vec<Ident>,
+    rust_generics: Vec<Ident>,
     where_clauses: Vec<TokenStream>,
     capture_generics: bool,
 }
 
 impl Signature {
-    pub fn new<'i>(
-        method_name: &Id,
-        span: Span,
-        in_scope_generics: impl IntoIterator<Item = &'i Id>,
-    ) -> Self {
+    /// Creates a signature attached to an item (e.g., a method) named `method_name`,
+    /// declared at `span`, which inherits
+    /// `external_generics` from its class and which declares `internal_generis` on itself.
+    ///
+    /// You can then invoke helper methods to convert java types into Rust types.
+    /// In some cases these conversions may create new entries in `fresh_generics`
+    /// or new entries in `where_clauses`.
+    ///
+    /// The final Rust method needs to include all the parameters from `generics`
+    /// along with the where-clauses from `where_clauses`.
+    pub fn new(method_name: &Id, span: Span, external_generics: &[Generic]) -> Self {
         Signature {
             method_name: method_name.clone(),
             span,
-            in_scope_generics: in_scope_generics.into_iter().cloned().collect(),
-            fresh_generics: vec![],
+            in_scope_generics: external_generics.iter().map(|g| g.id.clone()).collect(),
+            rust_generics: vec![],
             where_clauses: vec![],
             capture_generics: true,
         }
+    }
+
+    pub fn with_internal_generics(self, internal_generics: &[Generic]) -> Result<Self, SpanError> {
+        let mut s = self;
+
+        s.in_scope_generics
+            .extend(internal_generics.iter().map(|g| g.id.clone()));
+
+        // Forbid capture we don't have to worry about things like `X extends ArrayList<?>`.
+        // Actually, we could probably support capture here, but I don't know want to right now.
+        s.forbid_capture(|s| {
+            for g in internal_generics {
+                let ident = g.id.to_ident(s.span);
+                s.rust_generics.push(ident.clone());
+                s.where_clauses
+                    .push(quote_spanned!(s.span => #ident : duchess::JavaObject));
+                for e in &g.extends {
+                    let ty = s.class_ref_ty(e)?;
+                    s.where_clauses
+                        .push(quote_spanned!(s.span => #ident : AsRef<#ty>));
+                }
+            }
+            Ok(())
+        })?;
+
+        Ok(s)
     }
 
     /// Set the `capture_generics` field to false while `op` executes,
@@ -676,11 +693,11 @@ impl Signature {
                 message: format!("unsupported wildcards in `{}`", self.method_name),
             })
         } else {
-            let mut i = self.fresh_generics.len();
+            let mut i = self.rust_generics.len();
             loop {
                 let ident = Ident::new(&format!("Capture{}", i), self.span);
-                if !self.fresh_generics.contains(&ident) {
-                    self.fresh_generics.push(ident.clone());
+                if !self.rust_generics.contains(&ident) {
+                    self.rust_generics.push(ident.clone());
                     self.where_clauses
                         .push(quote_spanned!(self.span => #ident : JavaObject));
                     return Ok(ident);
@@ -869,4 +886,8 @@ impl DotIdExt for DotId {
             package_names.iter().map(|n| Ident::new(n, span)).collect();
         quote_spanned!(span => #(#package_idents ::)* #struct_ident)
     }
+}
+
+trait GenericExt {
+    fn to_where_clause(&self, span: Span) -> TokenStream;
 }

@@ -132,7 +132,7 @@ pub struct ClassInfo {
     pub flags: Flags,
     pub name: DotId,
     pub kind: ClassKind,
-    pub generics: Vec<Id>,
+    pub generics: Vec<Generic>,
     pub extends: Option<ClassRef>,
     pub implements: Vec<ClassRef>,
     pub constructors: Vec<Constructor>,
@@ -151,7 +151,7 @@ impl ClassInfo {
             generics: self
                 .generics
                 .iter()
-                .map(|g| RefType::TypeParameter(g.clone()))
+                .map(|g| RefType::TypeParameter(g.id.clone()))
                 .collect(),
         }
     }
@@ -174,6 +174,31 @@ impl ClassInfo {
         self.methods
             .iter()
             .filter(move |m| members.contains_method(m))
+    }
+}
+
+#[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
+pub struct Generic {
+    pub id: Id,
+    pub extends: Vec<ClassRef>,
+}
+
+impl Generic {
+    pub fn to_ident(&self, span: Span) -> Ident {
+        self.id.to_ident(span)
+    }
+}
+
+impl std::fmt::Display for Generic {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.id)?;
+        if let Some((e0, e1)) = self.extends.split_first() {
+            write!(f, " extends {e0}")?;
+            for ei in e1 {
+                write!(f, " & {ei}")?;
+            }
+        }
+        Ok(())
     }
 }
 
@@ -218,7 +243,7 @@ pub enum Privacy {
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
 pub struct Constructor {
     pub flags: Flags,
-    pub generics: Vec<Id>,
+    pub generics: Vec<Generic>,
     pub argument_tys: Vec<Type>,
     pub throws: Vec<ClassRef>,
     pub descriptor: Descriptor,
@@ -246,7 +271,7 @@ pub struct Field {
 pub struct Method {
     pub flags: Flags,
     pub name: Id,
-    pub generics: Vec<Id>,
+    pub generics: Vec<Generic>,
     pub argument_tys: Vec<Type>,
     pub return_ty: Option<Type>,
     pub throws: Vec<ClassRef>,
@@ -322,7 +347,7 @@ impl Parse for SpannedMethodSig {
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
 pub struct MethodSig {
     pub name: Id,
-    pub generics: Vec<Id>,
+    pub generics: Vec<Generic>,
     pub argument_tys: Vec<Type>,
 }
 
@@ -592,7 +617,8 @@ impl Id {
     }
 
     pub fn to_ident(&self, span: Span) -> Ident {
-        Ident::new(&self.data, span)
+        let data = self.data.replace("$", "__");
+        Ident::new(&data, span)
     }
 }
 

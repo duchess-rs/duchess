@@ -33,9 +33,23 @@ ClassKind: ClassKind = {
 };
 
 #[inline]
-Generics: Vec<Id> = {
+Generics: Vec<Generic> = {
     () => vec![],
-    ("<" <Comma<Id>> ">"),
+    ("<" <Comma<Generic>> ">"),
+};
+
+Generic: Generic = {
+    Id => Generic { id: <>, extends: vec![] },
+    <i:Id> "extends" <b:GenericBounds> => Generic { id: i, extends: b },
+};
+
+GenericBounds: Vec<ClassRef> = {
+    ClassRef => vec![<>],
+    <b:GenericBounds> "&" <c:ClassRef> => {
+        let mut b = b;
+        b.push(c);
+        b
+    },
 };
 
 Header: () = r#"Compiled from "[a-zA-Z.]+""#;

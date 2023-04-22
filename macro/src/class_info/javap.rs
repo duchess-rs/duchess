@@ -241,8 +241,11 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                     },
                     kind: Class,
                     generics: [
-                        Id {
-                            data: "E",
+                        Generic {
+                            id: Id {
+                                data: "E",
+                            },
+                            extends: [],
                         },
                     ],
                     extends: Some(
@@ -765,8 +768,11 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 data: "toArray",
                             },
                             generics: [
-                                Id {
-                                    data: "T",
+                                Generic {
+                                    id: Id {
+                                        data: "T",
+                                    },
+                                    extends: [],
                                 },
                             ],
                             argument_tys: [
