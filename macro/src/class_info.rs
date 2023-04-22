@@ -157,6 +157,12 @@ pub struct ClassInfo {
     pub methods: Vec<Method>,
 }
 
+impl ClassInfo {
+    pub fn parse(t: &str) -> Result<Self, String> {
+        javap::parse_class_info(t)
+    }
+}
+
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
 pub enum ClassKind {
     Class,
