@@ -1,8 +1,13 @@
-use std::{collections::BTreeMap, env, process::Command, sync::Arc};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    env,
+    process::Command,
+    sync::Arc,
+};
 
 use crate::{
     argument::{DuchessDeclaration, Ident, JavaClass, JavaPackage, JavaPath},
-    class_info::{ClassInfo, DotId, Id, RootMap, SpannedClassInfo, SpannedPackageInfo},
+    class_info::{ClassInfo, ClassRef, DotId, Id, RootMap, SpannedClassInfo, SpannedPackageInfo},
     span_error::SpanError,
 };
 
@@ -55,12 +60,33 @@ impl JavaPackage {
 #[derive(Default)]
 pub struct Reflector {
     classes: BTreeMap<DotId, Arc<ClassInfo>>,
+    extends: BTreeMap<DotId, Arc<BTreeSet<ClassRef>>>,
 }
 
 impl Reflector {
+    /// Returns the transitive set of classrefs that is extended/implemented by a given class.
+    ///
+    /// FIXME: This currently doesn't handle the transitive part.
+    pub fn extends(&mut self, class_name: &DotId) -> Result<&Arc<BTreeSet<ClassRef>>, String> {
+        if self.extends.contains_key(class_name) {
+            return Ok(&self.extends[class_name]);
+        }
+
+        let info = self.reflect(class_name)?;
+
+        let mut result = BTreeSet::default();
+        result.insert(info.this_ref());
+        result.extend(info.extends.iter().cloned());
+        result.extend(info.implements.iter().cloned());
+        result.insert(ClassRef::object());
+
+        self.extends.insert(class_name.clone(), Arc::new(result));
+        Ok(&self.extends[class_name])
+    }
+
     /// Returns the (potentially cached) info about `class_name`;
-    /// yields an error if we cannot reflect on that class.
     pub fn reflect(&mut self, class_name: &DotId) -> Result<&Arc<ClassInfo>, String> {
+        /// yields an error if we cannot reflect on that class.
         if self.classes.contains_key(class_name) {
             return Ok(&self.classes[class_name]);
         }

@@ -161,6 +161,17 @@ impl ClassInfo {
     pub fn parse(t: &str) -> Result<Self, String> {
         javap::parse_class_info(t)
     }
+
+    pub fn this_ref(&self) -> ClassRef {
+        ClassRef {
+            name: self.name.clone(),
+            generics: self
+                .generics
+                .iter()
+                .map(|g| RefType::TypeParameter(g.clone()))
+                .collect(),
+        }
+    }
 }
 
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
@@ -362,6 +373,15 @@ impl std::fmt::Display for ClassRef {
     }
 }
 
+impl ClassRef {
+    pub fn object() -> ClassRef {
+        ClassRef {
+            name: DotId::object(),
+            generics: vec![],
+        }
+    }
+}
+
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
 pub enum Type {
     Ref(RefType),
@@ -551,6 +571,10 @@ impl DotId {
     pub fn split(&self) -> (&[Id], &Id) {
         let (name, package) = self.ids.split_last().unwrap();
         (package, name)
+    }
+
+    pub fn object() -> Self {
+        Self::parse("java.lang.Object")
     }
 }
 
