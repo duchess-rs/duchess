@@ -30,8 +30,8 @@ impl RootMap {
         self.subpackages.get(p0)?.find_subpackage(ps)
     }
 
-    pub fn into_packages(self) -> impl Iterator<Item = SpannedPackageInfo> {
-        self.subpackages.into_values()
+    pub fn to_packages(&self) -> impl Iterator<Item = &SpannedPackageInfo> {
+        self.subpackages.values()
     }
 
     /// Find the names of all classes contained within.

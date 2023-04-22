@@ -13,16 +13,16 @@ use quote::quote_spanned;
 use rust_format::Formatter;
 
 impl DuchessDeclaration {
-    pub fn into_tokens(self) -> Result<TokenStream, SpanError> {
+    pub fn to_tokens(&self) -> Result<TokenStream, SpanError> {
         let root_map = self.to_root_map()?;
         let () = root_map.check()?;
-        root_map.into_tokens()
+        root_map.to_tokens()
     }
 }
 
 impl RootMap {
-    fn into_tokens(self) -> Result<TokenStream, SpanError> {
-        self.into_packages().map(|p| p.into_tokens(0)).collect()
+    fn to_tokens(self) -> Result<TokenStream, SpanError> {
+        self.to_packages().map(|p| p.to_tokens(0)).collect()
     }
 }
 
@@ -44,13 +44,13 @@ struct MethodOutput {
 }
 
 impl SpannedPackageInfo {
-    fn into_tokens(self, depth: usize) -> Result<TokenStream, SpanError> {
+    fn to_tokens(&self, depth: usize) -> Result<TokenStream, SpanError> {
         let name = Ident::new(&self.name, self.span);
         let inner: TokenStream = self
             .subpackages
-            .into_values()
-            .map(|p| p.into_tokens(depth + 1))
-            .chain(self.classes.into_iter().map(|c| c.into_tokens()))
+            .values()
+            .map(|p| p.to_tokens(depth + 1))
+            .chain(self.classes.iter().map(|c| c.to_tokens()))
             .collect::<Result<_, _>>()?;
 
         let path: TokenStream = (1..depth)
@@ -73,7 +73,7 @@ impl SpannedPackageInfo {
 }
 
 impl SpannedClassInfo {
-    pub fn into_tokens(self) -> Result<TokenStream, SpanError> {
+    pub fn to_tokens(&self) -> Result<TokenStream, SpanError> {
         let struct_name = self.struct_name();
         let ext_trait_name = self.ext_trait_name();
         let cached_class = self.cached_class();
@@ -81,12 +81,14 @@ impl SpannedClassInfo {
         let java_class_generics = self.class_generic_names();
 
         // Convert constructors
-        let constructors: Vec<_> = self.selected_constructors()
+        let constructors: Vec<_> = self
+            .selected_constructors()
             .map(|c| self.constructor(c))
             .collect::<Result<_, _>>()?;
 
         // Convert class methods (not static methods, those are different)
-        let object_methods: Vec<_> = self.selected_methods()
+        let object_methods: Vec<_> = self
+            .selected_methods()
             .filter(|m| !m.flags.is_static)
             .map(|m| self.method(m))
             .collect::<Result<_, _>>()?;
