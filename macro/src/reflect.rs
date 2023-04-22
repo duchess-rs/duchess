@@ -7,10 +7,10 @@ use crate::{
 };
 
 impl DuchessDeclaration {
-    pub fn to_root_map(&self) -> Result<RootMap, SpanError> {
+    pub fn to_root_map(&self, reflector: &mut Reflector) -> Result<RootMap, SpanError> {
         let mut subpackages = BTreeMap::new();
         for package in &self.packages {
-            package.to_spanned_packages(&package.package_name.ids, &mut subpackages)?;
+            package.to_spanned_packages(&package.package_name.ids, reflector, &mut subpackages)?;
         }
         Ok(RootMap { subpackages })
     }
@@ -20,6 +20,7 @@ impl JavaPackage {
     fn to_spanned_packages(
         &self,
         name: &[Ident],
+        reflector: &mut Reflector,
         map: &mut BTreeMap<Id, SpannedPackageInfo>,
     ) -> Result<(), SpanError> {
         let (first, rest) = name.split_first().unwrap();
@@ -39,12 +40,12 @@ impl JavaPackage {
 
         if rest.is_empty() {
             for c in &self.classes {
-                let j = c.parse_javap(&self.package_name)?;
+                let j = c.parse_javap(&self.package_name, reflector)?;
                 parent.classes.push(j);
             }
             Ok(())
         } else {
-            self.to_spanned_packages(rest, &mut parent.subpackages)
+            self.to_spanned_packages(rest, reflector, &mut parent.subpackages)
         }
     }
 }
@@ -112,8 +113,11 @@ impl Reflector {
 }
 
 impl JavaClass {
-    fn parse_javap(&self, package_name: &JavaPath) -> Result<SpannedClassInfo, SpanError> {
-        let mut reflector = Reflector::default();
+    fn parse_javap(
+        &self,
+        package_name: &JavaPath,
+        reflector: &mut Reflector,
+    ) -> Result<SpannedClassInfo, SpanError> {
         let class_name = DotId::parse(format!("{}.{}", package_name, self.class_name));
         match reflector.reflect(&class_name) {
             Ok(s) => Ok(SpannedClassInfo {

@@ -4,6 +4,7 @@ use crate::{
         ClassRef, Constructor, DotId, Id, Method, NonRepeatingType, RefType, RootMap, ScalarType,
         SpannedClassInfo, SpannedPackageInfo, Type,
     },
+    reflect::Reflector,
     span_error::SpanError,
 };
 use inflector::Inflector;
@@ -14,7 +15,8 @@ use rust_format::Formatter;
 
 impl DuchessDeclaration {
     pub fn to_tokens(&self) -> Result<TokenStream, SpanError> {
-        let root_map = self.to_root_map()?;
+        let mut reflector = Reflector::default();
+        let root_map = self.to_root_map(&mut reflector)?;
         let () = root_map.check()?;
         root_map.to_tokens()
     }
