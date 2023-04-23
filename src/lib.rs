@@ -37,7 +37,7 @@ pub mod prelude {
 /// names used by generated code.
 pub mod plumbing {
     pub use crate::cast::Upcast;
-    pub use crate::error::{convert_jni_error, convert_non_throw_jni_error, with_jni_env};
+    pub use crate::error::{convert_non_throw_jni_error, with_jni_env};
     pub use crate::jvm::{FromJValue, JavaObjectExt};
     pub use crate::str::ToJavaStringOp;
     pub use duchess_macro::duchess_javap;

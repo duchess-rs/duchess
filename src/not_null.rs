@@ -1,4 +1,4 @@
-use crate::{plumbing::convert_jni_error, JavaObject, JvmOp, Local};
+use crate::{plumbing::convert_non_throw_jni_error, JavaObject, JvmOp, Local};
 
 #[derive(Clone)]
 pub struct NotNull<J: JvmOp> {
@@ -31,10 +31,9 @@ where
         let j = self.j.execute_with(jvm, input)?;
         match j {
             Some(v) => Ok(v),
-            None => Err(convert_jni_error(
-                jvm.to_env(),
-                jni::errors::Error::NullDeref("not_null()"),
-            )),
+            None => Err(convert_non_throw_jni_error(jni::errors::Error::NullDeref(
+                "not_null()",
+            ))),
         }
     }
 }
