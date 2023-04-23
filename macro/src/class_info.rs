@@ -5,7 +5,7 @@ use proc_macro2::{Ident, Span, TokenTree};
 use crate::{
     argument::{JavaClass, MemberListing},
     class_info::{self},
-    parse::Parse,
+    parse::{Parse, TextAccum},
     span_error::SpanError,
 };
 
@@ -283,18 +283,21 @@ impl Parse for SpannedMethodSig {
             return Ok(None);
         };
 
-        let mut text: String = t0.to_string();
-        let mut span = t0.span();
+        if is_semi(&t0) {
+            return Err(SpanError {
+                span: t0.span(),
+                message: format!("empty method signature"),
+            });
+        }
 
-        if !is_semi(&t0) {
-            while let Some(t1) = p.eat_token() {
-                text.push_str(&t1.to_string());
-                span = span.join(t1.span()).unwrap_or(span);
-                if is_semi(&t1) {
-                    break;
-                }
+        let mut accum = TextAccum::new(p, t0);
+        while let Some(t1) = accum.accum() {
+            if is_semi(&t1) {
+                break;
             }
         }
+
+        let (text, span) = accum.into_accumulated_result();
 
         return match class_info::javap::parse_method_sig(&text) {
             Ok(ms) => Ok(Some(SpannedMethodSig {
