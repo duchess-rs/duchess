@@ -145,7 +145,7 @@ ClassRefOrId: RefType = {
     <Id> => RefType::TypeParameter(<>),
 };
 
-ClassRef: ClassRef = {
+pub ClassRef: ClassRef = {
     <name:DotId> => ClassRef { name, generics: vec![] },
     <name:DotId> "<" <generics:Comma<RefType>> ">" => ClassRef { <> },
 };

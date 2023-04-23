@@ -1,7 +1,7 @@
 use proc_macro2::{Delimiter, Span};
 
 use crate::{
-    class_info::{ClassInfo, Constructor, Id, Method, SpannedMethodSig},
+    class_info::{ClassInfo, Constructor, Id, Method, SpannedClassRef, SpannedMethodSig},
     parse::{Parse, Parser},
     span_error::SpanError,
 };

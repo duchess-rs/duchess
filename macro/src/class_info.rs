@@ -363,6 +363,77 @@ impl std::fmt::Display for MethodSig {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct SpannedClassRef {
+    pub class_ref: ClassRef,
+    pub span: Span,
+}
+
+impl Parse for SpannedClassRef {
+    fn parse(p: &mut crate::parse::Parser) -> Result<Option<Self>, SpanError> {
+        // Hackily consume a series of ident, `.` tokens until we either see
+        // something else or we see a `<`. If we see a `<`, then consume tokens
+        // until we see matching `>`.
+        //
+        // FIXME: clean this up.
+
+        // Consume `foo.bar.baz`
+        let Some(t0) = p.eat_token_if(is_part_of_java_path) else {
+            return Ok(None);
+        };
+        let mut accum = TextAccum::new(p, t0);
+        while let Some(_) = accum.accum_if(is_part_of_java_path) {}
+
+        // Consume `<...>` by matching `<` and `>`.
+        if let Some(_) = accum.accum_if(is_open_angle_bracket) {
+            let mut counter = 1;
+            while let Some(t) = accum.accum() {
+                if is_punct(&t, '<') {
+                    counter += 1;
+                } else if is_punct(&t, '>') {
+                    counter -= 1;
+                    if counter == 0 {
+                        break;
+                    }
+                }
+            }
+        }
+
+        let (text, span) = accum.into_accumulated_result();
+
+        return match class_info::javap::parse_class_ref(&text) {
+            Ok(cr) => Ok(Some(SpannedClassRef {
+                class_ref: cr,
+                span,
+            })),
+            Err(message) => return Err(SpanError { span, message }),
+        };
+
+        fn is_part_of_java_path(t: &TokenTree) -> bool {
+            match t {
+                TokenTree::Punct(p) => p.as_char() == '.',
+                TokenTree::Ident(_) => true,
+                _ => false,
+            }
+        }
+
+        fn is_open_angle_bracket(t: &TokenTree) -> bool {
+            is_punct(t, '<')
+        }
+
+        fn is_punct(t: &TokenTree, ch: char) -> bool {
+            match t {
+                TokenTree::Punct(p) => p.as_char() == ch,
+                _ => false,
+            }
+        }
+    }
+
+    fn description() -> String {
+        format!("java method signature")
+    }
+}
+
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
 pub struct ClassRef {
     pub name: DotId,
