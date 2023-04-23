@@ -57,6 +57,8 @@ impl Parse for JavaPackage {
 pub struct JavaClass {
     pub class_span: Span,
     pub class_name: Id,
+    pub extends: Option<Extends>,
+    pub implements: Option<Implements>,
     pub members: MemberListing,
 }
 
@@ -72,6 +74,9 @@ impl Parse for JavaClass {
 
         let class_span = p.last_span().unwrap();
 
+        let extends = Extends::parse(p)?;
+        let implements = Implements::parse(p)?;
+
         let Some(body) = p.eat_delimited(Delimiter::Brace) else {
             return Err(p.error("expected '{' after class name"));
         };
@@ -81,12 +86,67 @@ impl Parse for JavaClass {
         Ok(Some(JavaClass {
             class_span,
             class_name: Id::from(class_name),
+            extends,
+            implements,
             members,
         }))
     }
 
     fn description() -> String {
         format!("java class to reflect (e.g., `class Foo {{ * }}`)")
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum Extends {
+    Reflected(Span),
+    Specified(SpannedClassRef),
+}
+
+impl Parse for Extends {
+    fn parse(p: &mut Parser) -> Result<Option<Self>, SpanError> {
+        let Some(()) = p.eat_keyword("extends") else {
+            return Ok(None);
+        };
+
+        if let Some(span) = p.eat_punct('*') {
+            return Ok(Some(Extends::Reflected(span)));
+        }
+
+        let Some(class_name) = SpannedClassRef::parse(p)? else {
+            return Err(p.error("expected class name"));
+        };
+
+        return Ok(Some(Extends::Specified(class_name)));
+    }
+
+    fn description() -> String {
+        format!("`extends`")
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum Implements {
+    Reflected(Span),
+    Specified(Vec<SpannedClassRef>),
+}
+
+impl Parse for Implements {
+    fn parse(p: &mut Parser) -> Result<Option<Self>, SpanError> {
+        let Some(()) = p.eat_keyword("implements") else {
+            return Ok(None);
+        };
+
+        if let Some(span) = p.eat_punct('*') {
+            return Ok(Some(Implements::Reflected(span)));
+        }
+
+        let class_refs = SpannedClassRef::parse_many(p)?;
+        return Ok(Some(Implements::Specified(class_refs)));
+    }
+
+    fn description() -> String {
+        format!("`implements`")
     }
 }
 

@@ -204,4 +204,4 @@ pub trait Parse: Sized {
 }
 
 /// Keywords not considered valid identifiers; subset of java keywords.
-pub const KEYWORDS: &[&str] = &["package", "class"];
+pub const KEYWORDS: &[&str] = &["package", "class", "extends", "implements"];
