@@ -30,6 +30,9 @@ duchess::java_package! {
     // The `*` indicates "reflect all methods".
     // You can also name methods individually (see below).
     class Factory { * }
+
+    // For Widget, we choose not to mirror any methods.
+    class Widget { }
 }
 ```
 
