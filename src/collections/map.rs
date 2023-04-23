@@ -9,7 +9,7 @@ use once_cell::sync::OnceCell;
 
 use crate::{
     java::lang::{Class, Throwable},
-    plumbing::{JavaObjectExt, Upcast},
+    plumbing::{with_jni_env, JavaObjectExt, Upcast},
     Global, IntoJava, IntoLocal, JavaObject, Jvm, JvmOp, Local,
 };
 
@@ -26,10 +26,10 @@ unsafe impl<K: JavaObject, V: JavaObject> JavaObject for Map<K, V> {
         let env = jvm.to_env();
 
         static CLASS: OnceCell<Global<crate::java::lang::Class>> = OnceCell::new();
-        let global = CLASS.get_or_try_init::<_, crate::Error<Local<Throwable>>>(|| {
-            let class = env.find_class("java/util/Map")?;
-            // env.find_class() internally calls check_exception!()
-            Ok(unsafe { Global::from_jni(env.new_global_ref(class)?) })
+        let global = CLASS.get_or_try_init::<_, crate::Error<Local<'jvm, Throwable>>>(|| {
+            let class = with_jni_env(env, |env| env.find_class("java/util/Map"))?;
+            let global = with_jni_env(env, |env| env.new_global_ref(class))?;
+            Ok(unsafe { Global::from_jni(global) })
         })?;
         Ok(jvm.local(global))
     }
@@ -48,10 +48,10 @@ unsafe impl<K: JavaObject, V: JavaObject> JavaObject for HashMap<K, V> {
         let env = jvm.to_env();
 
         static CLASS: OnceCell<Global<crate::java::lang::Class>> = OnceCell::new();
-        let global = CLASS.get_or_try_init::<_, crate::Error<Local<Throwable>>>(|| {
-            let class = env.find_class("java/util/HashMap")?;
-            // env.find_class() internally calls check_exception!()
-            Ok(unsafe { Global::from_jni(env.new_global_ref(class)?) })
+        let global = CLASS.get_or_try_init::<_, crate::Error<Local<'jvm, Throwable>>>(|| {
+            let class = with_jni_env(env, |env| env.find_class("java/util/HashMap"))?;
+            let global = with_jni_env(env, |env| env.new_global_ref(class))?;
+            Ok(unsafe { Global::from_jni(global) })
         })?;
         Ok(jvm.local(global))
     }
@@ -99,10 +99,13 @@ where
                 let env = jvm.to_env();
 
                 static CONSTRUCTOR: OnceCell<JMethodID> = OnceCell::new();
-                let constructor =
-                    CONSTRUCTOR.get_or_try_init(|| env.get_method_id(&jclass, "<init>", "()V"))?;
+                let constructor = CONSTRUCTOR.get_or_try_init(|| {
+                    with_jni_env(env, |env| env.get_method_id(&jclass, "<init>", "()V"))
+                })?;
 
-                let object = unsafe { env.new_object_unchecked(jclass, *constructor, &[])? };
+                let object = with_jni_env(env, |env| unsafe {
+                    env.new_object_unchecked(jclass, *constructor, &[])
+                })?;
 
                 Ok(unsafe { Local::from_jni(AutoLocal::new(object, &env)) })
             }
@@ -179,15 +182,17 @@ where
 
         static METHOD: OnceCell<JMethodID> = OnceCell::new();
         let method = METHOD.get_or_try_init(|| {
-            env.get_method_id(
-                jclass,
-                "put",
-                "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
-            )
+            with_jni_env(env, |env| {
+                env.get_method_id(
+                    jclass,
+                    "put",
+                    "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+                )
+            })
         })?;
 
         // XX: safety?
-        let result = unsafe {
+        let result = with_jni_env(env, |env| unsafe {
             env.call_method_unchecked(
                 this.as_ref().as_jobject(),
                 *method,
@@ -200,8 +205,8 @@ where
                         l: value.as_ref().as_jobject().as_raw(),
                     },
                 ],
-            )?
-        };
+            )
+        })?;
         let JValueGen::Object(result) = result else {
             panic!("expected object for put() result");
         };

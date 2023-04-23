@@ -1,29 +1,8 @@
 use std::marker::PhantomData;
 
-use jni::{
-    objects::{AutoLocal, JObject},
-    JNIEnv,
-};
-
 use crate::{
     cast::Upcast, error::Error, java::lang::Throwable, jvm::CloneIn, IntoVoid, Jvm, JvmOp, Local,
 };
-
-/// Plumbing utility to check the exception state of the JVM thread convert it into a [`crate::Result`].
-// XX: many of the jni crate checked methods do this automatically. We only need this if/when we invoke
-// unchecked methods.
-pub fn try_catch<'jvm>(env: &mut JNIEnv<'jvm>) -> crate::Result<'jvm, ()> {
-    let exception = env.exception_occurred()?;
-    if exception.is_null() {
-        Ok(())
-    } else {
-        env.exception_clear()?;
-        let obj: JObject = exception.into();
-        Err(crate::Error::Thrown(unsafe {
-            Local::from_jni(AutoLocal::new(obj, &env))
-        }))
-    }
-}
 
 #[derive(Clone)]
 pub struct ThrownOp<T> {
@@ -170,12 +149,10 @@ where
         jvm: &mut Jvm<'jvm>,
         arg: Self::Input<'jvm>,
     ) -> crate::Result<'jvm, Self::Output<'jvm>> {
-        self.op
-            .execute_with(jvm, arg)
-            .or_else(|e| match e.extract_thrown(jvm) {
-                Error::Thrown(thrown) => self.catch.try_handle(jvm, thrown)?.map_err(Error::Thrown),
-                e => Err(e),
-            })
+        self.op.execute_with(jvm, arg).or_else(|e| match e {
+            Error::Thrown(thrown) => self.catch.try_handle(jvm, thrown)?.map_err(Error::Thrown),
+            e => Err(e),
+        })
     }
 }
 

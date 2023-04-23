@@ -1,11 +1,14 @@
 use std::marker::PhantomData;
 
 use crate::{
-    cast::Upcast, java::lang::Class, ops::IntoJava, plumbing::JavaObjectExt, IntoRust, JavaObject,
-    JavaType, Jvm, JvmOp, Local,
+    cast::Upcast,
+    java::lang::Class,
+    ops::IntoJava,
+    plumbing::{convert_non_throw_jni_error, with_jni_env, JavaObjectExt},
+    IntoRust, JavaObject, JavaType, Jvm, JvmOp, Local,
 };
 use jni::{
-    errors::{Error, JniError},
+    errors::JniError,
     objects::{AutoLocal, JObject, JPrimitiveArray},
 };
 
@@ -32,10 +35,11 @@ macro_rules! primivite_array {
                 fn into_java<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
                     let env = jvm.to_env();
                     let Ok(len) = self.len().try_into() else {
-                        return Err(Error::JniCall(JniError::InvalidArguments).into())
+                        return Err(convert_non_throw_jni_error(
+                            jni::errors::Error::JniCall(JniError::InvalidArguments)));
                     };
-                    let array = env.$new_fn(len)?;
-                    env.$set_fn(&array, 0, self)?;
+                    let array = with_jni_env(env, |env| env.$new_fn(len))?;
+                    with_jni_env(env, |env| env.$set_fn(&array, 0, self))?;
                     unsafe { Ok(Local::from_jni(AutoLocal::new(JObject::from(array), &env))) }
                 }
             }
@@ -51,11 +55,11 @@ macro_rules! primivite_array {
                     let env = jvm.to_env();
                     // XX: safety, is this violating any rules? right way to cast?
                     let array_object = unsafe { JPrimitiveArray::from_raw(object.as_ref().as_jobject().as_raw()) };
-                    let len = env.get_array_length(&array_object)? as usize;
+                    let len = with_jni_env(env, |env| env.get_array_length(&array_object))? as usize;
 
                     // XX: use MaybeUninit somehow to avoid the zero'ing
                     let mut vec = vec![Default::default(); len];
-                    env.$get_fn(&array_object, 0, &mut vec)?;
+                    with_jni_env(env, |env| env.$get_fn(&array_object, 0, &mut vec))?;
 
                     Ok(vec)
                 }
@@ -81,12 +85,13 @@ impl IntoJava<JavaArray<bool>> for &[bool] {
     fn into_java<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
         let env = jvm.to_env();
         let Ok(len) = self.len().try_into() else {
-            return Err(Error::JniCall(JniError::InvalidArguments).into())
+            return Err(convert_non_throw_jni_error(
+                jni::errors::Error::JniCall(JniError::InvalidArguments)));
         };
-        let array = env.new_boolean_array(len)?;
+        let array = with_jni_env(env, |env| env.new_boolean_array(len))?;
         // XX: is it possible to avoid this copy if we can make assumptions about bool repr?
         let u8s = self.iter().map(|&b| b as u8).collect::<Vec<_>>();
-        env.set_boolean_array_region(&array, 0, &u8s)?;
+        with_jni_env(env, |env| env.set_boolean_array_region(&array, 0, &u8s))?;
         unsafe { Ok(Local::from_jni(AutoLocal::new(JObject::from(array), &env))) }
     }
 }
@@ -103,11 +108,13 @@ where
         // XX: safety, is this violating any rules? right way to cast?
         let array_object =
             unsafe { JPrimitiveArray::from_raw(object.as_ref().as_jobject().as_raw()) };
-        let len = env.get_array_length(&array_object)? as usize;
+        let len = with_jni_env(env, |env| env.get_array_length(&array_object))? as usize;
 
         // XX: use MaybeUninit somehow to avoid the zero'ing
         let mut u8_vec = vec![0u8; len];
-        env.get_boolean_array_region(&array_object, 0, &mut u8_vec)?;
+        with_jni_env(env, |env| {
+            env.get_boolean_array_region(&array_object, 0, &mut u8_vec)
+        })?;
 
         Ok(u8_vec.into_iter().map(|x| x != 0).collect())
     }

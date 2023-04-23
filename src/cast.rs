@@ -2,7 +2,11 @@ use std::marker::PhantomData;
 
 use jni::objects::{AutoLocal, JClass};
 
-use crate::{jvm::JavaObjectExt, JavaObject, Jvm, JvmOp, Local};
+use crate::{
+    jvm::JavaObjectExt,
+    plumbing::{convert_jni_error, with_jni_env},
+    JavaObject, Jvm, JvmOp, Local,
+};
 
 /// A trait to represent safe upcast operations for a [`JavaObject`].
 ///
@@ -76,11 +80,11 @@ where
         let class: &JClass = (&*class).into();
 
         let env = jvm.to_env();
-        if !env.is_instance_of(&jobject, class)? {
+        if !with_jni_env(env, |env| env.is_instance_of(&jobject, class))? {
             return Ok(Err(instance));
         }
 
-        let local = env.new_local_ref(jobject)?;
+        let local = with_jni_env(env, |env| env.new_local_ref(jobject))?;
         // Safety: just shown that jobject instanceof To::class
         Ok(Ok(unsafe { Local::from_jni(AutoLocal::new(local, env)) }))
     }
@@ -154,7 +158,9 @@ where
         let env = jvm.to_env();
         // Safety: From: Upcast<To>
         unsafe {
-            let casted = env.new_local_ref(jobject)?;
+            let casted = env
+                .new_local_ref(jobject)
+                .map_err(|e| convert_jni_error(env, e))?;
             Ok(Local::from_jni(env.auto_local(casted)))
         }
     }

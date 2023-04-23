@@ -7,6 +7,7 @@ use crate::{
     java::lang::String as JavaString,
     jvm::JavaObjectExt,
     ops::{IntoJava, IntoRust},
+    plumbing::with_jni_env,
     Jvm, JvmOp, Local,
 };
 
@@ -42,7 +43,7 @@ where
     ) -> crate::Result<'jvm, Self::Output<'jvm>> {
         let data = self.op.execute_with(jvm, input)?;
         let env = jvm.to_env();
-        let o = env.new_string(data)?;
+        let o = with_jni_env(env, |env| env.new_string(data))?;
         let o: JObject = o.into();
         unsafe { Ok(Local::from_jni(AutoLocal::new(o, &env))) }
     }
@@ -53,7 +54,7 @@ impl IntoJava<JavaString> for &str {
 
     fn into_java<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Local<'jvm, JavaString>> {
         let env = jvm.to_env();
-        let string = env.new_string(self)?;
+        let string = with_jni_env(env, |env| env.new_string(self))?;
         unsafe { Ok(Local::from_jni(AutoLocal::new(JObject::from(string), &env))) }
     }
 }
@@ -76,7 +77,9 @@ where
         let env = jvm.to_env();
         // XX: safety? is this the right way to do this cast?
         let string_object = unsafe { JString::from_raw(object.as_ref().as_jobject().as_raw()) };
-        let string = unsafe { env.get_string_unchecked(&string_object)? };
+        let string = with_jni_env(env, |env| unsafe {
+            env.get_string_unchecked(&string_object)
+        })?;
         Ok(string.into())
     }
 }

@@ -73,8 +73,7 @@ impl JavaClass {
             .arg(classpath)
             .arg("-public")
             .arg("-s")
-            .arg(format!("{}.{}", package_name, self.class_name))
-            ;
+            .arg(format!("{}.{}", package_name, self.class_name));
 
         let output_or_err = command.output();
 

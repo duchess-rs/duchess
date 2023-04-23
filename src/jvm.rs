@@ -4,6 +4,7 @@ use crate::{
     inspect::{ArgOp, Inspect},
     java::lang::{Class, ClassExt, Throwable},
     not_null::NotNull,
+    plumbing::{convert_non_throw_jni_error, with_jni_env},
     IntoLocal,
 };
 
@@ -123,7 +124,9 @@ impl<'jvm> Jvm<'jvm> {
     pub fn with<R>(
         op: impl for<'a> FnOnce(&mut Jvm<'a>) -> crate::Result<'a, R>,
     ) -> crate::GlobalResult<R> {
-        let guard = GLOBAL_JVM.attach_current_thread()?;
+        let guard = GLOBAL_JVM
+            .attach_current_thread()
+            .map_err(convert_non_throw_jni_error)?;
 
         // Safety condition: must not be used to create new references
         // unless they are contained by `guard`. In this case, the
@@ -260,9 +263,9 @@ macro_rules! scalar {
 
                     static CLASS: OnceCell<Global<crate::java::lang::Class>> = OnceCell::new();
                     let global = CLASS.get_or_try_init::<_, crate::Error<Local<Throwable>>>(|| {
-                        let class = env.find_class($array_class)?;
-                        // env.find_class() internally calls check_exception!()
-                        Ok(unsafe { Global::from_jni(env.new_global_ref(class)?) })
+                        let class = with_jni_env(env, |env| env.find_class($array_class))?;
+                        let global = with_jni_env(env, |env| env.new_global_ref(class))?;
+                        Ok(unsafe { Global::from_jni(global) })
                     })?;
                     Ok(jvm.local(global))
                 }

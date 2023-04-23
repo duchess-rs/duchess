@@ -29,6 +29,9 @@ r#"
 
             public final native void notifyAll();
                 descriptor: ()V
+
+            public static native void notifyStatic(String...);
+                descriptor: ([Ljava/lang/String;)V
         }
     "#
 }
@@ -168,6 +171,7 @@ r#"
         public java.lang.Class arrayType();
             descriptor: ()Ljava/lang/Class;
         }
+
     "#
 }
 

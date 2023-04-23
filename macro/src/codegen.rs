@@ -214,9 +214,9 @@ impl SpannedClassInfo {
 
                 static CLASS: OnceCell<Global<java::lang::Class>> = OnceCell::new();
                 let global = CLASS.get_or_try_init::<_, duchess::Error<Local<java::lang::Throwable>>>(|| {
-                    let class = env.find_class(#jni_class_name)?;
-                    // env.find_class() internally calls check_exception!()
-                    Ok(unsafe { Global::from_jni(env.new_global_ref(class)?) })
+                    let class = with_jni_env(env, |env| env.find_class(#jni_class_name))?;
+                    let global = with_jni_env(env, |env| env.new_global_ref(class))?;
+                    Ok(unsafe { Global::from_jni(global) })
                 })?;
                 Ok(jvm.local(global))
             }
@@ -297,15 +297,15 @@ impl SpannedClassInfo {
                             // no matter how many generic monomorphizations there are. This makes sense
                             // given Java's erased-based generics system.
                             static CONSTRUCTOR: OnceCell<JMethodID> = OnceCell::new();
-                            let constructor =
-                                CONSTRUCTOR.get_or_try_init(|| env.get_method_id(class, "<init>", #descriptor))?;
+                            let constructor = CONSTRUCTOR.get_or_try_init(|| {
+                                with_jni_env(env, |env| env.get_method_id(class, "<init>", #descriptor))
+                            })?;
 
-                            let o = unsafe {
+                            let o = with_jni_env(env, |env| unsafe {
                                 env.new_object_unchecked(class, *constructor, &[
                                     #(JValue::from(#input_names).as_jni(),)*
-                                ])?
-                            };
-                            // env.new_object_unchecked() internally calls check_exception!()
+                                ])
+                            })?;
 
                             Ok(unsafe {
                                 Local::from_jni(AutoLocal::new(o, &env))
@@ -483,21 +483,20 @@ impl SpannedClassInfo {
                     // no matter how many generic monomorphizations there are. This makes sense
                     // given Java's erased-based generics system.
                     static METHOD: OnceCell<JMethodID> = OnceCell::new();
-                    let method = METHOD.get_or_try_init::<_, duchess::Error<Local<java::lang::Throwable>>>(|| {
+                    let method = METHOD.get_or_try_init(|| {
                         let class = <#this_ty>::class(jvm)?;
                         let class = class.as_jobject();
                         let class: &JClass = (&*class).into();
-                        Ok(jvm.to_env().get_method_id(class, #method_str, #descriptor)?)
+                        with_jni_env(jvm.to_env(), |env| env.get_method_id(class, #method_str, #descriptor))
                     })?;
 
                     let env = jvm.to_env();
 
-                    let result = unsafe {
+                    let result = with_jni_env(env, |env| unsafe {
                         env.call_method_unchecked(this, *method, #jni_return_ty, &[
                             #(JValue::from(#input_names).as_jni(),)*
-                        ])?
-                    };
-                    // env.call_method_unchecked internally calls check_exception!()
+                        ])
+                    })?;
 
                     Ok(FromJValue::from_jvalue(jvm, result))
                 }
