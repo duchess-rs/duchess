@@ -122,9 +122,9 @@ impl Parser {
         })
     }
 
-    pub fn eat_punct(&mut self, ch: char) -> Option<()> {
-        self.eat_if(|t| match t {
-            TokenTree::Punct(punct) if punct.as_char() == ch => Some(()),
+    pub fn eat_punct(&mut self, ch: char) -> Option<Span> {
+        self.eat_map(|t| match t {
+            TokenTree::Punct(punct) if punct.as_char() == ch => Some(punct.span()),
             _ => None,
         })
     }

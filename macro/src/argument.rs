@@ -36,7 +36,7 @@ impl Parse for JavaPackage {
             return Err(p.error("expected package name"));
         };
 
-        let Some(()) = p.eat_punct(';') else {
+        let Some(_) = p.eat_punct(';') else {
             return Err(p.error("expected `;` after package name"));
         };
 
@@ -157,8 +157,8 @@ impl Parse for MemberListing {
 impl Parse for MemberListingElement {
     fn parse(p: &mut Parser) -> Result<Option<Self>, SpanError> {
         // Parse wildcard like `*` or `* - (...)`
-        if let Some(()) = p.eat_punct('*') {
-            if let Some(()) = p.eat_punct('-') {
+        if let Some(_) = p.eat_punct('*') {
+            if let Some(_) = p.eat_punct('-') {
                 if let Some(g) = p.eat_delimited(Delimiter::Parenthesis) {
                     let ml = Parser::from(g).parse::<MemberListing>()?;
                     return Ok(Some(MemberListingElement::Wildcard(ml)));
@@ -198,7 +198,7 @@ impl Parse for JavaPath {
         let mut span = text.span;
         let mut ids = vec![text];
 
-        while let Some(()) = p.eat_punct('.') {
+        while let Some(_) = p.eat_punct('.') {
             let Some(next) = Ident::parse(p)? else {
                 return Err(SpanError { span: p.last_span().unwrap(), message: format!("expected identifier after `.`") });
             };
