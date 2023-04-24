@@ -15,186 +15,74 @@ mod object {
     duchess_macro::java_package! {
         package java.lang;
 
-        class Object {
-            Object();
-            hashCode();
-            equals(java.lang.Object);
-            toString();
-            notify();
-            notifyAll();
+        public class java.lang.Object {
+            public java.lang.Object();
+            public native int hashCode();
+            public boolean equals(java.lang.Object);
+            public java.lang.String toString();
+            public final native void notify();
+            public final native void notifyAll();
         }
-    }
-}
 
-pub use object::java::lang::{Object, ObjectExt};
-
-duchess_macro::duchess_javap! {
-r#"
-        Compiled from "Throwable.java"
         public class java.lang.Throwable {
-        public java.lang.Throwable();
-            descriptor: ()V
-
-        public java.lang.String getMessage();
-            descriptor: ()Ljava/lang/String;
-
-        public java.lang.String getLocalizedMessage();
-            descriptor: ()Ljava/lang/String;
-
-        public synchronized java.lang.Throwable getCause();
-            descriptor: ()Ljava/lang/Throwable;
-
-        public synchronized java.lang.Throwable initCause(java.lang.Throwable);
-            descriptor: (Ljava/lang/Throwable;)Ljava/lang/Throwable;
-
-        public java.lang.String toString();
-            descriptor: ()Ljava/lang/String;
-
-        public void printStackTrace();
-            descriptor: ()V
-
-        public synchronized java.lang.Throwable fillInStackTrace();
-            descriptor: ()Ljava/lang/Throwable;
-
-        public java.lang.StackTraceElement[] getStackTrace();
-            descriptor: ()[Ljava/lang/StackTraceElement;
-
-        public void setStackTrace(java.lang.StackTraceElement[]);
-            descriptor: ([Ljava/lang/StackTraceElement;)V
-
-        public final synchronized void addSuppressed(java.lang.Throwable);
-            descriptor: (Ljava/lang/Throwable;)V
-
-        public final synchronized java.lang.Throwable[] getSuppressed();
-            descriptor: ()[Ljava/lang/Throwable;
+            public java.lang.Throwable();
+            public java.lang.String getMessage();
+            public java.lang.String getLocalizedMessage();
+            public synchronized java.lang.Throwable getCause();
+            public synchronized java.lang.Throwable initCause(java.lang.Throwable);
+            public java.lang.String toString();
+            public void printStackTrace();
+            public synchronized java.lang.Throwable fillInStackTrace();
+            public java.lang.StackTraceElement[] getStackTrace();
+            public void setStackTrace(java.lang.StackTraceElement[]);
+            public final synchronized void addSuppressed(java.lang.Throwable);
+            public final synchronized java.lang.Throwable[] getSuppressed();
         }
-    "#
-}
 
-duchess_macro::duchess_javap! {
-r#"
-        Compiled from "StackTraceElement.java"
         public final class java.lang.StackTraceElement {
-        public java.lang.StackTraceElement(java.lang.String, java.lang.String, java.lang.String, int);
-            descriptor: (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)V
-
-        public java.lang.String getFileName();
-            descriptor: ()Ljava/lang/String;
-
-        public int getLineNumber();
-            descriptor: ()I
-
-        public java.lang.String getModuleName();
-            descriptor: ()Ljava/lang/String;
-
-        public java.lang.String getModuleVersion();
-            descriptor: ()Ljava/lang/String;
-
-        public java.lang.String getClassLoaderName();
-            descriptor: ()Ljava/lang/String;
-
-        public java.lang.String getClassName();
-            descriptor: ()Ljava/lang/String;
-
-        public java.lang.String getMethodName();
-            descriptor: ()Ljava/lang/String;
-
-        public boolean isNativeMethod();
-            descriptor: ()Z
-
-        public java.lang.String toString();
-            descriptor: ()Ljava/lang/String;
-
-        public boolean equals(java.lang.Object);
-            descriptor: (Ljava/lang/Object;)Z
-
-        public int hashCode();
-            descriptor: ()I
+            public java.lang.StackTraceElement(java.lang.String, java.lang.String, java.lang.String, int);
+            public java.lang.String getFileName();
+            public int getLineNumber();
+            public java.lang.String getModuleName();
+            public java.lang.String getModuleVersion();
+            public java.lang.String getClassLoaderName();
+            public java.lang.String getClassName();
+            public java.lang.String getMethodName();
+            public boolean isNativeMethod();
+            public java.lang.String toString();
+            public boolean equals(java.lang.Object);
+            public int hashCode();
         }
-    "#
-}
 
-duchess_macro::duchess_javap! {
-r#"
-        Compiled from "Class.java"
         public final class java.lang.Class {
-        public java.lang.String toString();
-            descriptor: ()Ljava/lang/String;
-
-        public java.lang.String toGenericString();
-            descriptor: ()Ljava/lang/String;
-
-        public native boolean isInstance(java.lang.Object);
-            descriptor: (Ljava/lang/Object;)Z
-
-        public native boolean isAssignableFrom(java.lang.Class);
-            descriptor: (Ljava/lang/Class;)Z
-
-        public native boolean isInterface();
-            descriptor: ()Z
-
-        public native boolean isArray();
-            descriptor: ()Z
-
-        public native boolean isPrimitive();
-            descriptor: ()Z
-
-        public boolean isAnnotation();
-            descriptor: ()Z
-
-        public boolean isSynthetic();
-            descriptor: ()Z
-
-        public java.lang.String getName();
-            descriptor: ()Ljava/lang/String;
-
-        public native java.lang.Class getSuperclass();
-            descriptor: ()Ljava/lang/Class;
-
-        public java.lang.String getPackageName();
-            descriptor: ()Ljava/lang/String;
-
-        public java.lang.Class[] getInterfaces();
-            descriptor: ()[Ljava/lang/Class;
-
-        public java.lang.Class getComponentType();
-            descriptor: ()Ljava/lang/Class;
-
-        public java.lang.Class arrayType();
-            descriptor: ()Ljava/lang/Class;
+            public java.lang.String toString();
+            public java.lang.String toGenericString();
+            public native boolean isInstance(java.lang.Object);
+            public native boolean isInterface();
+            public native boolean isArray();
+            public native boolean isPrimitive();
+            public boolean isAnnotation();
+            public boolean isSynthetic();
+            public java.lang.String getName();
+            public native java.lang.Class getSuperclass();
+            public java.lang.String getPackageName();
+            public java.lang.Class[] getInterfaces();
+            public java.lang.Class getComponentType();
+            public java.lang.Class arrayType();
         }
 
-    "#
-}
-
-duchess_macro::duchess_javap! {
-r#"
-        Compiled from "String.java"
         public final class java.lang.String {
-        public java.lang.String(byte[]);
-            descriptor: ([B)V
-
-        public int length();
-            descriptor: ()I
-
-        public boolean isEmpty();
-            descriptor: ()Z
+            public java.lang.String(byte[]);
+            public int length();
+            public boolean isEmpty();
         }
-    "#
-}
 
-duchess_macro::duchess_javap! {
-r#"
-    Compiled from "Record.java"
-    public abstract class java.lang.Record {
-    public abstract boolean equals(java.lang.Object);
-        descriptor: (Ljava/lang/Object;)Z
-
-    public abstract int hashCode();
-        descriptor: ()I
-
-    public abstract java.lang.String toString();
-        descriptor: ()Ljava/lang/String;
+        public abstract class java.lang.Record {
+            public abstract boolean equals(java.lang.Object);
+            public abstract int hashCode();
+            public abstract java.lang.String toString();
+        }
     }
-    "#
 }
+
+pub use object::java::lang::*;

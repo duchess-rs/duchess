@@ -1,7 +1,7 @@
 use std::iter::Peekable;
 
 use litrs::StringLit;
-use proc_macro2::{Delimiter, Span, TokenStream, TokenTree};
+use proc_macro2::{Delimiter, Spacing, Span, TokenStream, TokenTree};
 
 use crate::span_error::SpanError;
 
@@ -157,11 +157,13 @@ pub struct TextAccum<'p> {
 
 impl<'p> TextAccum<'p> {
     pub fn new(parser: &'p mut Parser, t0: TokenTree) -> Self {
-        Self {
-            text: t0.to_string(),
+        let mut s = Self {
+            text: String::new(),
             span: t0.span(),
             parser,
-        }
+        };
+        s.accum_token(&t0);
+        s
     }
 
     /// Accumulate next token into the internal buffer and return it.
@@ -172,9 +174,25 @@ impl<'p> TextAccum<'p> {
     /// If the next token passes `test`, accumulates it into the internal buffer, and returns it.
     pub fn accum_if(&mut self, test: impl Fn(&TokenTree) -> bool) -> Option<TokenTree> {
         let t1 = self.parser.eat_token_if(test)?;
-        self.text.push_str(&t1.to_string());
-        self.span = self.span.join(t1.span()).unwrap_or(self.span);
+        self.accum_token(&t1);
         Some(t1)
+    }
+
+    fn accum_token(&mut self, token: &TokenTree) {
+        self.text.push_str(&token.to_string());
+
+        // insert whitespace if this is a token that needs to be separated from following tokens
+        match token {
+            TokenTree::Group(_) => (),
+            TokenTree::Ident(_) => self.text.push(' '),
+            TokenTree::Punct(p) => match p.spacing() {
+                Spacing::Alone => self.text.push(' '),
+                Spacing::Joint => (),
+            },
+            TokenTree::Literal(_) => (),
+        }
+
+        self.span = self.span.join(token.span()).unwrap_or(self.span);
     }
 
     /// Return the string we accumulated.

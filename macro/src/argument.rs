@@ -1,7 +1,7 @@
-use proc_macro2::{Delimiter, Span};
+use proc_macro2::Span;
 
 use crate::{
-    class_info::{ClassInfo, Constructor, Id, Method, SpannedClassRef, SpannedMethodSig},
+    class_info::{ClassDecl, Id},
     parse::{Parse, Parser},
     span_error::SpanError,
 };
@@ -23,7 +23,7 @@ impl Parse for DuchessDeclaration {
 
 pub struct JavaPackage {
     pub package_name: JavaPath,
-    pub classes: Vec<JavaClass>,
+    pub classes: Vec<ClassDecl>,
 }
 
 impl Parse for JavaPackage {
@@ -40,7 +40,7 @@ impl Parse for JavaPackage {
             return Err(p.error("expected `;` after package name"));
         };
 
-        let classes = JavaClass::parse_many(p)?;
+        let classes = ClassDecl::parse_many(p)?;
 
         Ok(Some(JavaPackage {
             package_name,
@@ -50,197 +50,6 @@ impl Parse for JavaPackage {
 
     fn description() -> String {
         format!("java package to reflect (e.g., `package foo; ...`)")
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct JavaClass {
-    pub class_span: Span,
-    pub class_name: Id,
-    pub extends: Option<Extends>,
-    pub implements: Option<Implements>,
-    pub members: MemberListing,
-}
-
-impl Parse for JavaClass {
-    fn parse(p: &mut Parser) -> Result<Option<Self>, SpanError> {
-        let Some(()) = p.eat_keyword("class") else {
-            return Ok(None);
-        };
-
-        let Some(class_name) = p.eat_ident() else {
-            return Err(p.error("expected class name"));
-        };
-
-        let class_span = p.last_span().unwrap();
-
-        let extends = Extends::parse(p)?;
-        let implements = Implements::parse(p)?;
-
-        let Some(body) = p.eat_delimited(Delimiter::Brace) else {
-            return Err(p.error("expected '{' after class name"));
-        };
-
-        let members = Parser::from(body).parse::<MemberListing>()?;
-
-        Ok(Some(JavaClass {
-            class_span,
-            class_name: Id::from(class_name),
-            extends,
-            implements,
-            members,
-        }))
-    }
-
-    fn description() -> String {
-        format!("java class to reflect (e.g., `class Foo {{ * }}`)")
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum Extends {
-    Reflected(Span),
-    Specified(SpannedClassRef),
-}
-
-impl Parse for Extends {
-    fn parse(p: &mut Parser) -> Result<Option<Self>, SpanError> {
-        let Some(()) = p.eat_keyword("extends") else {
-            return Ok(None);
-        };
-
-        if let Some(span) = p.eat_punct('*') {
-            return Ok(Some(Extends::Reflected(span)));
-        }
-
-        let Some(class_name) = SpannedClassRef::parse(p)? else {
-            return Err(p.error("expected class name"));
-        };
-
-        return Ok(Some(Extends::Specified(class_name)));
-    }
-
-    fn description() -> String {
-        format!("`extends`")
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum Implements {
-    Reflected(Span),
-    Specified(Vec<SpannedClassRef>),
-}
-
-impl Parse for Implements {
-    fn parse(p: &mut Parser) -> Result<Option<Self>, SpanError> {
-        let Some(()) = p.eat_keyword("implements") else {
-            return Ok(None);
-        };
-
-        if let Some(span) = p.eat_punct('*') {
-            return Ok(Some(Implements::Reflected(span)));
-        }
-
-        let class_refs = SpannedClassRef::parse_many(p)?;
-        return Ok(Some(Implements::Specified(class_refs)));
-    }
-
-    fn description() -> String {
-        format!("`implements`")
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct MemberListing {
-    pub elements: Vec<MemberListingElement>,
-}
-
-#[derive(Clone, Debug)]
-pub enum MemberListingElement {
-    /// `* - <ML>`
-    Wildcard(MemberListing),
-
-    /// `void toString()` -- full details
-    Named(SpannedMethodSig),
-}
-
-impl MemberListing {
-    pub fn contains_method(&self, m: &Method) -> bool {
-        self.elements.iter().any(|e| e.contains_method(m))
-    }
-
-    pub fn contains_constructor(&self, class: &ClassInfo, ctor: &Constructor) -> bool {
-        self.elements
-            .iter()
-            .any(|e| e.contains_constructor(class, ctor))
-    }
-
-    pub fn all() -> Self {
-        MemberListing {
-            elements: vec![MemberListingElement::Wildcard(MemberListing::none())],
-        }
-    }
-
-    pub fn none() -> Self {
-        MemberListing { elements: vec![] }
-    }
-}
-
-impl MemberListingElement {
-    pub fn contains_method(&self, m: &Method) -> bool {
-        match self {
-            MemberListingElement::Wildcard(ml) => !ml.contains_method(m),
-            MemberListingElement::Named(n) => n.method_sig.matches(m),
-        }
-    }
-
-    pub fn contains_constructor(&self, class: &ClassInfo, ctor: &Constructor) -> bool {
-        match self {
-            MemberListingElement::Wildcard(ml) => !ml.contains_constructor(class, ctor),
-            MemberListingElement::Named(n) => n.method_sig.matches_constructor(class, ctor),
-        }
-    }
-}
-
-impl Parse for MemberListing {
-    fn parse(p: &mut Parser) -> Result<Option<Self>, SpanError> {
-        Ok(Some(MemberListing {
-            elements: MemberListingElement::parse_many(p)?,
-        }))
-    }
-
-    fn description() -> String {
-        format!("list of class members (`*` for all)")
-    }
-}
-
-impl Parse for MemberListingElement {
-    fn parse(p: &mut Parser) -> Result<Option<Self>, SpanError> {
-        // Parse wildcard like `*` or `* - (...)`
-        if let Some(_) = p.eat_punct('*') {
-            if let Some(_) = p.eat_punct('-') {
-                if let Some(g) = p.eat_delimited(Delimiter::Parenthesis) {
-                    let ml = Parser::from(g).parse::<MemberListing>()?;
-                    return Ok(Some(MemberListingElement::Wildcard(ml)));
-                }
-                return Err(SpanError {
-                    span: p.last_span().unwrap(),
-                    message: format!("expected parenthesized group of methods"),
-                });
-            } else {
-                return Ok(Some(MemberListingElement::Wildcard(MemberListing::none())));
-            }
-        }
-
-        let Some(sig) = SpannedMethodSig::parse(p)? else {
-            return Ok(None);
-        };
-
-        Ok(Some(MemberListingElement::Named(sig)))
-    }
-
-    fn description() -> String {
-        format!("list of methods to accept, or `*` for all")
     }
 }
 

@@ -1,8 +1,8 @@
 use crate::{
-    argument::{DuchessDeclaration, MemberListing},
+    argument::DuchessDeclaration,
     class_info::{
         ClassInfo, ClassRef, Constructor, DotId, Generic, Id, Method, NonRepeatingType, RefType,
-        RootMap, ScalarType, SpannedClassInfo, SpannedPackageInfo, Type,
+        RootMap, ScalarType, SpannedPackageInfo, Type,
     },
     reflect::Reflector,
     span_error::SpanError,
@@ -66,11 +66,7 @@ impl SpannedPackageInfo {
         let class_tokens: TokenStream = self
             .classes
             .iter()
-            .map(|class_id| {
-                let jc = &root_map.classes[class_id];
-                let info = &reflector.reflect_at(class_id, jc.class_span)?.clone();
-                ClassCodegen::from(info, jc.class_span, &jc.members).to_tokens()
-            })
+            .map(|class_id| root_map.classes[class_id].to_tokens())
             .collect::<Result<_, _>>()?;
 
         let supers: Vec<TokenStream> = package_id
@@ -94,33 +90,7 @@ impl SpannedPackageInfo {
     }
 }
 
-impl SpannedClassInfo {
-    pub fn to_tokens(&self) -> Result<TokenStream, SpanError> {
-        ClassCodegen::from(&self.info, self.span, &self.members).to_tokens()
-    }
-}
-
-#[derive(Debug)]
-pub struct ClassCodegen<'cx> {
-    /// The complete class info loaded from javap
-    info: &'cx ClassInfo,
-
-    /// The span where user declared interest in this class
-    span: Span,
-
-    /// The listing of members user wants to include
-    members: &'cx MemberListing,
-}
-
-impl<'cx> ClassCodegen<'cx> {
-    pub fn from(info: &'cx ClassInfo, span: Span, members: &'cx MemberListing) -> Self {
-        ClassCodegen {
-            info,
-            span,
-            members,
-        }
-    }
-
+impl ClassInfo {
     pub fn to_tokens(&self) -> Result<TokenStream, SpanError> {
         let struct_name = self.struct_name();
         let ext_trait_name = self.ext_trait_name();
@@ -130,15 +100,15 @@ impl<'cx> ClassCodegen<'cx> {
 
         // Convert constructors
         let constructors: Vec<_> = self
-            .info
-            .selected_constructors(&self.members)
+            .constructors
+            .iter()
             .map(|c| self.constructor(c))
             .collect::<Result<_, _>>()?;
 
         // Convert class methods (not static methods, those are different)
         let object_methods: Vec<_> = self
-            .info
-            .selected_methods(&self.members)
+            .methods
+            .iter()
             .filter(|m| !m.flags.is_static)
             .map(|m| self.method(m))
             .collect::<Result<_, _>>()?;
@@ -163,7 +133,7 @@ impl<'cx> ClassCodegen<'cx> {
             #[allow(non_camel_case_types)]
             pub trait #ext_trait_name<#(#java_class_generics,)*> : duchess::JvmOp
             where
-                #(#java_class_generics : JavaObject,)*
+                #(#java_class_generics : duchess::JavaObject,)*
             {
                 #(#trait_methods)*
             }
@@ -218,7 +188,7 @@ impl<'cx> ClassCodegen<'cx> {
         };
 
         if let Ok(f) = std::env::var("DUCHESS_DEBUG") {
-            if f == "*" || f == "1" || self.info.name.to_string().starts_with(&f) {
+            if f == "*" || f == "1" || self.name.to_string().starts_with(&f) {
                 match rust_format::RustFmt::default().format_tokens(output.clone()) {
                     Ok(v) => {
                         eprintln!("{v}");
@@ -240,7 +210,7 @@ impl<'cx> ClassCodegen<'cx> {
             .resolve_upcasts()
             .map(|r| {
                 let mut sig = Signature::new(&Id::from("supertrait"), self.span, &[])
-                .with_internal_generics(&self.info.generics)?;
+                .with_internal_generics(&self.generics)?;
                 let tokens = sig.forbid_capture(|sig| sig.class_ref_ty(r)).unwrap();
                 Ok(quote_spanned!(self.span =>
                     unsafe impl<#(#java_class_generics,)*> plumbing::Upcast<#tokens> for #struct_name<#(#java_class_generics,)*>
@@ -261,11 +231,10 @@ impl<'cx> ClassCodegen<'cx> {
             generics: vec![],
         });
 
-        self.info.extends.iter().chain(&self.info.implements).chain(
-            Some(object)
-                .filter(|obj| obj.name != self.info.name)
-                .into_iter(),
-        )
+        self.extends
+            .iter()
+            .chain(&self.implements)
+            .chain(Some(object).filter(|obj| obj.name != self.name).into_iter())
     }
 
     fn cached_class(&self) -> TokenStream {
@@ -288,7 +257,7 @@ impl<'cx> ClassCodegen<'cx> {
     }
 
     fn constructor(&self, constructor: &Constructor) -> Result<TokenStream, SpanError> {
-        let mut sig = Signature::new(self.info.name.class_name(), self.span, &self.info.generics);
+        let mut sig = Signature::new(self.name.class_name(), self.span, &self.generics);
 
         let input_traits: Vec<_> = constructor
             .argument_tys
@@ -305,7 +274,7 @@ impl<'cx> ClassCodegen<'cx> {
 
         let java_class_generics = self.class_generic_names();
 
-        let descriptor = Literal::string(&constructor.descriptor.string);
+        let descriptor = constructor.descriptor();
 
         // Code to convert each input appropriately
         let prepare_inputs = self.prepare_inputs(&input_names, &constructor.argument_tys);
@@ -313,7 +282,7 @@ impl<'cx> ClassCodegen<'cx> {
         let output = quote_spanned!(self.span =>
             impl< #(#java_class_generics,)* > #ty
             where
-                #(#java_class_generics: JavaObject,)*
+                #(#java_class_generics: duchess::JavaObject,)*
             {
                 pub fn new(
                     #(#input_names : impl #input_traits,)*
@@ -338,7 +307,7 @@ impl<'cx> ClassCodegen<'cx> {
                         #(#input_names,)*
                     >
                     where
-                        #(#java_class_generics: JavaObject,)*
+                        #(#java_class_generics: duchess::JavaObject,)*
                         #(#input_names : #input_traits,)*
                     {
                         type Input<'jvm> = ();
@@ -392,7 +361,7 @@ impl<'cx> ClassCodegen<'cx> {
     }
 
     fn method(&self, method: &Method) -> Result<MethodOutput, SpanError> {
-        let mut sig = Signature::new(&method.name, self.span, &self.info.generics)
+        let mut sig = Signature::new(&method.name, self.span, &self.generics)
             .with_internal_generics(&method.generics)?;
 
         let this_ty = self.this_type();
@@ -411,7 +380,7 @@ impl<'cx> ClassCodegen<'cx> {
         let output_trait = sig.method_trait(&method.return_ty)?;
         let jni_return_ty = sig.jni_return_ty(&method.return_ty)?;
 
-        let descriptor = Literal::string(&method.descriptor.string);
+        let descriptor = Literal::string(&method.descriptor());
 
         // Code to convert each input appropriately
         let prepare_inputs = self.prepare_inputs(&input_names, &method.argument_tys);
@@ -564,18 +533,17 @@ impl<'cx> ClassCodegen<'cx> {
     }
 
     fn struct_name(&self) -> Ident {
-        let tail = self.info.name.class_name();
+        let tail = self.name.class_name();
         Ident::new(&tail, self.span)
     }
 
     fn ext_trait_name(&self) -> Ident {
-        let tail = self.info.name.class_name();
+        let tail = self.name.class_name();
         Ident::new(&format!("{tail}Ext"), self.span)
     }
 
     fn class_generic_names(&self) -> Vec<Ident> {
-        self.info
-            .generics
+        self.generics
             .iter()
             .map(|g| g.to_ident(self.span))
             .collect()
@@ -583,7 +551,7 @@ impl<'cx> ClassCodegen<'cx> {
 
     fn this_type(&self) -> TokenStream {
         let s = self.struct_name();
-        if self.info.generics.is_empty() {
+        if self.generics.is_empty() {
             quote_spanned!(self.span => #s)
         } else {
             let g: Vec<Ident> = self.class_generic_names();
@@ -593,7 +561,7 @@ impl<'cx> ClassCodegen<'cx> {
 
     /// Returns a class name with `/`, like `java/lang/Object`.
     fn jni_class_name(&self) -> Literal {
-        self.info.name.to_jni_name(self.span)
+        self.name.to_jni_name(self.span)
     }
 
     fn prepare_inputs(&self, input_names: &[Ident], input_types: &[Type]) -> Vec<TokenStream> {

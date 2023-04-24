@@ -1,6 +1,5 @@
 use crate::{
-    argument::{JavaClass, MemberListing, MemberListingElement},
-    class_info::{ClassInfo, ClassRef, Constructor, DotId, Method, RefType, RootMap, Type},
+    class_info::{ClassInfo, ClassRef, Constructor, Method, RefType, RootMap, Type},
     reflect::Reflector,
     span_error::SpanError,
 };
@@ -11,7 +10,7 @@ impl RootMap {
 
         for class_name in &self.class_names() {
             let ci = self.find_class(class_name).unwrap();
-            ci.check(class_name, self, reflector, &mut |e| errors.push(e))?;
+            ci.check(self, reflector, &mut |e| errors.push(e))?;
         }
 
         // FIXME: support multiple errors
@@ -23,55 +22,138 @@ impl RootMap {
     }
 }
 
-impl JavaClass {
+impl ClassInfo {
     fn check(
         &self,
-        class_name: &DotId,
         root_map: &RootMap,
         reflector: &mut Reflector,
         push_error: &mut impl FnMut(SpanError),
     ) -> Result<(), SpanError> {
-        let info = reflector.reflect_at(class_name, self.class_span)?;
+        let info = reflector.reflect(&self.name, self.span)?;
 
         let mut push_error_message = |m: String| {
             push_error(SpanError {
-                span: self.class_span,
-                message: format!("error in class `{}`: {m}", self.class_name),
+                span: self.span,
+                message: format!("error in class `{}`: {m}", self.name),
             });
         };
 
-        for cref in &info.extends {
+        // We always allow people to elide generics, in which case
+        // they are mirroring the "erased" version of the class.
+        //
+        // We need this (at minimum) to deal with `java.lang.Class`, since we
+        // don't want to mirror its parameter.
+        if !self.generics.is_empty() {
+            // But if there *are* generics, they must match exactly.
+            if self.generics != info.generics {
+                push_error_message(format!(
+                    "class `{}` should have generic parameters `<{}>`",
+                    self.name,
+                    info.generics
+                        .iter()
+                        .map(|g| g.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                ));
+            }
+        }
+
+        for cref in &self.extends {
+            if !info.extends.iter().any(|c| c == cref) {
+                let extends_list: String = info
+                    .extends
+                    .iter()
+                    .map(|c| format!("`{}`", c))
+                    .collect::<Vec<String>>()
+                    .join(", ");
+                push_error_message(format!(
+                    "declared interface `{cref}` not found in the reflected superclasses ({})",
+                    extends_list
+                ));
+            }
+
             cref.check(root_map, &mut |m| {
-                push_error_message(format!("{m}, but is extended by `{}`", self.class_name))
+                push_error_message(format!("{m}, but is extended by `{}`", self.name))
             });
         }
 
-        for cref in &info.implements {
+        for cref in &self.implements {
+            if !info.implements.iter().any(|c| c == cref) {
+                let implements_list: String = info
+                    .implements
+                    .iter()
+                    .map(|c| format!("`{}`", c))
+                    .collect::<Vec<String>>()
+                    .join(", ");
+                push_error_message(format!(
+                    "declared interface `{cref}` not found in the reflected interfaces (`{}`)",
+                    implements_list
+                ));
+            }
+
             cref.check(root_map, &mut |m| {
-                push_error_message(format!("{m}, but is implemented by `{}`", self.class_name));
+                push_error_message(format!("{m}, but is implemented by `{}`", self.name));
             });
         }
 
-        for c in info.selected_constructors(&self.members) {
+        for c in &self.constructors {
+            let c_method_sig = c.to_method_sig(self);
+
             c.check(root_map, &mut |m| {
                 push_error_message(format!(
                     "{m}, which appears in constructor {}",
-                    c.to_method_sig(info)
+                    c_method_sig,
                 ));
             });
+
+            if !info
+                .constructors
+                .iter()
+                .any(|info_c| info_c.to_method_sig(info) == c_method_sig)
+            {
+                push_error_message(format!(
+                    "constructor {} does not match any constructors in the reflected class",
+                    c_method_sig,
+                ));
+            }
         }
 
-        for c in info.selected_methods(&self.members) {
+        for c in &self.methods {
+            let c_method_sig = c.to_method_sig();
+
             c.check(root_map, &mut |m| {
                 push_error_message(format!(
-                    "{m}, which appears in method {}",
+                    "{m}, which appears in method `{}`",
                     c.to_method_sig()
                 ));
             });
-        }
 
-        // Check that each of the method filters corresponds to an actual method that exists
-        self.members.check(root_map, info, push_error);
+            if !info
+                .methods
+                .iter()
+                .any(|info_c| info_c.to_method_sig() == c_method_sig)
+            {
+                let same_names: Vec<_> = info
+                    .methods
+                    .iter()
+                    .filter(|info_c| info_c.name == c_method_sig.name)
+                    .map(|info_c| info_c.to_method_sig())
+                    .map(|info_c| info_c.to_string())
+                    .collect();
+                if same_names.is_empty() {
+                    push_error_message(format!(
+                        "no method named `{}` in the reflected class",
+                        c_method_sig,
+                    ));
+                } else {
+                    push_error_message(format!(
+                        "method `{}` does not match any of the methods in the reflected class: {}",
+                        c_method_sig,
+                        same_names.join(", "),
+                    ));
+                }
+            }
+        }
 
         Ok(())
     }
@@ -86,35 +168,6 @@ impl ClassRef {
                     "class `{}` not in list of classes to be translated",
                     self.name,
                 ))
-            }
-        }
-    }
-}
-
-impl MemberListing {
-    fn check(&self, root_map: &RootMap, class: &ClassInfo, push_error: &mut impl FnMut(SpanError)) {
-        for element in &self.elements {
-            element.check(root_map, class, push_error);
-        }
-    }
-}
-
-impl MemberListingElement {
-    fn check(&self, root_map: &RootMap, class: &ClassInfo, push_error: &mut impl FnMut(SpanError)) {
-        match self {
-            MemberListingElement::Wildcard(ml) => ml.check(root_map, class, push_error),
-            MemberListingElement::Named(sm) => {
-                if !class
-                    .constructors
-                    .iter()
-                    .any(|ctor| sm.method_sig.matches_constructor(class, ctor))
-                    && !class.methods.iter().any(|m| sm.method_sig.matches(m))
-                {
-                    push_error(SpanError {
-                        span: sm.span,
-                        message: format!("no member of `{}` matches this signature", class.name),
-                    })
-                }
             }
         }
     }

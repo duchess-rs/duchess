@@ -1,15 +1,10 @@
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    env,
-    process::Command,
-    sync::Arc,
-};
+use std::{collections::BTreeMap, env, process::Command, sync::Arc};
 
 use proc_macro2::Span;
 
 use crate::{
-    argument::{DuchessDeclaration, Ident, JavaClass, JavaPackage, JavaPath},
-    class_info::{ClassInfo, ClassRef, DotId, Id, RootMap, SpannedClassInfo, SpannedPackageInfo},
+    argument::{DuchessDeclaration, Ident, JavaPackage},
+    class_info::{ClassDecl, ClassInfo, DotId, Id, RootMap, SpannedPackageInfo},
     span_error::SpanError,
 };
 
@@ -38,7 +33,7 @@ impl JavaPackage {
         name: &[Ident],
         reflector: &mut Reflector,
         map: &mut BTreeMap<Id, SpannedPackageInfo>,
-        classes: &mut BTreeMap<DotId, JavaClass>,
+        classes: &mut BTreeMap<DotId, Arc<ClassInfo>>,
     ) -> Result<(), SpanError> {
         let (first, rest) = name.split_first().unwrap();
 
@@ -56,21 +51,66 @@ impl JavaPackage {
         let parent = map.entry(first_id).or_insert_with(package_info);
 
         if rest.is_empty() {
-            for c in &self.classes {
-                let dot_id: DotId = self
-                    .package_name
-                    .ids
-                    .iter()
-                    .map(|n| n.to_id())
-                    .chain(std::iter::once(c.class_name.clone()))
-                    .collect();
-                parent.classes.push(dot_id.clone());
-                classes.insert(dot_id, c.clone());
-            }
-            Ok(())
+            self.insert_classes_into_root_map(reflector, parent, classes)
         } else {
             self.to_spanned_packages(rest, reflector, &mut parent.subpackages, classes)
         }
+    }
+
+    fn insert_classes_into_root_map(
+        &self,
+        reflector: &mut Reflector,
+        package: &mut SpannedPackageInfo,
+        classes: &mut BTreeMap<DotId, Arc<ClassInfo>>,
+    ) -> Result<(), SpanError> {
+        for c in &self.classes {
+            let (dot_id, info) = match c {
+                ClassDecl::Reflected(c) => {
+                    let dot_id = self.make_absolute_dot_id(c.span, &c.name)?;
+                    let info = reflector.reflect(&dot_id, c.span)?;
+                    (dot_id, info.clone())
+                }
+                ClassDecl::Specified(c) => {
+                    let dot_id = self.make_absolute_dot_id(c.span, &c.name)?;
+                    (
+                        dot_id.clone(),
+                        Arc::new(ClassInfo {
+                            name: dot_id,
+                            ..c.clone()
+                        }),
+                    )
+                }
+            };
+
+            package.classes.push(dot_id.clone());
+            classes.insert(dot_id, info);
+        }
+        Ok(())
+    }
+
+    /// The users give classnames that may not include java package information.
+    fn make_absolute_dot_id(&self, span: Span, class_dot_id: &DotId) -> Result<DotId, SpanError> {
+        let package_ids: Vec<Id> = self.package_name.ids.iter().map(|n| n.to_id()).collect();
+
+        let (package, class) = class_dot_id.split();
+
+        // If the user just wrote (e.g.) `String`, add the `java.lang` ourselves.
+        if package.is_empty() {
+            return Ok(DotId::new(&package_ids, &class));
+        }
+
+        // Otherwise, check that the package the user wrote matches our name.
+        if &package_ids[..] != package {
+            return Err(SpanError {
+                span,
+                message: format!(
+                    "class `{}` expected to be in package `{}`",
+                    class_dot_id, self.package_name
+                ),
+            });
+        }
+
+        Ok(class_dot_id.clone())
     }
 }
 
@@ -79,41 +119,15 @@ impl JavaPackage {
 #[derive(Default)]
 pub struct Reflector {
     classes: BTreeMap<DotId, Arc<ClassInfo>>,
-    extends: BTreeMap<DotId, Arc<BTreeSet<ClassRef>>>,
 }
 
 impl Reflector {
-    /// Returns the transitive set of classrefs that is extended/implemented by a given class.
-    ///
-    /// FIXME: This currently doesn't handle the transitive part.
-    pub fn extends(&mut self, class_name: &DotId) -> Result<&Arc<BTreeSet<ClassRef>>, String> {
-        if self.extends.contains_key(class_name) {
-            return Ok(&self.extends[class_name]);
-        }
-
-        let info = self.reflect(class_name)?;
-
-        let mut result = BTreeSet::default();
-        result.insert(info.this_ref());
-        result.extend(info.extends.iter().cloned());
-        result.extend(info.implements.iter().cloned());
-        result.insert(ClassRef::object());
-
-        self.extends.insert(class_name.clone(), Arc::new(result));
-        Ok(&self.extends[class_name])
-    }
-
-    pub fn reflect_at(
+    /// Returns the (potentially cached) info about `class_name`;
+    pub fn reflect(
         &mut self,
         class_name: &DotId,
         span: Span,
     ) -> Result<&Arc<ClassInfo>, SpanError> {
-        self.reflect(class_name)
-            .map_err(|message| SpanError { span, message })
-    }
-
-    /// Returns the (potentially cached) info about `class_name`;
-    pub fn reflect(&mut self, class_name: &DotId) -> Result<&Arc<ClassInfo>, String> {
         // yields an error if we cannot reflect on that class.
         if self.classes.contains_key(class_name) {
             return Ok(&self.classes[class_name]);
@@ -130,7 +144,6 @@ impl Reflector {
             .arg("-cp")
             .arg(classpath)
             .arg("-public")
-            .arg("-s")
             .arg(format!("{}", class_name));
 
         let output_or_err = command.output();
@@ -138,52 +151,41 @@ impl Reflector {
         let output = match output_or_err {
             Ok(o) => o,
             Err(err) => {
-                return Err(format!("failed to execute `{command:?}`: {err}"));
+                return Err(SpanError {
+                    span,
+                    message: format!("failed to execute `{command:?}`: {err}"),
+                });
             }
         };
 
         if !output.status.success() {
-            return Err(format!(
-                "unsuccessful execution of `{command:?}`: {}",
-                String::from_utf8(output.stderr).unwrap_or(String::from("error"))
-            ));
+            return Err(SpanError {
+                span,
+                message: format!(
+                    "unsuccessful execution of `{command:?}`: {}",
+                    String::from_utf8(output.stderr).unwrap_or(String::from("error"))
+                ),
+            });
         }
 
         let s = match String::from_utf8(output.stdout) {
             Ok(o) => o,
             Err(err) => {
-                return Err(format!(
-                    "failed to parse output of `{command:?}` as utf-8: {err}"
-                ));
+                return Err(SpanError {
+                    span,
+                    message: format!("failed to parse output of `{command:?}` as utf-8: {err}"),
+                });
             }
         };
 
-        let ci = ClassInfo::parse(&s)?;
+        let mut ci = ClassInfo::parse(&s, span)?;
+
+        // reset the span for the cached data to the call site so that when others look it up,
+        // they get the same span.
+        ci.span = Span::call_site();
         Ok(self
             .classes
             .entry(class_name.clone())
             .or_insert(Arc::new(ci)))
-    }
-}
-
-impl JavaClass {
-    fn parse_javap(
-        &self,
-        package_name: &JavaPath,
-        reflector: &mut Reflector,
-    ) -> Result<SpannedClassInfo, SpanError> {
-        let class_name = DotId::parse(format!("{}.{}", package_name, self.class_name));
-        match reflector.reflect(&class_name) {
-            Ok(s) => Ok(SpannedClassInfo {
-                info: ClassInfo::clone(s),
-                span: self.class_span,
-                members: self.members.clone(),
-            }),
-
-            Err(message) => Err(SpanError {
-                span: self.class_span,
-                message,
-            }),
-        }
     }
 }
