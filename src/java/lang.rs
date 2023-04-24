@@ -3,8 +3,6 @@
 #[cfg(not(doc))]
 use crate as duchess;
 
-use crate::java;
-
 // Declare the class "object" in isolation.
 // Eventually we'd like to move all the declarations
 // into a `java_package` call, but we still have

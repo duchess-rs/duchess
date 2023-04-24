@@ -1,5 +1,3 @@
-use crate::{java, JavaObject};
-
 #[cfg(not(doc))]
 use crate as duchess;
 

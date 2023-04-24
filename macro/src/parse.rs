@@ -1,7 +1,6 @@
 use std::iter::Peekable;
 
-use litrs::StringLit;
-use proc_macro2::{Delimiter, Spacing, Span, TokenStream, TokenTree};
+use proc_macro2::{Spacing, Span, TokenStream, TokenTree};
 
 use crate::span_error::SpanError;
 
@@ -86,13 +85,6 @@ impl Parser {
         }
     }
 
-    pub fn eat_delimited(&mut self, delimeter: Delimiter) -> Option<TokenStream> {
-        self.eat_map(|t| match t {
-            TokenTree::Group(g) if g.delimiter() == delimeter => Some(g.stream()),
-            _ => None,
-        })
-    }
-
     pub fn eat_map<R>(&mut self, op: impl FnOnce(&TokenTree) -> Option<R>) -> Option<R> {
         let t = self.peek_token()?;
         let r = op(t)?;
@@ -126,13 +118,6 @@ impl Parser {
                 }
             }
             _ => None,
-        })
-    }
-
-    pub fn eat_string_literal(&mut self) -> Option<String> {
-        self.eat_map(|t| match StringLit::try_from(t) {
-            Ok(v) => Some(v.into_value().into_owned()),
-            Err(_) => None,
         })
     }
 

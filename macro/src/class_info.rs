@@ -136,17 +136,6 @@ impl ClassInfo {
     pub fn parse(text: &str, span: Span) -> Result<ClassInfo, SpanError> {
         javap::parse_class_info(span, &text)
     }
-
-    pub fn this_ref(&self) -> ClassRef {
-        ClassRef {
-            name: self.name.clone(),
-            generics: self
-                .generics
-                .iter()
-                .map(|g| RefType::TypeParameter(g.id.clone()))
-                .collect(),
-        }
-    }
 }
 
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
@@ -291,18 +280,6 @@ pub struct MethodSig {
     pub argument_tys: Vec<Type>,
 }
 
-impl MethodSig {
-    pub fn matches(&self, m: &Method) -> bool {
-        m.name == self.name && m.generics == self.generics && m.argument_tys == self.argument_tys
-    }
-
-    pub fn matches_constructor(&self, class: &ClassInfo, ctor: &Constructor) -> bool {
-        class.name.is_class(&self.name)
-            && ctor.generics == self.generics
-            && ctor.argument_tys == self.argument_tys
-    }
-}
-
 impl std::fmt::Display for MethodSig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some((generic_id0, generic_ids)) = self.generics.split_first() {
@@ -341,15 +318,6 @@ impl std::fmt::Display for ClassRef {
             write!(f, ">")?;
         }
         Ok(())
-    }
-}
-
-impl ClassRef {
-    pub fn object() -> ClassRef {
-        ClassRef {
-            name: DotId::object(),
-            generics: vec![],
-        }
     }
 }
 
@@ -577,10 +545,6 @@ impl DotId {
     pub fn split(&self) -> (&[Id], &Id) {
         let (name, package) = self.ids.split_last().unwrap();
         (package, name)
-    }
-
-    pub fn object() -> Self {
-        Self::parse("java.lang.Object")
     }
 
     pub fn with_slashes(&self) -> String {
