@@ -18,7 +18,7 @@ mod object {
         class Object {
             Object();
             hashCode();
-            equals(Object);
+            equals(java.lang.Object);
             toString();
             notify();
             notifyAll();
