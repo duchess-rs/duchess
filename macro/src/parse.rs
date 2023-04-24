@@ -54,24 +54,30 @@ impl Parser {
         }
     }
 
+    /// Returns the next token without consuming it, or None if no tokens remain.
     pub fn peek_token(&mut self) -> Option<&TokenTree> {
         self.tokens.peek()
     }
 
+    /// Returns the span of the next token, or None if no tokens remain.
     pub fn peek_span(&mut self) -> Option<Span> {
         Some(self.peek_token()?.span())
     }
 
+    /// Returns the span of the most recently consumed token.
     pub fn last_span(&self) -> Option<Span> {
         self.last_span.clone()
     }
 
+    /// Consumes the next token, returning it; returns None if no tokens remain.
     pub fn eat_token(&mut self) -> Option<TokenTree> {
         let t = self.tokens.next()?;
         self.last_span = Some(t.span());
         Some(t)
     }
 
+    /// Tests whether `test` returns true for the next token and -- if so -- consumes and returns it;
+    /// returns `None` if no tokens remain.
     pub fn eat_token_if(&mut self, test: impl Fn(&TokenTree) -> bool) -> Option<TokenTree> {
         if test(self.peek_token()?) {
             self.eat_token()
@@ -177,6 +183,7 @@ impl<'p> TextAccum<'p> {
     }
 }
 
+/// A trait for things that can be parsed from a token stream.
 pub trait Parse: Sized {
     /// We assume an LL(1) grammar, so no need for backtracking.
     ///
