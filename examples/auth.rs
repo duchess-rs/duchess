@@ -24,7 +24,7 @@ mod java_auth {
         class AuthorizationExceptionDenied { * }
     }
 
-    // XX: will be supported with automatic dependency closure?
+    // XX: can be removed when we automatically look through extends/implements
     unsafe impl duchess::plumbing::Upcast<Throwable> for AuthenticationException {}
     unsafe impl duchess::plumbing::Upcast<Throwable> for AuthenticationExceptionUnauthenticated {}
     unsafe impl duchess::plumbing::Upcast<Throwable> for AuthenticationExceptionInvalidSecurityToken {}
@@ -147,6 +147,8 @@ impl HttpAuth {
     }
 }
 
+// XX: Could we build a #[derive(IntoJava)] macro to remove a lot this boiler plate? Or perhaps for data-only classes
+// the javap macro could build these?
 impl HttpRequest {
     fn into_java<'jvm>(
         &self,
