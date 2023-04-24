@@ -16,10 +16,19 @@ use crate::{
 impl DuchessDeclaration {
     pub fn to_root_map(&self, reflector: &mut Reflector) -> Result<RootMap, SpanError> {
         let mut subpackages = BTreeMap::new();
+        let mut classes = BTreeMap::new();
         for package in &self.packages {
-            package.to_spanned_packages(&package.package_name.ids, reflector, &mut subpackages)?;
+            package.to_spanned_packages(
+                &package.package_name.ids,
+                reflector,
+                &mut subpackages,
+                &mut classes,
+            )?;
         }
-        Ok(RootMap { subpackages })
+        Ok(RootMap {
+            subpackages,
+            classes,
+        })
     }
 }
 
@@ -29,6 +38,7 @@ impl JavaPackage {
         name: &[Ident],
         reflector: &mut Reflector,
         map: &mut BTreeMap<Id, SpannedPackageInfo>,
+        classes: &mut BTreeMap<DotId, JavaClass>,
     ) -> Result<(), SpanError> {
         let (first, rest) = name.split_first().unwrap();
 
@@ -47,11 +57,19 @@ impl JavaPackage {
 
         if rest.is_empty() {
             for c in &self.classes {
-                parent.classes.push(c.clone());
+                let dot_id: DotId = self
+                    .package_name
+                    .ids
+                    .iter()
+                    .map(|n| n.to_id())
+                    .chain(std::iter::once(c.class_name.clone()))
+                    .collect();
+                parent.classes.push(dot_id.clone());
+                classes.insert(dot_id, c.clone());
             }
             Ok(())
         } else {
-            self.to_spanned_packages(rest, reflector, &mut parent.subpackages)
+            self.to_spanned_packages(rest, reflector, &mut parent.subpackages, classes)
         }
     }
 }

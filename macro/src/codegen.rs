@@ -25,7 +25,7 @@ impl DuchessDeclaration {
 impl RootMap {
     fn to_tokens(self, reflector: &mut Reflector) -> Result<TokenStream, SpanError> {
         self.to_packages()
-            .map(|p| p.to_tokens(&[], reflector))
+            .map(|p| p.to_tokens(&[], &self, reflector))
             .collect()
     }
 }
@@ -51,6 +51,7 @@ impl SpannedPackageInfo {
     fn to_tokens(
         &self,
         parents: &[Id],
+        root_map: &RootMap,
         reflector: &mut Reflector,
     ) -> Result<TokenStream, SpanError> {
         let package_id = DotId::new(parents, &self.name);
@@ -59,16 +60,16 @@ impl SpannedPackageInfo {
         let subpackage_tokens: TokenStream = self
             .subpackages
             .values()
-            .map(|p| p.to_tokens(&package_id, reflector))
+            .map(|p| p.to_tokens(&package_id, root_map, reflector))
             .collect::<Result<_, _>>()?;
 
         let class_tokens: TokenStream = self
             .classes
             .iter()
-            .map(|c| {
-                let class_id = DotId::new(&package_id, &c.class_name);
-                let info = reflector.reflect_at(&class_id, c.class_span)?;
-                ClassCodegen::from(info, c.class_span, &c.members).to_tokens()
+            .map(|class_id| {
+                let jc = &root_map.classes[class_id];
+                let info = &reflector.reflect_at(class_id, jc.class_span)?.clone();
+                ClassCodegen::from(info, jc.class_span, &jc.members).to_tokens()
             })
             .collect::<Result<_, _>>()?;
 

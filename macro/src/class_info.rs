@@ -14,14 +14,13 @@ use crate::{
 #[derive(Debug)]
 pub struct RootMap {
     pub subpackages: BTreeMap<Id, SpannedPackageInfo>,
+    pub classes: BTreeMap<DotId, JavaClass>,
 }
 
 impl RootMap {
     /// Finds the class with the given name (if present).
     pub fn find_class(&self, cn: &DotId) -> Option<&JavaClass> {
-        let (package, class_name) = cn.split();
-        let package_info = self.find_package(package)?;
-        package_info.find_class(class_name)
+        self.classes.get(cn)
     }
 
     /// Finds the package with the given name (if present).
@@ -48,7 +47,7 @@ pub struct SpannedPackageInfo {
     pub name: Id,
     pub span: Span,
     pub subpackages: BTreeMap<Id, SpannedPackageInfo>,
-    pub classes: Vec<JavaClass>,
+    pub classes: Vec<DotId>,
 }
 
 impl SpannedPackageInfo {
@@ -62,8 +61,8 @@ impl SpannedPackageInfo {
     }
 
     /// Finds a class in this package with the given name (if any)
-    pub fn find_class(&self, cn: &Id) -> Option<&JavaClass> {
-        self.classes.iter().find(|c| c.class_name == *cn)
+    pub fn find_class(&self, cn: &Id) -> Option<&DotId> {
+        self.classes.iter().find(|c| c.is_class(cn))
     }
 
     /// Find the names of all classes contained within self
@@ -80,10 +79,7 @@ impl SpannedPackageInfo {
             .values()
             .flat_map(|pkg| pkg.class_names(&package_name));
 
-        let classes_from_this_package = self
-            .classes
-            .iter()
-            .map(|c| DotId::new(&package_name, &c.class_name));
+        let classes_from_this_package = self.classes.iter().cloned();
 
         classes_from_subpackages
             .chain(classes_from_this_package)
@@ -624,6 +620,14 @@ impl From<&Id> for DotId {
         DotId {
             ids: vec![value.clone()],
         }
+    }
+}
+
+impl FromIterator<Id> for DotId {
+    fn from_iter<T: IntoIterator<Item = Id>>(iter: T) -> Self {
+        let ids: Vec<Id> = iter.into_iter().collect();
+        assert!(ids.len() >= 1);
+        DotId { ids }
     }
 }
 
