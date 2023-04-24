@@ -14,7 +14,7 @@ pub ClassInfo: ClassInfo = {
 
 #[inline]
 ReflectedClassInfo: ReflectedClassInfo = {
-    <l:Flags> <k:ClassKind> <n:DotId> "{" "*" "}" => ReflectedClassInfo {
+    <l:Flags> <k:ClassKind> <n:ClassName> "{" "*" "}" => ReflectedClassInfo {
         span,
         flags: l,
         name: n,
@@ -22,10 +22,15 @@ ReflectedClassInfo: ReflectedClassInfo = {
     },
 };
 
+ClassName: DotId = {
+    <Id> => DotId::from(<>),
+    DotId => <>,  
+};
+
 #[inline]
 ClassInfoInline: ClassInfo = {
     Header? 
-    <l:Flags> <k:ClassKind> <n:DotId> 
+    <l:Flags> <k:ClassKind> <n:ClassName> 
         <g:Generics>
         <e:("extends" <ClassRef>)?>
         <i:("implements" <Comma<ClassRef>>)?>
