@@ -114,15 +114,17 @@ impl SpannedClassInfo {
             const _: () = {
                 use duchess::{
                     *,
+                    codegen_deps::{
+                        once_cell::sync::OnceCell,
+                        jni::{
+                            objects::{AutoLocal, JMethodID, JClass, JValue, JValueGen},
+                            signature::{ReturnType, Primitive},
+                            sys::jvalue,
+                        },
+                    },
                     plumbing::*,
                     prelude::*,
                 };
-                use jni::{
-                    objects::{AutoLocal, JMethodID, JClass, JValue, JValueGen},
-                    signature::{ReturnType, Primitive},
-                    sys::jvalue,
-                };
-                use once_cell::sync::OnceCell;
 
                 unsafe impl<#(#java_class_generics,)*> JavaObject for #struct_name<#(#java_class_generics,)*>
                 where
