@@ -375,6 +375,9 @@ impl NonRepeatingType {
             NonRepeatingType::Ref(r) => match r {
                 RefType::Class(c) => format!("L{};", c.name.with_slashes()),
                 RefType::Array(r) => format!("[{}", r.descriptor()),
+
+                // FIXME: The descriptor actually depends on how the type
+                // parameter was declared!
                 RefType::TypeParameter(_)
                 | RefType::Extends(_)
                 | RefType::Super(_)
