@@ -163,6 +163,7 @@ r#"
         public java.lang.Class arrayType();
             descriptor: ()Ljava/lang/Class;
         }
+
     "#
 }
 

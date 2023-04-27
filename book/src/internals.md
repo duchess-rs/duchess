@@ -44,6 +44,22 @@ The `jdk` object offers a method to create a Global reference a Java object. Glo
 
 The underlying `sys::jobject` can be null, but we maintain the invariant that this is never the case, instead using `Option<&R>` etc.
 
+## Exceptions 
+
+The [JNI exposes Java exception state](https://docs.oracle.com/javase/7/docs/technotes/guides/jni/spec/functions.html#wp5234) via 
+ * `ExceptionCheck()` returning `true` if an unhandled exception has been thrown
+ * `ExceptionOccurred()` returning a local reference to the thrown object
+ * `ExceptionClear()` clearing the exception (if any)
+
+If an exception has occurred and isn't cleared before the next JNI call, the invoked Java code will immediately "see" the exception. Since this can cause an exception to propagate outside of the normal stack bubble-up, the `jni` crate always calls `ExceptionCheck` after all JNI calls and returns `Err(jni::errors::Error::JavaException)` if one has occurred. 
+
+The `JavaException` value isn't useful on its own since it doesn't contain a reference to the thrown object. Also, if we were to expose it directly to users who may ignore the `Err` case of a Duchess result, the exception would be left uncleared and poison the next JNI call. We therefore wrap all `jni` calls with `duchess::plumbing::with_jni_env()` to check for the `JavaException` error, materialize the thrown object into `duchess::Error::Thrown(obj)`, and clear the exception state. 
+
+## `jni` crate conventions
+
+While we may unwind our dendency on the `jni` crate wrappers over the JNI, for now we have the following conventions for using `jni` functions:
+ 1. All `jni` functions that return a `Result` must be called inside of `duchess::plumbing::with_jni_env()` to properly materialize and clear exception state between JNI calls. See [Exceptions](#exceptions).
+
 ## Frequently asked questions
 
 Covers various bits of rationale.
