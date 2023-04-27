@@ -78,7 +78,15 @@ impl Parse for ClassDecl {
         };
         match t0 {
             TokenTree::Ident(i) => {
-                static START_KEYWORDS: &[&str] = &["class", "public", "final", "abstract"];
+                static START_KEYWORDS: &[&str] = &[
+                    "class",
+                    "public",
+                    "final",
+                    "abstract",
+                    "interface",
+                    "enum",
+                    "record",
+                ];
                 let s = i.to_string();
                 if !START_KEYWORDS.contains(&s.as_str()) {
                     return Ok(None);
