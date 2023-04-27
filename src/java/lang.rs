@@ -15,28 +15,6 @@ mod object {
     duchess_macro::java_package! {
         package java.lang;
 
-<<<<<<< HEAD
-            public final native java.lang.Class getClass();
-                descriptor: ()Ljava/lang/Class;
-
-            public native int hashCode();
-                descriptor: ()I
-
-            public boolean equals(java.lang.Object);
-                descriptor: (Ljava/lang/Object;)Z
-
-            public java.lang.String toString();
-                descriptor: ()Ljava/lang/String;
-
-            public final native void notify();
-                descriptor: ()V
-
-            public final native void notifyAll();
-                descriptor: ()V
-
-            public static native void notifyStatic(String...);
-                descriptor: ([Ljava/lang/String;)V
-=======
         class Object {
             Object();
             hashCode();
@@ -44,7 +22,6 @@ mod object {
             toString();
             notify();
             notifyAll();
->>>>>>> upstream/main
         }
     }
 }

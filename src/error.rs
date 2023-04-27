@@ -113,3 +113,59 @@ pub fn convert_non_throw_jni_error<T>(error: jni::errors::Error) -> Error<T> {
     assert!(!matches!(error, jni::errors::Error::JavaException));
     Error::from(JniError::from(JniErrorInternal::from(error)))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        java::{self, lang::ThrowableExt, util::ArrayListExt},
+        prelude::*,
+    };
+
+    #[test]
+    fn with_jni_env_materializes_thrown_exceptions() {
+        Jvm::with(|jvm| {
+            let env = jvm.to_env();
+            // set exception state
+            env.throw_new("java/lang/Throwable", "some thrown exception")
+                .unwrap();
+            let err = with_jni_env(env, |_env| Err::<(), _>(jni::errors::Error::JavaException))
+                .unwrap_err();
+            let Error::Thrown(t) = err else { panic!("expected materialized exception"); };
+            assert_eq!(
+                "some thrown exception",
+                t.get_message().assert_not_null().into_rust(jvm).unwrap()
+            );
+            Ok(())
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn with_jni_env_maps_everything_else_to_jni() {
+        Jvm::with(|jvm| {
+            let err = with_jni_env(jvm.to_env(), |_env| {
+                Err::<(), _>(jni::errors::Error::TryLock)
+            })
+            .unwrap_err();
+            assert!(matches!(err, Error::Jni(_)));
+            Ok(())
+        })
+        .unwrap();
+    }
+
+    // XX this should likely move to an integration test suite
+    #[test]
+    fn exceptions_from_duchess_generated_types_are_materialized_without_a_catch() {
+        Jvm::with(|jvm| {
+            let list = java::util::ArrayList::<java::lang::Object>::new()
+                .execute(jvm)
+                .unwrap();
+            // -2 is an illegal from index, throws
+            let err = list.sub_list(-2, 0).execute(jvm).err().unwrap();
+            assert!(matches!(err, Error::Thrown(_)));
+            Ok(())
+        })
+        .unwrap();
+    }
+}
