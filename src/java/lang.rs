@@ -52,6 +52,16 @@ mod object {
             public int hashCode();
         }
 
+        // NB: In Java, this is `Class<T>`, but we model it as the erased version
+        // `Class`. This is beacuse there are a lot of methods, including some that we would
+        // like to model such as `arrayType()`, that return a `Class<?>`, and we cannot model
+        // `?` in return position. By erasing the type parameter, we permit users to just
+        // write `java.lang.Class` for those methods, but this does mean that some of the fancier
+        // reflection types in Java won't work.
+        //
+        // It's not clear that this is the best solution, and we may revisit it in the future,
+        // perhaps by not modeling `arrayType()` and friends, or perhaps by finding some way to
+        // model `?` in return types in a satisfactory way.
         public final class java.lang.Class {
             public java.lang.String toString();
             public java.lang.String toGenericString();
