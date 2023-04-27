@@ -40,7 +40,7 @@ Generics: Vec<Id> = {
 
 Header: () = r#"Compiled from "[a-zA-Z.]+""#;
 
-DotId: Id = {
+DotId: DotId = {
     <a:Id> "." <b:ID> => a.dot(b),
     <i:DotId> "." <s:ID> => i.dot(s),
 };
@@ -50,24 +50,30 @@ Id: Id = {
 };
 
 ID: &'input str = {
-    r"[a-zA-Z][a-zA-Z0-9]*"
+    r"[a-zA-Z_$][a-zA-Z$0-9_]*"
 }
 
 Constructor: Constructor = {
-    <f:Flags> <n:DotId> "(" <a:Comma<Type>> ")" <t:Throws> ";" <d:Descriptor> => {
-        Constructor { flags: f, args: a, throws: t, descriptor: d, }
+    <f:Flags> <g:Generics> <n:DotId> "(" <a:Comma<Type>> ")" <t:Throws> ";" <d:MethodDescriptor> => {
+        Constructor { flags: f, generics: g, argument_tys: a, throws: t, descriptor: d, }
+    }
+};
+
+pub MethodSig: MethodSig = {
+    <g:Generics> <n:Id> "(" <a:Comma<Type>> ")" ";" => {
+        MethodSig { name: n, argument_tys: a, generics: g }
     }
 };
 
 Method: Method = {
-    <f:Flags> <g:Generics> <r:ReturnType> <n:Id> "(" <a:Comma<Type>> ")" <t:Throws> ";" <d:Descriptor> => {
+    <f:Flags> <g:Generics> <r:ReturnType> <n:Id> "(" <a:Comma<Type>> ")" <t:Throws> ";" <d:MethodDescriptor> => {
         Method { flags: f, name: n, argument_tys: a, return_ty: r, throws: t, descriptor: d, generics: g }
     }
 };
 
 Field: Field = {
-    <f:Flags> <t:Type> <n:Id> ";" => {
-        Field { flags: f, name: n, ty: t }
+    <f:Flags> <t:Type> <n:Id> ";" <d:FieldDescriptor> => {
+        Field { flags: f, name: n, ty: t, descriptor: d }
     }
 };
 
@@ -87,12 +93,17 @@ Privacy: Privacy = {
     () => Privacy::Package,
 };
 
-Descriptor: Descriptor = {
-    r"descriptor: \([\[\]a-zA-Z0-9/;]*\)[\[\]a-zA-Z0-9/;]+" => {
+MethodDescriptor: Descriptor = {
+    r"descriptor: \([\[\]a-zA-Z0-9$_/;]*\)[\[\]a-zA-Z0-9_/;]+" => {
         Descriptor::from(&<>["descriptor: ".len()..])
     }
 };
 
+FieldDescriptor: Descriptor = {
+    r"descriptor: [\[\]a-zA-Z0-9$_/;]+" => {
+        Descriptor::from(&<>["descriptor: ".len()..])
+    },
+};
 Throws: Vec<ClassRef> = {
     () => vec![],
     "throws" <Comma1<ClassRef>>,
@@ -112,6 +123,7 @@ Type: Type = {
 
 ScalarType: ScalarType = {
     "byte" => ScalarType::Byte,
+    "char" => ScalarType::Char,
     "short" => ScalarType::Short,
     "int" => ScalarType::Int,
     "long" => ScalarType::Long,

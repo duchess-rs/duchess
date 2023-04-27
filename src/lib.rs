@@ -24,6 +24,12 @@ pub use jvm::Local;
 
 pub use prelude::*;
 
+/// Re-export the dependencies that are used by the generated code.
+pub mod codegen_deps {
+    pub use jni;
+    pub use once_cell;
+}
+
 pub mod prelude {
     pub use crate::cast::by_type;
     pub use crate::jvm::JvmOp;

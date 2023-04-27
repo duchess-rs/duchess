@@ -1,7 +1,7 @@
 use proc_macro2::{Delimiter, Span};
 
 use crate::{
-    class_info::Id,
+    class_info::{ClassInfo, Constructor, Id, Method, SpannedMethodSig},
     parse::{Parse, Parser},
     span_error::SpanError,
 };
@@ -89,17 +89,93 @@ impl Parse for JavaClass {
     }
 }
 
-pub enum MemberListing {
-    All,
+#[derive(Clone, Debug)]
+pub struct MemberListing {
+    elements: Vec<MemberListingElement>,
+}
+
+#[derive(Clone, Debug)]
+pub enum MemberListingElement {
+    /// `* - <ML>`
+    Wildcard(MemberListing),
+
+    /// `void toString()` -- full details
+    Named(SpannedMethodSig),
+}
+
+impl MemberListing {
+    pub fn contains_method(&self, m: &Method) -> bool {
+        self.elements.iter().any(|e| e.contains_method(m))
+    }
+
+    pub fn contains_constructor(&self, class: &ClassInfo, ctor: &Constructor) -> bool {
+        self.elements
+            .iter()
+            .any(|e| e.contains_constructor(class, ctor))
+    }
+
+    pub fn all() -> Self {
+        MemberListing {
+            elements: vec![MemberListingElement::Wildcard(MemberListing::none())],
+        }
+    }
+
+    pub fn none() -> Self {
+        MemberListing { elements: vec![] }
+    }
+}
+
+impl MemberListingElement {
+    pub fn contains_method(&self, m: &Method) -> bool {
+        match self {
+            MemberListingElement::Wildcard(ml) => !ml.contains_method(m),
+            MemberListingElement::Named(n) => n.method_sig.matches(m),
+        }
+    }
+
+    pub fn contains_constructor(&self, class: &ClassInfo, ctor: &Constructor) -> bool {
+        match self {
+            MemberListingElement::Wildcard(ml) => !ml.contains_constructor(class, ctor),
+            MemberListingElement::Named(n) => n.method_sig.matches_constructor(class, ctor),
+        }
+    }
 }
 
 impl Parse for MemberListing {
     fn parse(p: &mut Parser) -> Result<Option<Self>, SpanError> {
+        Ok(Some(MemberListing {
+            elements: MemberListingElement::parse_many(p)?,
+        }))
+    }
+
+    fn description() -> String {
+        format!("list of class members (`*` for all)")
+    }
+}
+
+impl Parse for MemberListingElement {
+    fn parse(p: &mut Parser) -> Result<Option<Self>, SpanError> {
+        // Parse wildcard like `*` or `* - (...)`
         if let Some(()) = p.eat_punct('*') {
-            return Ok(Some(MemberListing::All));
+            if let Some(()) = p.eat_punct('-') {
+                if let Some(g) = p.eat_delimited(Delimiter::Parenthesis) {
+                    let ml = Parser::from(g).parse::<MemberListing>()?;
+                    return Ok(Some(MemberListingElement::Wildcard(ml)));
+                }
+                return Err(SpanError {
+                    span: p.last_span().unwrap(),
+                    message: format!("expected parenthesized group of methods"),
+                });
+            } else {
+                return Ok(Some(MemberListingElement::Wildcard(MemberListing::none())));
+            }
         }
 
-        Ok(None)
+        let Some(sig) = SpannedMethodSig::parse(p)? else {
+            return Ok(None);
+        };
+
+        Ok(Some(MemberListingElement::Named(sig)))
     }
 
     fn description() -> String {

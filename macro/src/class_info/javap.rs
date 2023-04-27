@@ -2,12 +2,19 @@ use std::fmt::Display;
 
 use lalrpop_util::{lalrpop_mod, lexer::Token};
 
-use super::ClassInfo;
+use super::{ClassInfo, MethodSig};
 
 lalrpop_mod!(pub javap_parser, "/class_info/javap_parser.rs"); // synthesized by LALRPOP
 
 pub(super) fn parse_class_info(input: &str) -> Result<ClassInfo, String> {
     match javap_parser::ClassInfoParser::new().parse(input) {
+        Ok(v) => Ok(v),
+        Err(error) => Err(format_lalrpop_error(input, error)),
+    }
+}
+
+pub(super) fn parse_method_sig(input: &str) -> Result<MethodSig, String> {
+    match javap_parser::MethodSigParser::new().parse(input) {
         Ok(v) => Ok(v),
         Err(error) => Err(format_lalrpop_error(input, error)),
     }
@@ -212,8 +219,18 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                         is_static: false,
                         is_default: false,
                     },
-                    name: Id {
-                        data: "java.util.ArrayList",
+                    name: DotId {
+                        ids: [
+                            Id {
+                                data: "java",
+                            },
+                            Id {
+                                data: "util",
+                            },
+                            Id {
+                                data: "ArrayList",
+                            },
+                        ],
                     },
                     kind: Class,
                     generics: [
@@ -223,8 +240,18 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                     ],
                     extends: Some(
                         ClassRef {
-                            name: Id {
-                                data: "java.util.AbstractList",
+                            name: DotId {
+                                ids: [
+                                    Id {
+                                        data: "java",
+                                    },
+                                    Id {
+                                        data: "util",
+                                    },
+                                    Id {
+                                        data: "AbstractList",
+                                    },
+                                ],
                             },
                             generics: [
                                 TypeParameter(
@@ -237,8 +264,18 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                     ),
                     implements: [
                         ClassRef {
-                            name: Id {
-                                data: "java.util.List",
+                            name: DotId {
+                                ids: [
+                                    Id {
+                                        data: "java",
+                                    },
+                                    Id {
+                                        data: "util",
+                                    },
+                                    Id {
+                                        data: "List",
+                                    },
+                                ],
                             },
                             generics: [
                                 TypeParameter(
@@ -249,20 +286,50 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                             ],
                         },
                         ClassRef {
-                            name: Id {
-                                data: "java.util.RandomAccess",
+                            name: DotId {
+                                ids: [
+                                    Id {
+                                        data: "java",
+                                    },
+                                    Id {
+                                        data: "util",
+                                    },
+                                    Id {
+                                        data: "RandomAccess",
+                                    },
+                                ],
                             },
                             generics: [],
                         },
                         ClassRef {
-                            name: Id {
-                                data: "java.lang.Cloneable",
+                            name: DotId {
+                                ids: [
+                                    Id {
+                                        data: "java",
+                                    },
+                                    Id {
+                                        data: "lang",
+                                    },
+                                    Id {
+                                        data: "Cloneable",
+                                    },
+                                ],
                             },
                             generics: [],
                         },
                         ClassRef {
-                            name: Id {
-                                data: "java.io.Serializable",
+                            name: DotId {
+                                ids: [
+                                    Id {
+                                        data: "java",
+                                    },
+                                    Id {
+                                        data: "io",
+                                    },
+                                    Id {
+                                        data: "Serializable",
+                                    },
+                                ],
                             },
                             generics: [],
                         },
@@ -278,7 +345,8 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 is_static: false,
                                 is_default: false,
                             },
-                            args: [
+                            generics: [],
+                            argument_tys: [
                                 Scalar(
                                     Int,
                                 ),
@@ -298,7 +366,8 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 is_static: false,
                                 is_default: false,
                             },
-                            args: [],
+                            generics: [],
+                            argument_tys: [],
                             throws: [],
                             descriptor: Descriptor {
                                 string: "()V",
@@ -314,12 +383,23 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 is_static: false,
                                 is_default: false,
                             },
-                            args: [
+                            generics: [],
+                            argument_tys: [
                                 Ref(
                                     Class(
                                         ClassRef {
-                                            name: Id {
-                                                data: "java.util.Collection",
+                                            name: DotId {
+                                                ids: [
+                                                    Id {
+                                                        data: "java",
+                                                    },
+                                                    Id {
+                                                        data: "util",
+                                                    },
+                                                    Id {
+                                                        data: "Collection",
+                                                    },
+                                                ],
                                             },
                                             generics: [
                                                 Extends(
@@ -456,8 +536,18 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 Ref(
                                     Class(
                                         ClassRef {
-                                            name: Id {
-                                                data: "java.lang.Object",
+                                            name: DotId {
+                                                ids: [
+                                                    Id {
+                                                        data: "java",
+                                                    },
+                                                    Id {
+                                                        data: "lang",
+                                                    },
+                                                    Id {
+                                                        data: "Object",
+                                                    },
+                                                ],
                                             },
                                             generics: [],
                                         },
@@ -492,8 +582,18 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 Ref(
                                     Class(
                                         ClassRef {
-                                            name: Id {
-                                                data: "java.lang.Object",
+                                            name: DotId {
+                                                ids: [
+                                                    Id {
+                                                        data: "java",
+                                                    },
+                                                    Id {
+                                                        data: "lang",
+                                                    },
+                                                    Id {
+                                                        data: "Object",
+                                                    },
+                                                ],
                                             },
                                             generics: [],
                                         },
@@ -528,8 +628,18 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 Ref(
                                     Class(
                                         ClassRef {
-                                            name: Id {
-                                                data: "java.lang.Object",
+                                            name: DotId {
+                                                ids: [
+                                                    Id {
+                                                        data: "java",
+                                                    },
+                                                    Id {
+                                                        data: "lang",
+                                                    },
+                                                    Id {
+                                                        data: "Object",
+                                                    },
+                                                ],
                                             },
                                             generics: [],
                                         },
@@ -565,8 +675,18 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 Ref(
                                     Class(
                                         ClassRef {
-                                            name: Id {
-                                                data: "java.lang.Object",
+                                            name: DotId {
+                                                ids: [
+                                                    Id {
+                                                        data: "java",
+                                                    },
+                                                    Id {
+                                                        data: "lang",
+                                                    },
+                                                    Id {
+                                                        data: "Object",
+                                                    },
+                                                ],
                                             },
                                             generics: [],
                                         },
@@ -599,8 +719,18 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                         Ref(
                                             Class(
                                                 ClassRef {
-                                                    name: Id {
-                                                        data: "java.lang.Object",
+                                                    name: DotId {
+                                                        ids: [
+                                                            Id {
+                                                                data: "java",
+                                                            },
+                                                            Id {
+                                                                data: "lang",
+                                                            },
+                                                            Id {
+                                                                data: "Object",
+                                                            },
+                                                        ],
                                                     },
                                                     generics: [],
                                                 },
@@ -852,8 +982,18 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 Ref(
                                     Class(
                                         ClassRef {
-                                            name: Id {
-                                                data: "java.lang.Object",
+                                            name: DotId {
+                                                ids: [
+                                                    Id {
+                                                        data: "java",
+                                                    },
+                                                    Id {
+                                                        data: "lang",
+                                                    },
+                                                    Id {
+                                                        data: "Object",
+                                                    },
+                                                ],
                                             },
                                             generics: [],
                                         },
@@ -913,8 +1053,18 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 Ref(
                                     Class(
                                         ClassRef {
-                                            name: Id {
-                                                data: "java.lang.Object",
+                                            name: DotId {
+                                                ids: [
+                                                    Id {
+                                                        data: "java",
+                                                    },
+                                                    Id {
+                                                        data: "lang",
+                                                    },
+                                                    Id {
+                                                        data: "Object",
+                                                    },
+                                                ],
                                             },
                                             generics: [],
                                         },
@@ -970,8 +1120,18 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 Ref(
                                     Class(
                                         ClassRef {
-                                            name: Id {
-                                                data: "java.util.Collection",
+                                            name: DotId {
+                                                ids: [
+                                                    Id {
+                                                        data: "java",
+                                                    },
+                                                    Id {
+                                                        data: "util",
+                                                    },
+                                                    Id {
+                                                        data: "Collection",
+                                                    },
+                                                ],
                                             },
                                             generics: [
                                                 Extends(
@@ -1017,8 +1177,18 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 Ref(
                                     Class(
                                         ClassRef {
-                                            name: Id {
-                                                data: "java.util.Collection",
+                                            name: DotId {
+                                                ids: [
+                                                    Id {
+                                                        data: "java",
+                                                    },
+                                                    Id {
+                                                        data: "util",
+                                                    },
+                                                    Id {
+                                                        data: "Collection",
+                                                    },
+                                                ],
                                             },
                                             generics: [
                                                 Extends(
@@ -1061,8 +1231,18 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 Ref(
                                     Class(
                                         ClassRef {
-                                            name: Id {
-                                                data: "java.util.Collection",
+                                            name: DotId {
+                                                ids: [
+                                                    Id {
+                                                        data: "java",
+                                                    },
+                                                    Id {
+                                                        data: "util",
+                                                    },
+                                                    Id {
+                                                        data: "Collection",
+                                                    },
+                                                ],
                                             },
                                             generics: [
                                                 Wildcard,
@@ -1099,8 +1279,18 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 Ref(
                                     Class(
                                         ClassRef {
-                                            name: Id {
-                                                data: "java.util.Collection",
+                                            name: DotId {
+                                                ids: [
+                                                    Id {
+                                                        data: "java",
+                                                    },
+                                                    Id {
+                                                        data: "util",
+                                                    },
+                                                    Id {
+                                                        data: "Collection",
+                                                    },
+                                                ],
                                             },
                                             generics: [
                                                 Wildcard,
@@ -1142,8 +1332,18 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 Ref(
                                     Class(
                                         ClassRef {
-                                            name: Id {
-                                                data: "java.util.ListIterator",
+                                            name: DotId {
+                                                ids: [
+                                                    Id {
+                                                        data: "java",
+                                                    },
+                                                    Id {
+                                                        data: "util",
+                                                    },
+                                                    Id {
+                                                        data: "ListIterator",
+                                                    },
+                                                ],
                                             },
                                             generics: [
                                                 TypeParameter(
@@ -1180,8 +1380,18 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 Ref(
                                     Class(
                                         ClassRef {
-                                            name: Id {
-                                                data: "java.util.ListIterator",
+                                            name: DotId {
+                                                ids: [
+                                                    Id {
+                                                        data: "java",
+                                                    },
+                                                    Id {
+                                                        data: "util",
+                                                    },
+                                                    Id {
+                                                        data: "ListIterator",
+                                                    },
+                                                ],
                                             },
                                             generics: [
                                                 TypeParameter(
@@ -1218,8 +1428,18 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 Ref(
                                     Class(
                                         ClassRef {
-                                            name: Id {
-                                                data: "java.util.Iterator",
+                                            name: DotId {
+                                                ids: [
+                                                    Id {
+                                                        data: "java",
+                                                    },
+                                                    Id {
+                                                        data: "util",
+                                                    },
+                                                    Id {
+                                                        data: "Iterator",
+                                                    },
+                                                ],
                                             },
                                             generics: [
                                                 TypeParameter(
@@ -1263,8 +1483,18 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 Ref(
                                     Class(
                                         ClassRef {
-                                            name: Id {
-                                                data: "java.util.List",
+                                            name: DotId {
+                                                ids: [
+                                                    Id {
+                                                        data: "java",
+                                                    },
+                                                    Id {
+                                                        data: "util",
+                                                    },
+                                                    Id {
+                                                        data: "List",
+                                                    },
+                                                ],
                                             },
                                             generics: [
                                                 TypeParameter(
@@ -1300,8 +1530,21 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 Ref(
                                     Class(
                                         ClassRef {
-                                            name: Id {
-                                                data: "java.util.function.Consumer",
+                                            name: DotId {
+                                                ids: [
+                                                    Id {
+                                                        data: "java",
+                                                    },
+                                                    Id {
+                                                        data: "util",
+                                                    },
+                                                    Id {
+                                                        data: "function",
+                                                    },
+                                                    Id {
+                                                        data: "Consumer",
+                                                    },
+                                                ],
                                             },
                                             generics: [
                                                 Super(
@@ -1341,8 +1584,18 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 Ref(
                                     Class(
                                         ClassRef {
-                                            name: Id {
-                                                data: "java.util.Spliterator",
+                                            name: DotId {
+                                                ids: [
+                                                    Id {
+                                                        data: "java",
+                                                    },
+                                                    Id {
+                                                        data: "util",
+                                                    },
+                                                    Id {
+                                                        data: "Spliterator",
+                                                    },
+                                                ],
                                             },
                                             generics: [
                                                 TypeParameter(
@@ -1378,8 +1631,21 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 Ref(
                                     Class(
                                         ClassRef {
-                                            name: Id {
-                                                data: "java.util.function.Predicate",
+                                            name: DotId {
+                                                ids: [
+                                                    Id {
+                                                        data: "java",
+                                                    },
+                                                    Id {
+                                                        data: "util",
+                                                    },
+                                                    Id {
+                                                        data: "function",
+                                                    },
+                                                    Id {
+                                                        data: "Predicate",
+                                                    },
+                                                ],
                                             },
                                             generics: [
                                                 Super(
@@ -1422,8 +1688,21 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 Ref(
                                     Class(
                                         ClassRef {
-                                            name: Id {
-                                                data: "java.util.function.UnaryOperator",
+                                            name: DotId {
+                                                ids: [
+                                                    Id {
+                                                        data: "java",
+                                                    },
+                                                    Id {
+                                                        data: "util",
+                                                    },
+                                                    Id {
+                                                        data: "function",
+                                                    },
+                                                    Id {
+                                                        data: "UnaryOperator",
+                                                    },
+                                                ],
                                             },
                                             generics: [
                                                 TypeParameter(
@@ -1460,8 +1739,18 @@ public class java.util.ArrayList<E> extends java.util.AbstractList<E> implements
                                 Ref(
                                     Class(
                                         ClassRef {
-                                            name: Id {
-                                                data: "java.util.Comparator",
+                                            name: DotId {
+                                                ids: [
+                                                    Id {
+                                                        data: "java",
+                                                    },
+                                                    Id {
+                                                        data: "util",
+                                                    },
+                                                    Id {
+                                                        data: "Comparator",
+                                                    },
+                                                ],
                                             },
                                             generics: [
                                                 Super(
@@ -1544,8 +1833,18 @@ public class java.lang.Object {
                         is_static: false,
                         is_default: false,
                     },
-                    name: Id {
-                        data: "java.lang.Object",
+                    name: DotId {
+                        ids: [
+                            Id {
+                                data: "java",
+                            },
+                            Id {
+                                data: "lang",
+                            },
+                            Id {
+                                data: "Object",
+                            },
+                        ],
                     },
                     kind: Class,
                     generics: [],
@@ -1562,7 +1861,8 @@ public class java.lang.Object {
                                 is_static: false,
                                 is_default: false,
                             },
-                            args: [],
+                            generics: [],
+                            argument_tys: [],
                             throws: [],
                             descriptor: Descriptor {
                                 string: "()V",
@@ -1590,8 +1890,18 @@ public class java.lang.Object {
                                 Ref(
                                     Class(
                                         ClassRef {
-                                            name: Id {
-                                                data: "java.lang.Class",
+                                            name: DotId {
+                                                ids: [
+                                                    Id {
+                                                        data: "java",
+                                                    },
+                                                    Id {
+                                                        data: "lang",
+                                                    },
+                                                    Id {
+                                                        data: "Class",
+                                                    },
+                                                ],
                                             },
                                             generics: [
                                                 Wildcard,
@@ -1648,8 +1958,18 @@ public class java.lang.Object {
                                 Ref(
                                     Class(
                                         ClassRef {
-                                            name: Id {
-                                                data: "java.lang.Object",
+                                            name: DotId {
+                                                ids: [
+                                                    Id {
+                                                        data: "java",
+                                                    },
+                                                    Id {
+                                                        data: "lang",
+                                                    },
+                                                    Id {
+                                                        data: "Object",
+                                                    },
+                                                ],
                                             },
                                             generics: [],
                                         },
@@ -1685,8 +2005,18 @@ public class java.lang.Object {
                                 Ref(
                                     Class(
                                         ClassRef {
-                                            name: Id {
-                                                data: "java.lang.String",
+                                            name: DotId {
+                                                ids: [
+                                                    Id {
+                                                        data: "java",
+                                                    },
+                                                    Id {
+                                                        data: "lang",
+                                                    },
+                                                    Id {
+                                                        data: "String",
+                                                    },
+                                                ],
                                             },
                                             generics: [],
                                         },
@@ -1758,8 +2088,18 @@ public class java.lang.Object {
                             return_ty: None,
                             throws: [
                                 ClassRef {
-                                    name: Id {
-                                        data: "java.lang.InterruptedException",
+                                    name: DotId {
+                                        ids: [
+                                            Id {
+                                                data: "java",
+                                            },
+                                            Id {
+                                                data: "lang",
+                                            },
+                                            Id {
+                                                data: "InterruptedException",
+                                            },
+                                        ],
                                     },
                                     generics: [],
                                 },
@@ -1790,8 +2130,18 @@ public class java.lang.Object {
                             return_ty: None,
                             throws: [
                                 ClassRef {
-                                    name: Id {
-                                        data: "java.lang.InterruptedException",
+                                    name: DotId {
+                                        ids: [
+                                            Id {
+                                                data: "java",
+                                            },
+                                            Id {
+                                                data: "lang",
+                                            },
+                                            Id {
+                                                data: "InterruptedException",
+                                            },
+                                        ],
                                     },
                                     generics: [],
                                 },
@@ -1825,8 +2175,18 @@ public class java.lang.Object {
                             return_ty: None,
                             throws: [
                                 ClassRef {
-                                    name: Id {
-                                        data: "java.lang.InterruptedException",
+                                    name: DotId {
+                                        ids: [
+                                            Id {
+                                                data: "java",
+                                            },
+                                            Id {
+                                                data: "lang",
+                                            },
+                                            Id {
+                                                data: "InterruptedException",
+                                            },
+                                        ],
                                     },
                                     generics: [],
                                 },

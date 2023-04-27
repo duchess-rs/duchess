@@ -1,7 +1,7 @@
 use crate::{
     class_info::{
-        ClassRef, Constructor, Id, Method, NonRepeatingType, RefType, ScalarType, SpannedClassInfo,
-        SpannedPackageInfo, Type,
+        ClassRef, Constructor, DotId, Id, Method, NonRepeatingType, RefType, ScalarType,
+        SpannedClassInfo, SpannedPackageInfo, Type,
     },
     span_error::SpanError,
 };
@@ -70,6 +70,7 @@ impl SpannedClassInfo {
             .info
             .constructors
             .iter()
+            .filter(|c| self.members.contains_constructor(&self.info, c))
             .map(|c| self.constructor(c))
             .collect::<Result<_, _>>()?;
 
@@ -79,6 +80,7 @@ impl SpannedClassInfo {
             .methods
             .iter()
             .filter(|m| !m.flags.is_static)
+            .filter(|m| self.members.contains_method(m))
             .map(|m| self.method(m))
             .collect::<Result<_, _>>()?;
 
@@ -112,15 +114,17 @@ impl SpannedClassInfo {
             const _: () = {
                 use duchess::{
                     *,
+                    codegen_deps::{
+                        once_cell::sync::OnceCell,
+                        jni::{
+                            objects::{AutoLocal, JMethodID, JClass, JValue, JValueGen},
+                            signature::{ReturnType, Primitive},
+                            sys::jvalue,
+                        },
+                    },
                     plumbing::*,
                     prelude::*,
                 };
-                use jni::{
-                    objects::{AutoLocal, JMethodID, JClass, JValue, JValueGen},
-                    signature::{ReturnType, Primitive},
-                    sys::jvalue,
-                };
-                use once_cell::sync::OnceCell;
 
                 unsafe impl<#(#java_class_generics,)*> JavaObject for #struct_name<#(#java_class_generics,)*>
                 where
@@ -155,7 +159,7 @@ impl SpannedClassInfo {
         };
 
         if let Ok(f) = std::env::var("DUCHESS_DEBUG") {
-            if f == "*" || f == "1" || self.info.name.starts_with(&f) {
+            if f == "*" || f == "1" || self.info.name.to_string().starts_with(&f) {
                 match rust_format::RustFmt::default().format_tokens(output.clone()) {
                     Ok(v) => {
                         eprintln!("{v}");
@@ -193,7 +197,7 @@ impl SpannedClassInfo {
     fn resolve_upcasts(&self) -> impl Iterator<Item = &'_ ClassRef> {
         static OBJECT: OnceCell<ClassRef> = OnceCell::new();
         let object = OBJECT.get_or_init(|| ClassRef {
-            name: "java.lang.Object".into(),
+            name: DotId::parse("java.lang.Object"),
             generics: vec![],
         });
 
@@ -224,10 +228,10 @@ impl SpannedClassInfo {
     }
 
     fn constructor(&self, constructor: &Constructor) -> Result<TokenStream, SpanError> {
-        let mut sig = Signature::new(&self.info.name, self.span, &self.info.generics);
+        let mut sig = Signature::new(self.info.name.class_name(), self.span, &self.info.generics);
 
         let input_traits: Vec<_> = constructor
-            .args
+            .argument_tys
             .iter()
             .map(|ty| sig.input_trait(ty))
             .collect::<Result<_, _>>()?;
@@ -244,7 +248,7 @@ impl SpannedClassInfo {
         let descriptor = Literal::string(&constructor.descriptor.string);
 
         // Code to convert each input appropriately
-        let prepare_inputs = self.prepare_inputs(&input_names, &constructor.args);
+        let prepare_inputs = self.prepare_inputs(&input_names, &constructor.argument_tys);
 
         let output = quote_spanned!(self.span =>
             impl< #(#java_class_generics,)* > #ty
@@ -516,12 +520,12 @@ impl SpannedClassInfo {
     }
 
     fn struct_name(&self) -> Ident {
-        let tail = self.info.name.split('.').last().unwrap();
+        let tail = self.info.name.class_name();
         Ident::new(&tail, self.span)
     }
 
     fn ext_trait_name(&self) -> Ident {
-        let tail = self.info.name.split('.').last().unwrap();
+        let tail = self.info.name.class_name();
         Ident::new(&format!("{tail}Ext"), self.span)
     }
 
@@ -688,6 +692,7 @@ impl Signature {
                     ScalarType::F64 => quote_spanned!(self.span => Primitive::Double),
                     ScalarType::F32 => quote_spanned!(self.span => Primitive::Float),
                     ScalarType::Boolean => quote_spanned!(self.span => Primitive::Boolean),
+                    ScalarType::Char => quote_spanned!(self.span => Primitive::Char),
                 };
                 Ok(quote_spanned!(self.span => ReturnType::Primitive(#primitive)))
             }
@@ -726,7 +731,12 @@ impl Signature {
                 Ok(quote_spanned!(self.span => java::Array<#e>))
             }
             RefType::TypeParameter(t) => {
-                assert!(self.in_scope_generics.contains(&t));
+                assert!(
+                    self.in_scope_generics.contains(&t),
+                    "generic type parameter `{:?}` not among in-scope parameters: {:?}",
+                    t,
+                    self.in_scope_generics,
+                );
                 let t = t.to_ident(self.span);
                 Ok(quote_spanned!(self.span => #t))
             }
@@ -764,6 +774,7 @@ impl Signature {
 
     fn java_scalar_ty(&self, ty: &ScalarType) -> TokenStream {
         match ty {
+            ScalarType::Char => quote_spanned!(self.span => u16),
             ScalarType::Int => quote_spanned!(self.span => i32),
             ScalarType::Long => quote_spanned!(self.span => i64),
             ScalarType::Short => quote_spanned!(self.span => i16),
@@ -775,20 +786,25 @@ impl Signature {
     }
 }
 
-trait IdExt {
+trait DotIdExt {
     fn to_jni_name(&self, span: Span) -> Literal;
     fn to_module_name(&self, span: Span) -> TokenStream;
 }
 
-impl IdExt for Id {
+impl DotIdExt for DotId {
     fn to_jni_name(&self, _span: Span) -> Literal {
-        let s = self.replace('.', "/");
-        Literal::string(&s)
+        let (package_names, struct_name) = self.split();
+        let mut output = String::new();
+        for p in package_names {
+            output.push_str(p);
+            output.push_str("/");
+        }
+        output.push_str(struct_name);
+        Literal::string(&output)
     }
 
     fn to_module_name(&self, span: Span) -> TokenStream {
-        let rust_name: Vec<&str> = self.split('.').collect();
-        let (struct_name, package_names) = rust_name.split_last().unwrap();
+        let (package_names, struct_name) = self.split();
         let struct_ident = Ident::new(struct_name, span);
         let package_idents: Vec<Ident> =
             package_names.iter().map(|n| Ident::new(n, span)).collect();

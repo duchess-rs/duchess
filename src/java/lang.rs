@@ -5,13 +5,17 @@ use crate as duchess;
 
 use crate::java;
 
-duchess_macro::duchess_javap! {
-r#"
-        Compiled from "Object.java"
-        public class java.lang.Object {
-            public java.lang.Object();
-                descriptor: ()V
+// Declare the class "object" in isolation.
+// Eventually we'd like to move all the declarations
+// into a `java_package` call, but we still have
+// to fix some bugs, so for now, just do that call
+// inside of a `mod object` and re-export what we want.
+mod object {
+    use super::*;
+    duchess_macro::java_package! {
+        package java.lang;
 
+<<<<<<< HEAD
             public final native java.lang.Class getClass();
                 descriptor: ()Ljava/lang/Class;
 
@@ -32,9 +36,20 @@ r#"
 
             public static native void notifyStatic(String...);
                 descriptor: ([Ljava/lang/String;)V
+=======
+        class Object {
+            Object();
+            hashCode();
+            equals(java.lang.Object);
+            toString();
+            notify();
+            notifyAll();
+>>>>>>> upstream/main
         }
-    "#
+    }
 }
+
+pub use object::java::lang::{Object, ObjectExt};
 
 duchess_macro::duchess_javap! {
 r#"

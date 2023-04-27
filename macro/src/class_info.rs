@@ -1,8 +1,13 @@
 use std::{collections::BTreeMap, sync::Arc};
 
-use proc_macro2::{Ident, Span};
+use proc_macro2::{Ident, Span, TokenTree};
 
-use crate::{parse::Parse, span_error::SpanError};
+use crate::{
+    argument::MemberListing,
+    class_info::{self},
+    parse::Parse,
+    span_error::SpanError,
+};
 
 pub struct SpannedPackageInfo {
     pub name: Id,
@@ -12,14 +17,24 @@ pub struct SpannedPackageInfo {
 }
 
 pub struct SpannedClassInfo {
+    /// The complete class info loaded from javap
     pub info: ClassInfo,
+
+    /// The span where user declared interest in this class
     pub span: Span,
+
+    /// The listing of members user wants to include
+    pub members: MemberListing,
 }
 
 impl SpannedClassInfo {
-    pub fn parse(t: &str, span: Span) -> Result<Self, SpanError> {
+    pub fn parse(t: &str, span: Span, members: MemberListing) -> Result<Self, SpanError> {
         match javap::parse_class_info(&t) {
-            Ok(info) => Ok(SpannedClassInfo { span, info }),
+            Ok(info) => Ok(SpannedClassInfo {
+                span,
+                info,
+                members,
+            }),
             Err(message) => Err(SpanError { span, message }),
         }
     }
@@ -31,7 +46,7 @@ impl Parse for SpannedClassInfo {
             return Ok(None);
         };
         let span = p.last_span().unwrap();
-        let r = Self::parse(&t, span)?;
+        let r = Self::parse(&t, span, MemberListing::all())?;
         Ok(Some(r))
     }
 
@@ -43,7 +58,7 @@ impl Parse for SpannedClassInfo {
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
 pub struct ClassInfo {
     pub flags: Flags,
-    pub name: Id,
+    pub name: DotId,
     pub kind: ClassKind,
     pub generics: Vec<Id>,
     pub extends: Option<ClassRef>,
@@ -94,7 +109,8 @@ pub enum Privacy {
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
 pub struct Constructor {
     pub flags: Flags,
-    pub args: Vec<Type>,
+    pub generics: Vec<Id>,
+    pub argument_tys: Vec<Type>,
     pub throws: Vec<ClassRef>,
     pub descriptor: Descriptor,
 }
@@ -104,6 +120,7 @@ pub struct Field {
     pub flags: Flags,
     pub name: Id,
     pub ty: Type,
+    pub descriptor: Descriptor,
 }
 
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
@@ -117,9 +134,81 @@ pub struct Method {
     pub descriptor: Descriptor,
 }
 
+#[derive(Clone, Debug)]
+pub struct SpannedMethodSig {
+    pub method_sig: MethodSig,
+    pub span: Span,
+}
+
+impl Parse for SpannedMethodSig {
+    fn parse(p: &mut crate::parse::Parser) -> Result<Option<Self>, SpanError> {
+        // Parse an individual method. For this, we hackily consume all tokens until a `;`
+        // and make a string out of it, then pass to the lalrpop parser.
+        //
+        // FIXME: clean this up.
+        let Some(t0) = p.eat_token() else {
+            return Ok(None);
+        };
+
+        let mut text: String = t0.to_string();
+        let mut span = t0.span();
+
+        if !is_semi(&t0) {
+            while let Some(t1) = p.eat_token() {
+                text.push_str(&t1.to_string());
+                span = span.join(t1.span()).unwrap_or(span);
+                if is_semi(&t1) {
+                    break;
+                }
+            }
+        }
+
+        return match class_info::javap::parse_method_sig(&text) {
+            Ok(ms) => Ok(Some(SpannedMethodSig {
+                method_sig: ms,
+                span,
+            })),
+            Err(message) => return Err(SpanError { span, message }),
+        };
+
+        fn is_semi(t: &TokenTree) -> bool {
+            match t {
+                TokenTree::Punct(p) => p.as_char() == ';',
+                _ => false,
+            }
+        }
+    }
+
+    fn description() -> String {
+        format!("java method signature")
+    }
+}
+
+/// Signature of a single method in a class;
+/// identifies the method precisely enough
+/// to select from one of many overloaded methods.
+#[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
+pub struct MethodSig {
+    pub name: Id,
+    pub generics: Vec<Id>,
+    pub argument_tys: Vec<Type>,
+}
+
+impl MethodSig {
+    pub fn matches(&self, m: &Method) -> bool {
+        m.name == self.name && m.generics == self.generics && m.argument_tys == self.argument_tys
+    }
+
+    pub fn matches_constructor(&self, class: &ClassInfo, ctor: &Constructor) -> bool {
+        class.name.is_class(&self.name)
+            && ctor.generics == self.generics
+            && ctor.argument_tys == self.argument_tys
+    }
+}
+
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
 pub struct ClassRef {
-    pub name: Id,
+    pub name: DotId,
     pub generics: Vec<RefType>,
 }
 
@@ -168,6 +257,7 @@ pub enum ScalarType {
     F64,
     F32,
     Boolean,
+    Char,
 }
 
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
@@ -183,9 +273,10 @@ impl From<&str> for Descriptor {
     }
 }
 
+/// A single identifier
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
 pub struct Id {
-    pub data: Arc<String>,
+    pub data: String,
 }
 
 impl std::ops::Deref for Id {
@@ -198,23 +289,21 @@ impl std::ops::Deref for Id {
 
 impl From<String> for Id {
     fn from(value: String) -> Self {
-        Id {
-            data: Arc::new(value),
-        }
+        Id { data: value }
     }
 }
 
 impl From<&str> for Id {
     fn from(value: &str) -> Self {
         Id {
-            data: Arc::new(value.to_owned()),
+            data: value.to_owned(),
         }
     }
 }
 
 impl Id {
-    pub fn dot(&self, s: &str) -> Id {
-        Id::from(format!("{self}.{s}"))
+    pub fn dot(self, s: &str) -> DotId {
+        DotId::from(self).dot(s)
     }
 
     pub fn to_ident(&self, span: Span) -> Ident {
@@ -225,6 +314,66 @@ impl Id {
 impl std::fmt::Display for Id {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.data)
+    }
+}
+
+/// A dotted identifier
+#[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
+pub struct DotId {
+    /// Dotted components. Invariant: len >= 1.
+    ids: Vec<Id>,
+}
+
+impl From<Id> for DotId {
+    fn from(value: Id) -> Self {
+        DotId { ids: vec![value] }
+    }
+}
+
+impl From<&Id> for DotId {
+    fn from(value: &Id) -> Self {
+        DotId {
+            ids: vec![value.clone()],
+        }
+    }
+}
+
+impl DotId {
+    pub fn parse(s: impl AsRef<str>) -> DotId {
+        let s: &str = s.as_ref();
+        let ids: Vec<Id> = s.split(".").map(Id::from).collect();
+        assert!(ids.len() > 1, "bad input to DotId::parse: {s:?}");
+        DotId { ids }
+    }
+
+    pub fn dot(mut self, s: &str) -> DotId {
+        self.ids.push(Id::from(s));
+        self
+    }
+
+    pub fn is_class(&self, s: &Id) -> bool {
+        self.split().1 == s
+    }
+
+    pub fn class_name(&self) -> &Id {
+        self.split().1
+    }
+
+    /// Split and return the (package name, class name) pair.
+    pub fn split(&self) -> (&[Id], &Id) {
+        let (name, package) = self.ids.split_last().unwrap();
+        (package, name)
+    }
+}
+
+impl std::fmt::Display for DotId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let (package, class) = self.split();
+        for id in package {
+            write!(f, "{id}.")?;
+        }
+        write!(f, "{class}")?;
+        Ok(())
     }
 }
 
