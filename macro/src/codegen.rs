@@ -776,7 +776,7 @@ impl Signature {
             }
             RefType::TypeParameter(t) => {
                 assert!(
-                    self.in_scope_generics.contains(&t),
+                    self.in_scope_generics.contains(t),
                     "generic type parameter `{:?}` not among in-scope parameters: {:?}",
                     t,
                     self.in_scope_generics,
