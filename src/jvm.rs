@@ -9,6 +9,7 @@ use crate::{
 };
 
 use std::{
+    env,
     marker::PhantomData,
     ops::{Deref, DerefMut},
     ptr::NonNull,
@@ -105,12 +106,13 @@ pub trait IsVoid: Default {}
 impl IsVoid for () {}
 
 static GLOBAL_JVM: Lazy<JavaVM> = Lazy::new(|| {
-    let jvm_args = InitArgsBuilder::new()
+    let mut jvm_builder = InitArgsBuilder::new()
         .version(jni::JNIVersion::V8)
-        .option("-Xcheck:jni")
-        .option("-Djava.class.path=java")
-        .build()
-        .unwrap();
+        .option("-Xcheck:jni");
+    if let Ok(classpath) = env::var("CLASSPATH") {
+        jvm_builder = jvm_builder.option(format!("-Djava.class.path={classpath}"));
+    }
+    let jvm_args = jvm_builder.build().unwrap();
 
     JavaVM::new(jvm_args).unwrap()
 });
