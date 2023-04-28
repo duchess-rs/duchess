@@ -155,16 +155,16 @@ impl ClassInfo {
                     prelude::*,
                 };
 
-                unsafe impl<#(#java_class_generics,)*> JavaObject for #struct_name<#(#java_class_generics,)*>
+                unsafe impl<#(#java_class_generics,)*> duchess::JavaObject for #struct_name<#(#java_class_generics,)*>
                 where
-                    #(#java_class_generics: JavaObject,)*
+                    #(#java_class_generics: duchess::JavaObject,)*
                 {
                     #cached_class
                 }
 
                 unsafe impl<#(#java_class_generics,)*> plumbing::Upcast<#struct_name<#(#java_class_generics,)*>> for #struct_name<#(#java_class_generics,)*>
                 where
-                    #(#java_class_generics: JavaObject,)*
+                    #(#java_class_generics: duchess::JavaObject,)*
                 {}
 
                 #upcast_impls
@@ -180,7 +180,7 @@ impl ClassInfo {
                 where
                     This: JvmOp,
                     for<'jvm> This::Output<'jvm>: AsRef<#this_ty>,
-                    #(#java_class_generics: JavaObject,)*
+                    #(#java_class_generics: duchess::JavaObject,)*
                 {
                     #(#trait_impl_methods)*
                 }
@@ -215,7 +215,7 @@ impl ClassInfo {
                 Ok(quote_spanned!(self.span =>
                     unsafe impl<#(#java_class_generics,)*> plumbing::Upcast<#tokens> for #struct_name<#(#java_class_generics,)*>
                     where
-                        #(#java_class_generics: JavaObject,)*
+                        #(#java_class_generics: duchess::JavaObject,)*
                     {}
                 ))
             })
@@ -667,7 +667,7 @@ impl Signature {
                 if !self.rust_generics.contains(&ident) {
                     self.rust_generics.push(ident.clone());
                     self.where_clauses
-                        .push(quote_spanned!(self.span => #ident : JavaObject));
+                        .push(quote_spanned!(self.span => #ident : duchess::JavaObject));
                     return Ok(ident);
                 }
                 i += 1;
