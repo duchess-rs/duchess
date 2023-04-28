@@ -86,7 +86,7 @@ GenericBounds: Vec<ClassRef> = {
     },
 };
 
-Header: () = r#"Compiled from "[a-zA-Z.]+""#;
+Header: () = r#"Compiled from "[a-zA-Z$0-9_.]+""#;
 
 DotId: DotId = {
     <a:Id> "." <b:ID> => a.dot(b),
