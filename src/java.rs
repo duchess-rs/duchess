@@ -46,6 +46,14 @@ mod auto {
             public int hashCode();
         }
 
+        public class java.lang.Exception extends java.lang.Throwable {
+            public java.lang.Exception();
+        }
+
+        public class java.lang.RuntimeException extends java.lang.Exception {
+            public java.lang.RuntimeException();
+        }
+
         // NB: In Java, this is `Class<T>`, but we model it as the erased version
         // `Class`. This is beacuse there are a lot of methods, including some that we would
         // like to model such as `arrayType()`, that return a `Class<?>`, and we cannot model
