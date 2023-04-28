@@ -96,9 +96,9 @@ pub use crate::array::JavaArray as Array;
 pub mod util {
     pub use crate::collections::list::ArrayList;
     pub use crate::collections::list::ArrayListExt;
+    pub use crate::collections::list::HashMap;
     pub use crate::collections::list::List;
     pub use crate::collections::list::ListExt;
-    pub use crate::collections::map::HashMap;
-    pub use crate::collections::map::Map;
-    pub use crate::collections::map::MapExt;
+    pub use crate::collections::list::Map;
+    pub use crate::collections::list::MapExt;
 }
