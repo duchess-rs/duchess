@@ -3,7 +3,6 @@
 mod array;
 mod cast;
 mod catch;
-mod collections;
 mod error;
 mod inspect;
 mod jvm;
