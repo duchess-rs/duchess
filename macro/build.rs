@@ -8,4 +8,5 @@ fn main() {
     // which they depend change. So, as a workaround we force a recompilation.
     // See issue: https://github.com/duchess-rs/duchess/issues/7
     println!("cargo:rerun-if-env-changed=CLASSPATH");
+    println!("cargo:rerun-if-env-changed=DUCHESS_DEBUG");
 }
