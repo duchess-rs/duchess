@@ -210,6 +210,12 @@ pub enum Privacy {
 }
 
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
+pub enum MemberFunction {
+    Constructor(Constructor),
+    Method(Method),
+}
+
+#[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
 pub struct Constructor {
     pub flags: Flags,
     pub generics: Vec<Generic>,
