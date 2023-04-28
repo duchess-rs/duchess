@@ -1,10 +1,36 @@
 use crate::class_info::*;
+use proc_macro2::Span;
 
-grammar;
+grammar(span: Span);
+
+pub ClassDecl: ClassDecl = {
+    ReflectedClassInfo => ClassDecl::Reflected(<>),
+    ClassInfoInline => ClassDecl::Specified(<>),
+};
 
 pub ClassInfo: ClassInfo = {
+    ClassInfoInline
+};
+
+#[inline]
+ReflectedClassInfo: ReflectedClassInfo = {
+    <l:Flags> <k:ClassKind> <n:ClassName> "{" "*" "}" => ReflectedClassInfo {
+        span,
+        flags: l,
+        name: n,
+        kind: k,
+    },
+};
+
+ClassName: DotId = {
+    <Id> => DotId::from(<>),
+    DotId => <>,  
+};
+
+#[inline]
+ClassInfoInline: ClassInfo = {
     Header? 
-    <l:Flags> <k:ClassKind> <n:DotId> 
+    <l:Flags> <k:ClassKind> <n:ClassName> 
         <g:Generics>
         <e:("extends" <ClassRef>)?>
         <i:("implements" <Comma<ClassRef>>)?>
@@ -14,6 +40,7 @@ pub ClassInfo: ClassInfo = {
         <m:Method*>
     "}" => {
         ClassInfo {
+            span: span,
             flags: l,
             name: n,
             kind: k,
@@ -33,9 +60,23 @@ ClassKind: ClassKind = {
 };
 
 #[inline]
-Generics: Vec<Id> = {
+Generics: Vec<Generic> = {
     () => vec![],
-    ("<" <Comma<Id>> ">"),
+    ("<" <Comma<Generic>> ">"),
+};
+
+Generic: Generic = {
+    Id => Generic { id: <>, extends: vec![] },
+    <i:Id> "extends" <b:GenericBounds> => Generic { id: i, extends: b },
+};
+
+GenericBounds: Vec<ClassRef> = {
+    ClassRef => vec![<>],
+    <b:GenericBounds> "&" <c:ClassRef> => {
+        let mut b = b;
+        b.push(c);
+        b
+    },
 };
 
 Header: () = r#"Compiled from "[a-zA-Z.]+""#;
@@ -54,26 +95,26 @@ ID: &'input str = {
 }
 
 Constructor: Constructor = {
-    <f:Flags> <g:Generics> <n:DotId> "(" <a:Comma<Type>> ")" <t:Throws> ";" <d:MethodDescriptor> => {
-        Constructor { flags: f, generics: g, argument_tys: a, throws: t, descriptor: d, }
+    <f:Flags> <g:Generics> <n:DotId> "(" <a:Comma<Type>> ")" <t:Throws> ";"  => {
+        Constructor { flags: f, generics: g, argument_tys: a, throws: t,  }
     }
 };
 
-pub MethodSig: MethodSig = {
+MethodSig: MethodSig = {
     <g:Generics> <n:Id> "(" <a:Comma<Type>> ")" ";" => {
         MethodSig { name: n, argument_tys: a, generics: g }
     }
 };
 
 Method: Method = {
-    <f:Flags> <g:Generics> <r:ReturnType> <n:Id> "(" <a:Comma<Type>> ")" <t:Throws> ";" <d:MethodDescriptor> => {
-        Method { flags: f, name: n, argument_tys: a, return_ty: r, throws: t, descriptor: d, generics: g }
+    <f:Flags> <g:Generics> <r:ReturnType> <n:Id> "(" <a:Comma<Type>> ")" <t:Throws> ";" => {
+        Method { flags: f, name: n, argument_tys: a, return_ty: r, throws: t, generics: g }
     }
 };
 
 Field: Field = {
-    <f:Flags> <t:Type> <n:Id> ";" <d:FieldDescriptor> => {
-        Field { flags: f, name: n, ty: t, descriptor: d }
+    <f:Flags> <t:Type> <n:Id> ";" => {
+        Field { flags: f, name: n, ty: t }
     }
 };
 
@@ -93,17 +134,6 @@ Privacy: Privacy = {
     () => Privacy::Package,
 };
 
-MethodDescriptor: Descriptor = {
-    r"descriptor: \([\[\]a-zA-Z0-9$_/;]*\)[\[\]a-zA-Z0-9_/;]+" => {
-        Descriptor::from(&<>["descriptor: ".len()..])
-    }
-};
-
-FieldDescriptor: Descriptor = {
-    r"descriptor: [\[\]a-zA-Z0-9$_/;]+" => {
-        Descriptor::from(&<>["descriptor: ".len()..])
-    },
-};
 Throws: Vec<ClassRef> = {
     () => vec![],
     "throws" <Comma1<ClassRef>>,

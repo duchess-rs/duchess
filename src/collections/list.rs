@@ -1,5 +1,3 @@
-use crate::{java, JavaObject};
-
 #[cfg(not(doc))]
 use crate as duchess;
 
@@ -7,115 +5,50 @@ use crate as duchess;
 // Rust structs and (b) they've got a lot of difficult cases (type params, overloaded methods, interfaces, etc.) that we
 // wont' be able to tackle until later.
 
-duchess_macro::duchess_javap! {
-    r#"
-Compiled from "List.java"
-public interface java.util.List<E> {
-  public abstract int size();
-    descriptor: ()I
+mod tmp {
+    use super::*;
+    duchess_macro::java_package! {
+      package java.util;
 
-  public abstract boolean isEmpty();
-    descriptor: ()Z
+      public interface java.util.List<E> {
+        public abstract int size();
+        public abstract boolean isEmpty();
+        public abstract boolean contains(java.lang.Object);
+        public abstract <T> T[] toArray(T[]);
+        public abstract boolean add(E);
+        public abstract boolean remove(java.lang.Object);
+        public abstract void clear();
+        public abstract boolean equals(java.lang.Object);
+        public abstract int hashCode();
+        public abstract E get(int);
+        public abstract E set(int, E);
+        public abstract int indexOf(java.lang.Object);
+        public abstract int lastIndexOf(java.lang.Object);
+        public abstract java.util.List<E> subList(int, int);
+        public static <E> java.util.List<E> of(E...);
+      }
 
-  public abstract boolean contains(java.lang.Object);
-    descriptor: (Ljava/lang/Object;)Z
-
-  public abstract <T> T[] toArray(T[]);
-    descriptor: ([Ljava/lang/Object;)[Ljava/lang/Object;
-
-  public abstract boolean add(E);
-    descriptor: (Ljava/lang/Object;)Z
-
-  public abstract boolean remove(java.lang.Object);
-    descriptor: (Ljava/lang/Object;)Z
-
-  public abstract void clear();
-    descriptor: ()V
-
-  public abstract boolean equals(java.lang.Object);
-    descriptor: (Ljava/lang/Object;)Z
-
-  public abstract int hashCode();
-    descriptor: ()I
-
-  public abstract E get(int);
-    descriptor: (I)Ljava/lang/Object;
-
-  public abstract E set(int, E);
-    descriptor: (ILjava/lang/Object;)Ljava/lang/Object;
-
-  public abstract int indexOf(java.lang.Object);
-    descriptor: (Ljava/lang/Object;)I
-
-  public abstract int lastIndexOf(java.lang.Object);
-    descriptor: (Ljava/lang/Object;)I
-
-  public abstract java.util.List<E> subList(int, int);
-    descriptor: (II)Ljava/util/List;
-
-  public static <E> java.util.List<E> of(E...);
-    descriptor: ([Ljava/lang/Object;)Ljava/util/List;
-}
-    "#
+      public class java.util.ArrayList<E> implements java.util.List<E> {
+        public java.util.ArrayList();
+        public void trimToSize();
+        public void ensureCapacity(int);
+        public int size();
+        public boolean isEmpty();
+        public boolean contains(java.lang.Object);
+        public int indexOf(java.lang.Object);
+        public int lastIndexOf(java.lang.Object);
+        public java.lang.Object clone();
+        public java.lang.Object[] toArray();
+        public E get(int);
+        public E set(int, E);
+        public boolean add(E);
+        public boolean equals(java.lang.Object);
+        public int hashCode();
+        public boolean remove(java.lang.Object);
+        public void clear();
+        public java.util.List<E> subList(int, int);
+      }
+    }
 }
 
-duchess_macro::duchess_javap! {
-    r#"
-    Compiled from "ArrayList.java"
-public class java.util.ArrayList<E> implements java.util.List<E> {
-  public java.util.ArrayList();
-    descriptor: ()V
-
-  public void trimToSize();
-    descriptor: ()V
-
-  public void ensureCapacity(int);
-    descriptor: (I)V
-
-  public int size();
-    descriptor: ()I
-
-  public boolean isEmpty();
-    descriptor: ()Z
-
-  public boolean contains(java.lang.Object);
-    descriptor: (Ljava/lang/Object;)Z
-
-  public int indexOf(java.lang.Object);
-    descriptor: (Ljava/lang/Object;)I
-
-  public int lastIndexOf(java.lang.Object);
-    descriptor: (Ljava/lang/Object;)I
-
-  public java.lang.Object clone();
-    descriptor: ()Ljava/lang/Object;
-
-  public java.lang.Object[] toArray();
-    descriptor: ()[Ljava/lang/Object;
-
-  public E get(int);
-    descriptor: (I)Ljava/lang/Object;
-
-  public E set(int, E);
-    descriptor: (ILjava/lang/Object;)Ljava/lang/Object;
-
-  public boolean add(E);
-    descriptor: (Ljava/lang/Object;)Z
-
-  public boolean equals(java.lang.Object);
-    descriptor: (Ljava/lang/Object;)Z
-
-  public int hashCode();
-    descriptor: ()I
-
-  public boolean remove(java.lang.Object);
-    descriptor: (Ljava/lang/Object;)Z
-
-  public void clear();
-    descriptor: ()V
-
-  public java.util.List<E> subList(int, int);
-    descriptor: (II)Ljava/util/List;
-}
-    "#
-}
+pub use tmp::java::util::*;

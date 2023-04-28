@@ -1,71 +1,174 @@
 use std::{collections::BTreeMap, sync::Arc};
 
-use proc_macro2::{Ident, Span, TokenTree};
+use proc_macro2::{Delimiter, Ident, Span, TokenTree};
 
 use crate::{
-    argument::MemberListing,
-    class_info::{self},
-    parse::Parse,
+    parse::{Parse, TextAccum},
     span_error::SpanError,
 };
 
+/// Stores all the data about the classes/packages to be translated
+/// as well as whatever we have learned from reflection.
+#[derive(Debug)]
+pub struct RootMap {
+    pub subpackages: BTreeMap<Id, SpannedPackageInfo>,
+    pub classes: BTreeMap<DotId, Arc<ClassInfo>>,
+}
+
+impl RootMap {
+    /// Finds the class with the given name (if present).
+    pub fn find_class(&self, cn: &DotId) -> Option<&Arc<ClassInfo>> {
+        self.classes.get(cn)
+    }
+
+    /// Finds the package with the given name (if present).
+    pub fn find_package(&self, ids: &[Id]) -> Option<&SpannedPackageInfo> {
+        let (p0, ps) = ids.split_first().unwrap();
+        self.subpackages.get(p0)?.find_subpackage(ps)
+    }
+
+    pub fn to_packages(&self) -> impl Iterator<Item = &SpannedPackageInfo> {
+        self.subpackages.values()
+    }
+
+    /// Find the names of all classes contained within.
+    pub fn class_names(&self) -> Vec<DotId> {
+        self.classes.keys().cloned().collect()
+    }
+}
+
+#[derive(Debug)]
 pub struct SpannedPackageInfo {
     pub name: Id,
     pub span: Span,
     pub subpackages: BTreeMap<Id, SpannedPackageInfo>,
-    pub classes: Vec<SpannedClassInfo>,
+    pub classes: Vec<DotId>,
 }
 
-pub struct SpannedClassInfo {
-    /// The complete class info loaded from javap
-    pub info: ClassInfo,
+impl SpannedPackageInfo {
+    /// Find a (sub)package given its relative name
+    pub fn find_subpackage(&self, ids: &[Id]) -> Option<&SpannedPackageInfo> {
+        let Some((p0, ps)) = ids.split_first() else {
+            return Some(self);
+        };
 
-    /// The span where user declared interest in this class
-    pub span: Span,
+        self.subpackages.get(p0)?.find_subpackage(ps)
+    }
 
-    /// The listing of members user wants to include
-    pub members: MemberListing,
-}
-
-impl SpannedClassInfo {
-    pub fn parse(t: &str, span: Span, members: MemberListing) -> Result<Self, SpanError> {
-        match javap::parse_class_info(&t) {
-            Ok(info) => Ok(SpannedClassInfo {
-                span,
-                info,
-                members,
-            }),
-            Err(message) => Err(SpanError { span, message }),
-        }
+    /// Finds a class in this package with the given name (if any)
+    pub fn find_class(&self, cn: &Id) -> Option<&DotId> {
+        self.classes.iter().find(|c| c.is_class(cn))
     }
 }
 
-impl Parse for SpannedClassInfo {
+#[derive(Debug)]
+pub enum ClassDecl {
+    /// User wrote `class Foo { * }`
+    Reflected(ReflectedClassInfo),
+
+    /// User wrote `class Foo { ... }` with full details.
+    Specified(ClassInfo),
+}
+
+impl Parse for ClassDecl {
     fn parse(p: &mut crate::parse::Parser) -> Result<Option<Self>, SpanError> {
-        let Some(t) = p.eat_string_literal() else {
+        // Look for a keyword that could start a class definition.
+        let Some(t0) = p.peek_token() else {
             return Ok(None);
         };
-        let span = p.last_span().unwrap();
-        let r = Self::parse(&t, span, MemberListing::all())?;
+        match t0 {
+            TokenTree::Ident(i) => {
+                static START_KEYWORDS: &[&str] = &[
+                    "class",
+                    "public",
+                    "final",
+                    "abstract",
+                    "interface",
+                    "enum",
+                    "record",
+                ];
+                let s = i.to_string();
+                if !START_KEYWORDS.contains(&s.as_str()) {
+                    return Ok(None);
+                }
+            }
+            _ => return Ok(None),
+        }
+
+        // Accumulate tokens until we see a braced block `{}` that is the class body.
+        let t0 = p.eat_token().unwrap();
+        let mut accum = TextAccum::new(p, t0);
+        while let Some(t1) = accum.accum() {
+            match t1 {
+                TokenTree::Group(d) if d.delimiter() == Delimiter::Brace => {
+                    break;
+                }
+                _ => {}
+            }
+        }
+
+        // Parse the text with LALRPOP.
+        let (text, span) = accum.into_accumulated_result();
+        let r = javap::parse_class_decl(span, &text)?;
         Ok(Some(r))
     }
 
     fn description() -> String {
-        format!("output from `javap -public -s`")
+        format!("class definition (copy/paste the output from `javap -public`)")
     }
 }
 
-#[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
-pub struct ClassInfo {
+#[derive(Clone, Debug)]
+pub struct ReflectedClassInfo {
+    pub span: Span,
     pub flags: Flags,
     pub name: DotId,
     pub kind: ClassKind,
-    pub generics: Vec<Id>,
+}
+
+#[derive(Clone, Debug)]
+pub struct ClassInfo {
+    pub span: Span,
+    pub flags: Flags,
+    pub name: DotId,
+    pub kind: ClassKind,
+    pub generics: Vec<Generic>,
     pub extends: Option<ClassRef>,
     pub implements: Vec<ClassRef>,
     pub constructors: Vec<Constructor>,
     pub fields: Vec<Field>,
     pub methods: Vec<Method>,
+}
+
+impl ClassInfo {
+    pub fn parse(text: &str, span: Span) -> Result<ClassInfo, SpanError> {
+        javap::parse_class_info(span, &text)
+    }
+}
+
+#[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
+pub struct Generic {
+    pub id: Id,
+    pub extends: Vec<ClassRef>,
+}
+
+impl Generic {
+    pub fn to_ident(&self, span: Span) -> Ident {
+        self.id.to_ident(span)
+    }
+}
+
+impl std::fmt::Display for Generic {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.id)?;
+        if let Some((e0, e1)) = self.extends.split_first() {
+            write!(f, " extends {e0}")?;
+            for ei in e1 {
+                write!(f, " & {ei}")?;
+            }
+        }
+        Ok(())
+    }
 }
 
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
@@ -109,10 +212,29 @@ pub enum Privacy {
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
 pub struct Constructor {
     pub flags: Flags,
-    pub generics: Vec<Id>,
+    pub generics: Vec<Generic>,
     pub argument_tys: Vec<Type>,
     pub throws: Vec<ClassRef>,
-    pub descriptor: Descriptor,
+}
+
+impl Constructor {
+    pub fn to_method_sig(&self, class: &ClassInfo) -> MethodSig {
+        MethodSig {
+            name: class.name.class_name().clone(),
+            generics: self.generics.clone(),
+            argument_tys: self.argument_tys.clone(),
+        }
+    }
+
+    pub fn descriptor(&self) -> String {
+        format!(
+            "({})V",
+            self.argument_tys
+                .iter()
+                .map(|a| a.descriptor())
+                .collect::<String>()
+        )
+    }
 }
 
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
@@ -120,67 +242,39 @@ pub struct Field {
     pub flags: Flags,
     pub name: Id,
     pub ty: Type,
-    pub descriptor: Descriptor,
 }
 
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
 pub struct Method {
     pub flags: Flags,
     pub name: Id,
-    pub generics: Vec<Id>,
+    pub generics: Vec<Generic>,
     pub argument_tys: Vec<Type>,
     pub return_ty: Option<Type>,
     pub throws: Vec<ClassRef>,
-    pub descriptor: Descriptor,
 }
 
-#[derive(Clone, Debug)]
-pub struct SpannedMethodSig {
-    pub method_sig: MethodSig,
-    pub span: Span,
-}
-
-impl Parse for SpannedMethodSig {
-    fn parse(p: &mut crate::parse::Parser) -> Result<Option<Self>, SpanError> {
-        // Parse an individual method. For this, we hackily consume all tokens until a `;`
-        // and make a string out of it, then pass to the lalrpop parser.
-        //
-        // FIXME: clean this up.
-        let Some(t0) = p.eat_token() else {
-            return Ok(None);
-        };
-
-        let mut text: String = t0.to_string();
-        let mut span = t0.span();
-
-        if !is_semi(&t0) {
-            while let Some(t1) = p.eat_token() {
-                text.push_str(&t1.to_string());
-                span = span.join(t1.span()).unwrap_or(span);
-                if is_semi(&t1) {
-                    break;
-                }
-            }
-        }
-
-        return match class_info::javap::parse_method_sig(&text) {
-            Ok(ms) => Ok(Some(SpannedMethodSig {
-                method_sig: ms,
-                span,
-            })),
-            Err(message) => return Err(SpanError { span, message }),
-        };
-
-        fn is_semi(t: &TokenTree) -> bool {
-            match t {
-                TokenTree::Punct(p) => p.as_char() == ';',
-                _ => false,
-            }
+impl Method {
+    pub fn to_method_sig(&self) -> MethodSig {
+        MethodSig {
+            name: self.name.clone(),
+            generics: self.generics.clone(),
+            argument_tys: self.argument_tys.clone(),
         }
     }
 
-    fn description() -> String {
-        format!("java method signature")
+    pub fn descriptor(&self) -> String {
+        format!(
+            "({}){}",
+            self.argument_tys
+                .iter()
+                .map(|a| a.descriptor())
+                .collect::<String>(),
+            self.return_ty
+                .as_ref()
+                .map(|r| r.descriptor())
+                .unwrap_or_else(|| format!("V")),
+        )
     }
 }
 
@@ -190,19 +284,28 @@ impl Parse for SpannedMethodSig {
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
 pub struct MethodSig {
     pub name: Id,
-    pub generics: Vec<Id>,
+    pub generics: Vec<Generic>,
     pub argument_tys: Vec<Type>,
 }
 
-impl MethodSig {
-    pub fn matches(&self, m: &Method) -> bool {
-        m.name == self.name && m.generics == self.generics && m.argument_tys == self.argument_tys
-    }
-
-    pub fn matches_constructor(&self, class: &ClassInfo, ctor: &Constructor) -> bool {
-        class.name.is_class(&self.name)
-            && ctor.generics == self.generics
-            && ctor.argument_tys == self.argument_tys
+impl std::fmt::Display for MethodSig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some((generic_id0, generic_ids)) = self.generics.split_first() {
+            write!(f, "<{generic_id0}")?;
+            for id in generic_ids {
+                write!(f, ", {id}")?;
+            }
+            write!(f, "> ")?;
+        }
+        write!(f, "{}(", self.name)?;
+        if let Some((ty0, tys)) = self.argument_tys.split_first() {
+            write!(f, "{ty0}")?;
+            for ty in tys {
+                write!(f, ", {ty}")?;
+            }
+        }
+        write!(f, ")")?;
+        Ok(())
     }
 }
 
@@ -212,11 +315,35 @@ pub struct ClassRef {
     pub generics: Vec<RefType>,
 }
 
+impl std::fmt::Display for ClassRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.name)?;
+        if let Some((ty0, tys)) = self.generics.split_first() {
+            write!(f, "<{ty0}")?;
+            for ty in tys {
+                write!(f, ", {ty}")?;
+            }
+            write!(f, ">")?;
+        }
+        Ok(())
+    }
+}
+
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
 pub enum Type {
     Ref(RefType),
     Scalar(ScalarType),
     Repeat(Arc<Type>),
+}
+
+impl std::fmt::Display for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Type::Ref(t) => write!(f, "{t}"),
+            Type::Scalar(t) => write!(f, "{t}"),
+            Type::Repeat(t) => write!(f, "{t}..."),
+        }
+    }
 }
 
 impl Type {
@@ -229,6 +356,10 @@ impl Type {
             Type::Repeat(t) => NonRepeatingType::Ref(RefType::Array(t.clone())),
         }
     }
+
+    pub fn descriptor(&self) -> String {
+        self.to_non_repeating().descriptor()
+    }
 }
 
 /// A variant of type
@@ -236,6 +367,34 @@ impl Type {
 pub enum NonRepeatingType {
     Ref(RefType),
     Scalar(ScalarType),
+}
+
+impl NonRepeatingType {
+    pub fn descriptor(&self) -> String {
+        match self {
+            NonRepeatingType::Ref(r) => match r {
+                RefType::Class(c) => format!("L{};", c.name.with_slashes()),
+                RefType::Array(r) => format!("[{}", r.descriptor()),
+
+                // FIXME(#42): The descriptor actually depends on how the type
+                // parameter was declared!
+                RefType::TypeParameter(_)
+                | RefType::Extends(_)
+                | RefType::Super(_)
+                | RefType::Wildcard => format!("Ljava/lang/Object;"),
+            },
+            NonRepeatingType::Scalar(s) => match s {
+                ScalarType::Int => format!("I"),
+                ScalarType::Long => format!("J"),
+                ScalarType::Short => format!("S"),
+                ScalarType::Byte => format!("B"),
+                ScalarType::F64 => format!("D"),
+                ScalarType::F32 => format!("F"),
+                ScalarType::Boolean => format!("Z"),
+                ScalarType::Char => format!("C"),
+            },
+        }
+    }
 }
 
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
@@ -246,6 +405,19 @@ pub enum RefType {
     Extends(Arc<RefType>),
     Super(Arc<RefType>),
     Wildcard,
+}
+
+impl std::fmt::Display for RefType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RefType::Class(c) => write!(f, "{c}"),
+            RefType::Array(e) => write!(f, "{e}[]"),
+            RefType::TypeParameter(id) => write!(f, "{id}"),
+            RefType::Extends(t) => write!(f, "? extends {t}"),
+            RefType::Super(t) => write!(f, "? super {t}"),
+            RefType::Wildcard => write!(f, "?"),
+        }
+    }
 }
 
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
@@ -260,15 +432,17 @@ pub enum ScalarType {
     Char,
 }
 
-#[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
-pub struct Descriptor {
-    pub string: String,
-}
-
-impl From<&str> for Descriptor {
-    fn from(value: &str) -> Self {
-        Descriptor {
-            string: value.to_string(),
+impl std::fmt::Display for ScalarType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ScalarType::Int => write!(f, "int"),
+            ScalarType::Long => write!(f, "long"),
+            ScalarType::Short => write!(f, "long"),
+            ScalarType::Byte => write!(f, "byte"),
+            ScalarType::F64 => write!(f, "double"),
+            ScalarType::F32 => write!(f, "float"),
+            ScalarType::Boolean => write!(f, "boolean"),
+            ScalarType::Char => write!(f, "char"),
         }
     }
 }
@@ -307,7 +481,8 @@ impl Id {
     }
 
     pub fn to_ident(&self, span: Span) -> Ident {
-        Ident::new(&self.data, span)
+        let data = self.data.replace("$", "__");
+        Ident::new(&data, span)
     }
 }
 
@@ -338,7 +513,25 @@ impl From<&Id> for DotId {
     }
 }
 
+impl FromIterator<Id> for DotId {
+    fn from_iter<T: IntoIterator<Item = Id>>(iter: T) -> Self {
+        let ids: Vec<Id> = iter.into_iter().collect();
+        assert!(ids.len() >= 1);
+        DotId { ids }
+    }
+}
+
 impl DotId {
+    pub fn new(package: &[Id], class: &Id) -> Self {
+        DotId {
+            ids: package
+                .iter()
+                .chain(std::iter::once(class))
+                .cloned()
+                .collect(),
+        }
+    }
+
     pub fn parse(s: impl AsRef<str>) -> DotId {
         let s: &str = s.as_ref();
         let ids: Vec<Id> = s.split(".").map(Id::from).collect();
@@ -363,6 +556,22 @@ impl DotId {
     pub fn split(&self) -> (&[Id], &Id) {
         let (name, package) = self.ids.split_last().unwrap();
         (package, name)
+    }
+
+    pub fn with_slashes(&self) -> String {
+        self.ids
+            .iter()
+            .map(|id| &id[..])
+            .collect::<Vec<_>>()
+            .join("/")
+    }
+}
+
+impl std::ops::Deref for DotId {
+    type Target = [Id];
+
+    fn deref(&self) -> &Self::Target {
+        &self.ids
     }
 }
 

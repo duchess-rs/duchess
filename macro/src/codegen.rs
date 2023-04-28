@@ -1,8 +1,10 @@
 use crate::{
+    argument::DuchessDeclaration,
     class_info::{
-        ClassRef, Constructor, DotId, Id, Method, NonRepeatingType, RefType, ScalarType,
-        SpannedClassInfo, SpannedPackageInfo, Type,
+        ClassInfo, ClassRef, Constructor, DotId, Generic, Id, Method, NonRepeatingType, RefType,
+        RootMap, ScalarType, SpannedPackageInfo, Type,
     },
+    reflect::Reflector,
     span_error::SpanError,
 };
 use inflector::Inflector;
@@ -10,6 +12,23 @@ use once_cell::sync::OnceCell;
 use proc_macro2::{Ident, Literal, Span, TokenStream};
 use quote::quote_spanned;
 use rust_format::Formatter;
+
+impl DuchessDeclaration {
+    pub fn to_tokens(&self) -> Result<TokenStream, SpanError> {
+        let reflector = &mut Reflector::default();
+        let root_map = self.to_root_map(reflector)?;
+        let () = root_map.check(reflector)?;
+        root_map.to_tokens(reflector)
+    }
+}
+
+impl RootMap {
+    fn to_tokens(self, reflector: &mut Reflector) -> Result<TokenStream, SpanError> {
+        self.to_packages()
+            .map(|p| p.to_tokens(&[], &self, reflector))
+            .collect()
+    }
+}
 
 /// The various pieces that we use to reflect a Java method into Rust.
 struct MethodOutput {
@@ -29,36 +48,50 @@ struct MethodOutput {
 }
 
 impl SpannedPackageInfo {
-    pub fn into_tokens(self, depth: usize) -> Result<TokenStream, SpanError> {
+    fn to_tokens(
+        &self,
+        parents: &[Id],
+        root_map: &RootMap,
+        reflector: &mut Reflector,
+    ) -> Result<TokenStream, SpanError> {
+        let package_id = DotId::new(parents, &self.name);
         let name = Ident::new(&self.name, self.span);
-        let inner: TokenStream = self
+
+        let subpackage_tokens: TokenStream = self
             .subpackages
-            .into_values()
-            .map(|p| p.into_tokens(depth + 1))
-            .chain(self.classes.into_iter().map(|c| c.into_tokens()))
+            .values()
+            .map(|p| p.to_tokens(&package_id, root_map, reflector))
             .collect::<Result<_, _>>()?;
 
-        let path: TokenStream = (1..depth)
-            .map(|_| quote_spanned!(self.span => "::super"))
+        let class_tokens: TokenStream = self
+            .classes
+            .iter()
+            .map(|class_id| root_map.classes[class_id].to_tokens())
+            .collect::<Result<_, _>>()?;
+
+        let supers: Vec<TokenStream> = package_id
+            .iter()
+            .map(|_| quote_spanned!(self.span => super))
             .collect();
 
         Ok(quote_spanned!(self.span =>
             #[allow(unused_imports)]
             pub mod #name {
                 // Import the contents of the parent module that we are created inside
-                use super #path :: *;
+                use #(#supers ::)* *;
 
                 // Import the java package provided by duchess
                 use duchess::java;
 
-                #inner
+                #subpackage_tokens
+                #class_tokens
             }
         ))
     }
 }
 
-impl SpannedClassInfo {
-    pub fn into_tokens(self) -> Result<TokenStream, SpanError> {
+impl ClassInfo {
+    pub fn to_tokens(&self) -> Result<TokenStream, SpanError> {
         let struct_name = self.struct_name();
         let ext_trait_name = self.ext_trait_name();
         let cached_class = self.cached_class();
@@ -67,20 +100,16 @@ impl SpannedClassInfo {
 
         // Convert constructors
         let constructors: Vec<_> = self
-            .info
             .constructors
             .iter()
-            .filter(|c| self.members.contains_constructor(&self.info, c))
             .map(|c| self.constructor(c))
             .collect::<Result<_, _>>()?;
 
         // Convert class methods (not static methods, those are different)
         let object_methods: Vec<_> = self
-            .info
             .methods
             .iter()
             .filter(|m| !m.flags.is_static)
-            .filter(|m| self.members.contains_method(m))
             .map(|m| self.method(m))
             .collect::<Result<_, _>>()?;
 
@@ -91,7 +120,7 @@ impl SpannedClassInfo {
             .map(|m| &m.trait_impl_method)
             .collect();
         let jvm_op_impls: Vec<_> = object_methods.iter().map(|m| &m.jvm_op_impl).collect();
-        let upcast_impls = self.upcast_impls();
+        let upcast_impls = self.upcast_impls()?;
 
         let output = quote_spanned! {
             self.span =>
@@ -104,7 +133,7 @@ impl SpannedClassInfo {
             #[allow(non_camel_case_types)]
             pub trait #ext_trait_name<#(#java_class_generics,)*> : duchess::JvmOp
             where
-                #(#java_class_generics : JavaObject,)*
+                #(#java_class_generics : duchess::JavaObject,)*
             {
                 #(#trait_methods)*
             }
@@ -159,7 +188,7 @@ impl SpannedClassInfo {
         };
 
         if let Ok(f) = std::env::var("DUCHESS_DEBUG") {
-            if f == "*" || f == "1" || self.info.name.to_string().starts_with(&f) {
+            if f == "*" || f == "1" || self.name.to_string().starts_with(&f) {
                 match rust_format::RustFmt::default().format_tokens(output.clone()) {
                     Ok(v) => {
                         eprintln!("{v}");
@@ -174,20 +203,21 @@ impl SpannedClassInfo {
         Ok(output)
     }
 
-    fn upcast_impls(&self) -> TokenStream {
+    fn upcast_impls(&self) -> Result<TokenStream, SpanError> {
         let struct_name = self.struct_name();
         let java_class_generics = self.class_generic_names();
         self
             .resolve_upcasts()
             .map(|r| {
-                let mut sig = Signature::new(&Id::from("supertrait"), self.span, &self.info.generics);
+                let mut sig = Signature::new(&Id::from("supertrait"), self.span, &[])
+                .with_internal_generics(&self.generics)?;
                 let tokens = sig.forbid_capture(|sig| sig.class_ref_ty(r)).unwrap();
-                quote_spanned!(self.span =>
+                Ok(quote_spanned!(self.span =>
                     unsafe impl<#(#java_class_generics,)*> plumbing::Upcast<#tokens> for #struct_name<#(#java_class_generics,)*>
                     where
                         #(#java_class_generics: JavaObject,)*
                     {}
-                )
+                ))
             })
             .collect()
     }
@@ -201,11 +231,10 @@ impl SpannedClassInfo {
             generics: vec![],
         });
 
-        self.info.extends.iter().chain(&self.info.implements).chain(
-            Some(object)
-                .filter(|obj| obj.name != self.info.name)
-                .into_iter(),
-        )
+        self.extends
+            .iter()
+            .chain(&self.implements)
+            .chain(Some(object).filter(|obj| obj.name != self.name).into_iter())
     }
 
     fn cached_class(&self) -> TokenStream {
@@ -228,7 +257,7 @@ impl SpannedClassInfo {
     }
 
     fn constructor(&self, constructor: &Constructor) -> Result<TokenStream, SpanError> {
-        let mut sig = Signature::new(self.info.name.class_name(), self.span, &self.info.generics);
+        let mut sig = Signature::new(self.name.class_name(), self.span, &self.generics);
 
         let input_traits: Vec<_> = constructor
             .argument_tys
@@ -245,7 +274,7 @@ impl SpannedClassInfo {
 
         let java_class_generics = self.class_generic_names();
 
-        let descriptor = Literal::string(&constructor.descriptor.string);
+        let descriptor = constructor.descriptor();
 
         // Code to convert each input appropriately
         let prepare_inputs = self.prepare_inputs(&input_names, &constructor.argument_tys);
@@ -253,7 +282,7 @@ impl SpannedClassInfo {
         let output = quote_spanned!(self.span =>
             impl< #(#java_class_generics,)* > #ty
             where
-                #(#java_class_generics: JavaObject,)*
+                #(#java_class_generics: duchess::JavaObject,)*
             {
                 pub fn new(
                     #(#input_names : impl #input_traits,)*
@@ -278,7 +307,7 @@ impl SpannedClassInfo {
                         #(#input_names,)*
                     >
                     where
-                        #(#java_class_generics: JavaObject,)*
+                        #(#java_class_generics: duchess::JavaObject,)*
                         #(#input_names : #input_traits,)*
                     {
                         type Input<'jvm> = ();
@@ -332,11 +361,8 @@ impl SpannedClassInfo {
     }
 
     fn method(&self, method: &Method) -> Result<MethodOutput, SpanError> {
-        let mut sig = Signature::new(
-            &method.name,
-            self.span,
-            self.info.generics.iter().chain(&method.generics),
-        );
+        let mut sig = Signature::new(&method.name, self.span, &self.generics)
+            .with_internal_generics(&method.generics)?;
 
         let this_ty = self.this_type();
 
@@ -354,7 +380,7 @@ impl SpannedClassInfo {
         let output_trait = sig.method_trait(&method.return_ty)?;
         let jni_return_ty = sig.jni_return_ty(&method.return_ty)?;
 
-        let descriptor = Literal::string(&method.descriptor.string);
+        let descriptor = Literal::string(&method.descriptor());
 
         // Code to convert each input appropriately
         let prepare_inputs = self.prepare_inputs(&input_names, &method.argument_tys);
@@ -366,22 +392,13 @@ impl SpannedClassInfo {
 
         // The generic parameters declared on the Java method.
         let java_class_generics: Vec<_> = self.class_generic_names();
-        let java_method_generics: Vec<_> = method
-            .generics
-            .iter()
-            .map(|g| g.to_ident(self.span))
-            .collect();
 
         // The generic parameters we need on the Rust method, these include:
         //
         // * a type parameter `a0` for each input
         // * a type parameter for each java generic
         // * any fresh generics we created to capture wildcards
-        let rust_method_generics: Vec<_> = input_names
-            .iter()
-            .chain(&java_method_generics)
-            .chain(sig.fresh_generics.iter())
-            .collect();
+        let rust_method_generics: Vec<_> = input_names.iter().chain(&sig.rust_generics).collect();
 
         // The generic parameters we need on the *method struct* (which will implement the `JvmOp`).
         // These include the class generics plus all the generics from the method.
@@ -414,7 +431,6 @@ impl SpannedClassInfo {
             type #rust_method_type_name<#(#rust_method_generics),*>: #output_trait
             where
                 #(#input_names: #input_traits,)*
-                #(#java_method_generics: JavaObject,)*
                 #(#sig_where_clauses,)*
                 ;
 
@@ -424,7 +440,6 @@ impl SpannedClassInfo {
             ) -> Self::#rust_method_type_name<#(#rust_method_generics),*>
             where
                 #(#input_names: #input_traits,)*
-                #(#java_method_generics: JavaObject,)*
                 #(#sig_where_clauses,)*
                 ;
         );
@@ -435,7 +450,6 @@ impl SpannedClassInfo {
                 #rust_method_type_name<Self, #(#method_struct_generics),*>
             where
                 #(#input_names: #input_traits,)*
-                #(#java_method_generics: JavaObject,)*
                 #(#sig_where_clauses,)*
                 ;
 
@@ -445,7 +459,6 @@ impl SpannedClassInfo {
             ) -> Self::#rust_method_type_name<#(#rust_method_generics),*>
             where
                 #(#input_names: #input_traits,)*
-                #(#java_method_generics: JavaObject,)*
                 #(#sig_where_clauses,)*
             {
                 #rust_method_type_name {
@@ -466,8 +479,8 @@ impl SpannedClassInfo {
                 This: JvmOp,
                 for<'jvm> This::Output<'jvm>: AsRef<#this_ty>,
                 #(#input_names: #input_traits,)*
-                #(#java_class_generics: JavaObject,)*
-                #(#java_method_generics: JavaObject,)*
+                #(#java_class_generics: duchess::JavaObject,)*
+                #(#sig_where_clauses,)*
             {
                 type Input<'jvm> = This::Input<'jvm>;
                 type Output<'jvm> = #output_ty;
@@ -520,18 +533,17 @@ impl SpannedClassInfo {
     }
 
     fn struct_name(&self) -> Ident {
-        let tail = self.info.name.class_name();
+        let tail = self.name.class_name();
         Ident::new(&tail, self.span)
     }
 
     fn ext_trait_name(&self) -> Ident {
-        let tail = self.info.name.class_name();
+        let tail = self.name.class_name();
         Ident::new(&format!("{tail}Ext"), self.span)
     }
 
     fn class_generic_names(&self) -> Vec<Ident> {
-        self.info
-            .generics
+        self.generics
             .iter()
             .map(|g| g.to_ident(self.span))
             .collect()
@@ -539,7 +551,7 @@ impl SpannedClassInfo {
 
     fn this_type(&self) -> TokenStream {
         let s = self.struct_name();
-        if self.info.generics.is_empty() {
+        if self.generics.is_empty() {
             quote_spanned!(self.span => #s)
         } else {
             let g: Vec<Ident> = self.class_generic_names();
@@ -549,7 +561,7 @@ impl SpannedClassInfo {
 
     /// Returns a class name with `/`, like `java/lang/Object`.
     fn jni_class_name(&self) -> Literal {
-        self.info.name.to_jni_name(self.span)
+        self.name.to_jni_name(self.span)
     }
 
     fn prepare_inputs(&self, input_names: &[Ident], input_types: &[Type]) -> Vec<TokenStream> {
@@ -574,25 +586,57 @@ struct Signature {
     method_name: Id,
     span: Span,
     in_scope_generics: Vec<Id>,
-    fresh_generics: Vec<Ident>,
+    rust_generics: Vec<Ident>,
     where_clauses: Vec<TokenStream>,
     capture_generics: bool,
 }
 
 impl Signature {
-    pub fn new<'i>(
-        method_name: &Id,
-        span: Span,
-        in_scope_generics: impl IntoIterator<Item = &'i Id>,
-    ) -> Self {
+    /// Creates a signature attached to an item (e.g., a method) named `method_name`,
+    /// declared at `span`, which inherits
+    /// `external_generics` from its class and which declares `internal_generis` on itself.
+    ///
+    /// You can then invoke helper methods to convert java types into Rust types.
+    /// In some cases these conversions may create new entries in `fresh_generics`
+    /// or new entries in `where_clauses`.
+    ///
+    /// The final Rust method needs to include all the parameters from `generics`
+    /// along with the where-clauses from `where_clauses`.
+    pub fn new(method_name: &Id, span: Span, external_generics: &[Generic]) -> Self {
         Signature {
             method_name: method_name.clone(),
             span,
-            in_scope_generics: in_scope_generics.into_iter().cloned().collect(),
-            fresh_generics: vec![],
+            in_scope_generics: external_generics.iter().map(|g| g.id.clone()).collect(),
+            rust_generics: vec![],
             where_clauses: vec![],
             capture_generics: true,
         }
+    }
+
+    pub fn with_internal_generics(self, internal_generics: &[Generic]) -> Result<Self, SpanError> {
+        let mut s = self;
+
+        s.in_scope_generics
+            .extend(internal_generics.iter().map(|g| g.id.clone()));
+
+        // Forbid capture we don't have to worry about things like `X extends ArrayList<?>`.
+        // Actually, we could probably support capture here, but I don't know want to right now.
+        s.forbid_capture(|s| {
+            for g in internal_generics {
+                let ident = g.id.to_ident(s.span);
+                s.rust_generics.push(ident.clone());
+                s.where_clauses
+                    .push(quote_spanned!(s.span => #ident : duchess::JavaObject));
+                for e in &g.extends {
+                    let ty = s.class_ref_ty(e)?;
+                    s.where_clauses
+                        .push(quote_spanned!(s.span => #ident : AsRef<#ty>));
+                }
+            }
+            Ok(())
+        })?;
+
+        Ok(s)
     }
 
     /// Set the `capture_generics` field to false while `op` executes,
@@ -617,11 +661,11 @@ impl Signature {
                 message: format!("unsupported wildcards in `{}`", self.method_name),
             })
         } else {
-            let mut i = self.fresh_generics.len();
+            let mut i = self.rust_generics.len();
             loop {
                 let ident = Ident::new(&format!("Capture{}", i), self.span);
-                if !self.fresh_generics.contains(&ident) {
-                    self.fresh_generics.push(ident.clone());
+                if !self.rust_generics.contains(&ident) {
+                    self.rust_generics.push(ident.clone());
                     self.where_clauses
                         .push(quote_spanned!(self.span => #ident : JavaObject));
                     return Ok(ident);
@@ -810,4 +854,8 @@ impl DotIdExt for DotId {
             package_names.iter().map(|n| Ident::new(n, span)).collect();
         quote_spanned!(span => #(#package_idents ::)* #struct_ident)
     }
+}
+
+trait GenericExt {
+    fn to_where_clause(&self, span: Span) -> TokenStream;
 }
