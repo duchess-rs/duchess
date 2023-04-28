@@ -7,8 +7,6 @@ use duchess::{prelude::*, Global, Jvm, Local};
 // XX: should we automatically attach allow(dead_code)?
 #[allow(dead_code)]
 mod java_auth {
-    use duchess::java::lang::Throwable;
-
     duchess::java_package! {
         package auth;
 
@@ -16,6 +14,7 @@ mod java_auth {
         class AuthorizeRequest { * }
         class HttpAuth { * }
         class HttpRequest { * }
+
         class AuthenticationException { * }
         class AuthenticationExceptionUnauthenticated { * }
         class AuthenticationExceptionInvalidSecurityToken { * }
@@ -25,12 +24,11 @@ mod java_auth {
     }
 
     // XX: can be removed when we automatically look through extends/implements
-    unsafe impl duchess::plumbing::Upcast<Throwable> for AuthenticationException {}
-    unsafe impl duchess::plumbing::Upcast<Throwable> for AuthenticationExceptionUnauthenticated {}
-    unsafe impl duchess::plumbing::Upcast<Throwable> for AuthenticationExceptionInvalidSecurityToken {}
-    unsafe impl duchess::plumbing::Upcast<Throwable> for AuthenticationExceptionInvalidSignature {}
-    unsafe impl duchess::plumbing::Upcast<Throwable> for AuthorizationException {}
-    unsafe impl duchess::plumbing::Upcast<Throwable> for AuthorizationExceptionDenied {}
+    use duchess::java;
+    unsafe impl duchess::plumbing::Upcast<java::lang::Throwable> for AuthenticationExceptionUnauthenticated {}
+    unsafe impl duchess::plumbing::Upcast<java::lang::Throwable> for AuthenticationExceptionInvalidSecurityToken {}
+    unsafe impl duchess::plumbing::Upcast<java::lang::Throwable> for AuthenticationExceptionInvalidSignature {}
+    unsafe impl duchess::plumbing::Upcast<java::lang::Throwable> for AuthorizationExceptionDenied {}
 
     pub use auth::*;
 }
