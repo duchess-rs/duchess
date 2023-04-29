@@ -1,8 +1,6 @@
 use std::marker::PhantomData;
 
-use jni::objects::{AutoLocal, JClass};
-
-use crate::{jvm::JavaObjectExt, plumbing::with_jni_env, JavaObject, Jvm, JvmOp, Local};
+use crate::{jvm::JavaObjectExt, raw::HasEnvPtr, JavaObject, Jvm, JvmOp, Local};
 
 /// A trait to represent safe upcast operations for a [`JavaObject`].
 ///
@@ -69,20 +67,26 @@ where
         input: J::Input<'jvm>,
     ) -> crate::Result<'jvm, Self::Output<'jvm>> {
         let instance = self.op.execute_with(jvm, input)?;
-        let jobject = instance.as_ref().as_jobject();
+        let instance_raw = instance.as_ref().as_raw();
 
         let class = To::class(jvm)?;
-        let class = class.as_jobject();
-        let class: &JClass = (&*class).into();
+        let class_raw = class.as_raw();
 
-        let env = jvm.to_env();
-        if !with_jni_env(env, |env| env.is_instance_of(&jobject, class))? {
-            return Ok(Err(instance));
+        let env = jvm.env();
+        let is_inst = unsafe {
+            env.invoke(
+                |env| env.IsInstanceOf,
+                |env, f| f(env, instance_raw.as_ptr(), class_raw.as_ptr()),
+            ) == jni_sys::JNI_TRUE
+        };
+
+        if is_inst {
+            // XX: Safety: just shown that jobject instanceof To::class
+            let casted = unsafe { std::mem::transmute::<&From, &To>(instance.as_ref()) };
+            Ok(Ok(jvm.local(casted)))
+        } else {
+            Ok(Err(instance))
         }
-
-        let local = with_jni_env(env, |env| env.new_local_ref(jobject))?;
-        // Safety: just shown that jobject instanceof To::class
-        Ok(Ok(unsafe { Local::from_jni(AutoLocal::new(local, env)) }))
     }
 }
 
@@ -138,25 +142,22 @@ where
         input: J::Input<'jvm>,
     ) -> crate::Result<'jvm, Self::Output<'jvm>> {
         let instance = self.op.execute_with(jvm, input)?;
-        let jobject = instance.as_ref().as_jobject();
 
         if cfg!(debug_assertions) {
-            let to_class = To::class(jvm)?;
-            let to_class = to_class.as_jobject();
-            let to_class: &JClass = (&*to_class).into();
+            let class = To::class(jvm)?;
+            let class_raw = class.as_raw();
 
-            let env = jvm.to_env();
-            assert!(!jobject.is_null());
-            let class = env.get_object_class(&jobject).unwrap();
-            assert!(env.is_assignable_from(class, to_class).unwrap());
+            let instance_raw = instance.as_ref().as_raw();
+            assert!(unsafe {
+                jvm.env().invoke(
+                    |env| env.IsInstanceOf,
+                    |env, f| f(env, instance_raw.as_ptr(), class_raw.as_ptr()),
+                ) == jni_sys::JNI_TRUE
+            });
         }
 
-        let env = jvm.to_env();
         // Safety: From: Upcast<To>
-        unsafe {
-            let casted = with_jni_env(env, |env| env.new_local_ref(jobject))?;
-            Ok(Local::from_jni(env.auto_local(casted)))
-        }
+        Ok(jvm.local(unsafe { std::mem::transmute::<&From, &To>(instance.as_ref()) }))
     }
 }
 

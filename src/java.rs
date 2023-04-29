@@ -218,3 +218,4 @@ pub use auto::java::*;
 // XX this isn't a real class in the JVM, since each array type (e.g. Foo[] and int[]) is just a subclass of Object.
 // Should it go somewhere outside of the JDK core classes?
 pub use crate::array::JavaArray as Array;
+pub use crate::array::JavaArrayExt as ArrayExt;
