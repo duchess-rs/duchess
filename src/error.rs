@@ -58,12 +58,33 @@ pub struct JniError(#[from] pub(crate) JniErrorInternal);
 pub(crate) enum JniErrorInternal {
     #[error(transparent)]
     CheckFailure(#[from] jni::errors::Error),
+
     #[error(transparent)]
     Jni(#[from] jni::errors::JniError),
+
+    /// An internal error that can occur when invoking a JVM
+    #[error(transparent)]
+    JvmError(#[from] jni::JvmError),
+
+    /// An internal JNI error that can occur when invoking a JVM
+    #[error(transparent)]
+    StartJvmError(#[from] jni::errors::StartJvmError),
 }
 
 impl<T> From<jni::errors::JniError> for Error<T> {
     fn from(value: jni::errors::JniError) -> Self {
+        Self::from(JniError::from(JniErrorInternal::from(value)))
+    }
+}
+
+impl<T> From<jni::JvmError> for Error<T> {
+    fn from(value: jni::JvmError) -> Self {
+        Self::from(JniError::from(JniErrorInternal::from(value)))
+    }
+}
+
+impl<T> From<jni::errors::StartJvmError> for Error<T> {
+    fn from(value: jni::errors::StartJvmError) -> Self {
         Self::from(JniError::from(JniErrorInternal::from(value)))
     }
 }
