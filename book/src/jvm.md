@@ -9,7 +9,7 @@ The `Jvm` type represents a running Java Virtual Machine (JVM). It is mostly use
 
 ## Starting multiple JVMs
 
-Once a thread has access to a `Jvm`, either by invoking `Jvm::with` or by getting called via JNI, you cannot get access to another one. Invoking `Jvm::with` on a thread that already has access to a Jvm is an error. This is required to ensure safety, because it allows us to be sure that mutably borrowing a `Jvm` instance blocks the thread from performing other `Jvm` operations until that borrow is complete.
+As long as a thread has access to a `Jvm`, either by invoking `Jvm::with` or by getting called via JNI, you cannot get access to another one. Invoking `Jvm::with` on a thread that already has access to a Jvm is an error. This is required to ensure safety, because it allows us to be sure that mutably borrowing a `Jvm` instance blocks the thread from performing other `Jvm` operations until that borrow is complete. Sequential invocations of `Jvm::with` are allowed and will all be attached to that same underlying JVM instance.
 
 Multiple threads can invoke `Jvm::with`, but only one underlying JVM can ever be active at a time. If multiple threads invoke `Jvm::with`, one of them will succeed in starting the JVM, and the others will be attached to that same underlying JVM instance as additional active threads.
 
