@@ -9,7 +9,8 @@ use crate::{
 };
 
 use std::{
-    env,
+    borrow::Cow,
+    fmt::Display,
     marker::PhantomData,
     ops::{Deref, DerefMut},
     ptr::NonNull,
@@ -19,7 +20,7 @@ use jni::{
     objects::{AutoLocal, GlobalRef, JObject, JValueOwned},
     sys, InitArgsBuilder, JNIEnv, JavaVM,
 };
-use once_cell::sync::{Lazy, OnceCell};
+use once_cell::sync::OnceCell;
 
 /// A "jdk op" is a suspended operation that, when executed, will run
 /// on the jvm, producing a value of type `Output`. These ops typically
@@ -105,17 +106,7 @@ pub trait JvmOp: Sized {
 pub trait IsVoid: Default {}
 impl IsVoid for () {}
 
-static GLOBAL_JVM: Lazy<JavaVM> = Lazy::new(|| {
-    let mut jvm_builder = InitArgsBuilder::new()
-        .version(jni::JNIVersion::V8)
-        .option("-Xcheck:jni");
-    if let Ok(classpath) = env::var("CLASSPATH") {
-        jvm_builder = jvm_builder.option(format!("-Djava.class.path={classpath}"));
-    }
-    let jvm_args = jvm_builder.build().unwrap();
-
-    JavaVM::new(jvm_args).unwrap()
-});
+static GLOBAL_JVM: OnceCell<JavaVM> = OnceCell::new();
 
 #[repr(transparent)]
 pub struct Jvm<'jvm> {
@@ -123,10 +114,21 @@ pub struct Jvm<'jvm> {
 }
 
 impl<'jvm> Jvm<'jvm> {
+    fn get_or_default_init_jvm() -> crate::GlobalResult<&'static JavaVM> {
+        GLOBAL_JVM.get_or_try_init(|| {
+            let jvm = JvmBuilder::new().build_jvm()?;
+            Ok(jvm)
+        })
+    }
+
+    pub fn builder<'args>() -> JvmBuilder<'args> {
+        JvmBuilder::new()
+    }
+
     pub fn with<R>(
         op: impl for<'a> FnOnce(&mut Jvm<'a>) -> crate::Result<'a, R>,
     ) -> crate::GlobalResult<R> {
-        let guard = GLOBAL_JVM
+        let guard = Self::get_or_default_init_jvm()?
             .attach_current_thread()
             .map_err(convert_non_throw_jni_error)?;
 
@@ -175,6 +177,48 @@ impl<'jvm> Jvm<'jvm> {
             assert!(!new_global_ref.is_null());
             Global::from_jni(new_global_ref)
         }
+    }
+}
+
+pub struct JvmBuilder<'args> {
+    args_builder: InitArgsBuilder<'args>,
+}
+
+impl<'args> JvmBuilder<'args> {
+    fn new() -> Self {
+        let args_builder = InitArgsBuilder::new()
+            .version(jni::JNIVersion::V8)
+            .option("-Xcheck:jni");
+        JvmBuilder {
+            args_builder
+        }
+    }
+
+    pub fn add_classpath(mut self, classpath: impl Display) -> Self {
+        self.args_builder = self.args_builder.option(format!("-Djava.class.path={classpath}"));
+        self
+    }
+
+    pub fn custom(mut self, opt_string: impl AsRef<str> + Into<Cow<'args, str>>) -> Self {
+        self.args_builder = self.args_builder.option(opt_string);
+        self
+    }
+
+    fn build_jvm(self) -> crate::GlobalResult<JavaVM> {
+        let jvm_args = self.args_builder.build()?;
+        let jvm = JavaVM::new(jvm_args)?;
+        Ok(jvm)
+    }
+
+    /// Launch a new JVM, returning an error if one already exists.
+    pub fn launch<R>(
+        self, op: impl for<'a> FnOnce(&mut Jvm<'a>) -> crate::Result<'a, R>,
+    ) -> crate::GlobalResult<R> {
+        let jvm = self.build_jvm()?;
+        // This unwrap never fails, because in case a JVM already exists `build_jvm` would have
+        // failed first.
+        GLOBAL_JVM.set(jvm).unwrap();
+        Jvm::with(op)
     }
 }
 
