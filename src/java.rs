@@ -1,7 +1,7 @@
 mod auto {
     // Make current crate available as `duchess` for use by the generated code.
-    // NB. in documentation mode, the current crate is already available as duchess.
-    #[cfg(not(doc))]
+    // NB. in doctests, the current crate is already available as duchess.
+    #[cfg(not(doctest))]
     use crate as duchess;
 
     duchess_macro::java_package! {
