@@ -9,7 +9,7 @@ use crate::{jvm::JavaObjectExt, raw::HasEnvPtr, JavaObject, Jvm, JvmOp, Local};
 /// Inherits the rules of [`JavaObject`], but also `S` must be a valid superclass or implemented interface of `Self`.
 /// XX: would this actually allow unsafe behavior in a JNI call? or is it already checked/enforced?
 ///
-/// XX: having to impl Upcast<T> for T on each struct is pretty annoying to get AsRef<T> to work without conflicts
+/// XX: having to impl `Upcast<T>` for T on each struct is pretty annoying to get `AsRef<T>` to work without conflicts
 pub unsafe trait Upcast<S: JavaObject>: JavaObject {}
 
 pub struct TryDowncast<J, From, To> {

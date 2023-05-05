@@ -18,6 +18,7 @@ mod thread;
 /// Contains reusable declarations for classes distributed by the JDK under the `java.*` packages.
 pub mod java;
 
+pub use catch::{CatchNone, CatchSome, Catching};
 pub use duchess_macro::java_package;
 pub use error::{Error, GlobalResult, Result};
 pub use jvm::JavaObject;

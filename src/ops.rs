@@ -46,8 +46,6 @@ identity_jvm_op! {
 /// Types that are able to be used as a Java `T`, either because they will produce a Java `T` (e.g. [`JvmOp`]s that
 /// produce a `T`) or because we can convert into them via a JNI call.
 ///
-/// See [`crate::str::IntoJavaString`].
-///
 /// This is intended to be used as a shorthand trait alias in Duchess fn definitions, like
 /// ```ignore
 /// fn my_java_call(a: impl IntoJava<JavaString>, b: impl IntoJava<JavaArray<i8>>) -> impl JvmOp {
