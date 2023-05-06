@@ -7,7 +7,7 @@ use crate::{
     ops::IntoJava,
     plumbing::JavaObjectExt,
     raw::{HasEnvPtr, ObjectPtr},
-    Error, IntoRust, IntoScalar, JavaObject, JavaType, Jvm, JvmOp, Local, ScalarMethod,
+    Error, IntoRust, JavaObject, JavaType, Jvm, JvmOp, Local, ScalarMethod,
 };
 
 pub struct JavaArray<T: JavaType> {
@@ -60,8 +60,8 @@ where
 {
     type Output<'jvm> = jni_sys::jsize;
 
-    fn execute_with<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
-        let this = self.this.execute_with(jvm)?;
+    fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
+        let this = self.this.execute(jvm)?;
         let this = this.as_ref().as_raw();
 
         let len = unsafe {
@@ -114,7 +114,7 @@ macro_rules! primivite_array {
                 for<'jvm> J::Output<'jvm>: AsRef<JavaArray<$rust>>,
             {
                 fn into_rust<'jvm>(self, jvm: &mut Jvm<'jvm>) -> $crate::Result<'jvm, Vec<$rust>> {
-                    let array = self.execute_with(jvm)?;
+                    let array = self.execute(jvm)?;
                     let array = jvm.local(array.as_ref());
 
                     let len = array.length().execute(jvm)?;

@@ -45,7 +45,7 @@ where
     for<'jvm> J::Output<'jvm>: AsRef<JavaString>,
 {
     fn into_rust<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, String> {
-        let output = self.execute_with(jvm)?;
+        let output = self.execute(jvm)?;
         let str_raw = output.as_ref().as_raw();
 
         let env = jvm.env();

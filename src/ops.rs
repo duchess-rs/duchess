@@ -11,7 +11,7 @@ macro_rules! identity_jvm_op {
             impl<$($param)*> JvmOp for $t {
                 type Output<'jvm> = Self;
 
-                fn execute_with<'jvm>(self, _jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
+                fn execute<'jvm>(self, _jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
                     Ok(self)
                 }
             }
@@ -70,7 +70,7 @@ where
     type Output<'jvm> = <J as JvmOp>::Output<'jvm>;
 
     fn into_java<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
-        self.execute_with(jvm)
+        self.execute(jvm)
     }
 }
 
@@ -85,18 +85,13 @@ pub trait IntoRust<T> {
 /// A [`JvmOp`] that produces a [`Local`] reference to a `T` object.
 /// Local references are values that are only valid in this JNI call.
 /// They can be converted to [`Global`] references.
-pub trait IntoLocal<T: JavaObject>: for<'jvm> JvmOp<Output<'jvm> = Local<'jvm, T>> {
-    fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Local<'jvm, T>>;
-}
+pub trait IntoLocal<T: JavaObject>: for<'jvm> JvmOp<Output<'jvm> = Local<'jvm, T>> {}
 
 impl<J, T> IntoLocal<T> for J
 where
     T: JavaObject,
     J: for<'jvm> JvmOp<Output<'jvm> = Local<'jvm, T>>,
 {
-    fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Local<'jvm, T>> {
-        self.execute_with(jvm)
-    }
 }
 
 /// A [`JvmOp`] that produces an optional [`Local`] reference to a `T`;
@@ -106,7 +101,6 @@ where
 pub trait IntoOptLocal<T: JavaObject>:
     for<'jvm> JvmOp<Output<'jvm> = Option<Local<'jvm, T>>>
 {
-    fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Option<Local<'jvm, T>>>;
 }
 
 impl<J, T> IntoOptLocal<T> for J
@@ -114,44 +108,22 @@ where
     T: JavaObject,
     J: for<'jvm> JvmOp<Output<'jvm> = Option<Local<'jvm, T>>>,
 {
-    fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Option<Local<'jvm, T>>> {
-        self.execute_with(jvm)
-    }
 }
 
 /// A [`JvmOp`] that produces a scalar value, like `i8` or `i32`.
-pub trait IntoScalar<T: JavaScalar>: for<'jvm> JvmOp<Output<'jvm> = T> {
-    fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, T>;
-}
+pub trait IntoScalar<T: JavaScalar>: for<'jvm> JvmOp<Output<'jvm> = T> {}
 
 impl<J, T> IntoScalar<T> for J
 where
     T: JavaScalar,
     J: for<'jvm> JvmOp<Output<'jvm> = T>,
 {
-    fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, T> {
-        self.execute_with(jvm)
-    }
 }
 
 /// A [`JvmOp`] that produces a void (`()`)
-pub trait IntoVoid: for<'jvm> JvmOp<Output<'jvm> = ()> {
-    fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, ()>
-    where
-        Self: JvmOp;
-}
+pub trait IntoVoid: for<'jvm> JvmOp<Output<'jvm> = ()> {}
 
-impl<J> IntoVoid for J
-where
-    J: for<'jvm> JvmOp<Output<'jvm> = ()>,
-{
-    fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, ()>
-    where
-        Self: JvmOp,
-    {
-        self.execute_with(jvm)
-    }
-}
+impl<J> IntoVoid for J where J: for<'jvm> JvmOp<Output<'jvm> = ()> {}
 
 /// A java method, invoked on `B`, that returns a `T` object.
 pub trait JavaMethod<B, T>

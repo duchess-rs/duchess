@@ -4,7 +4,7 @@ use crate::{
     java::lang::{Class, ClassExt, Throwable},
     not_null::NotNull,
     raw::{self, EnvPtr, HasEnvPtr, JvmPtr, ObjectPtr},
-    thread, Error, Global, GlobalResult, IntoLocal, Local,
+    thread, Error, Global, GlobalResult, Local,
 };
 
 use std::{ffi::CStr, fmt::Display, ptr::NonNull};
@@ -62,10 +62,7 @@ pub trait JvmOp: Sized {
         AsUpcast::new(self)
     }
 
-    fn execute_with<'jvm>(
-        self,
-        jvm: &mut Jvm<'jvm>,
-    ) -> crate::Result<'jvm, Self::Output<'jvm>>;
+    fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>>;
 }
 
 /// This trait is only implemented for `()`; it allows the `JvmOp::execute` method to only

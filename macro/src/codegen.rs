@@ -315,7 +315,7 @@ impl ClassInfo {
                     {
                         type Output<'jvm> = Local<'jvm, #ty>;
 
-                        fn execute_with<'jvm>(
+                        fn execute<'jvm>(
                             self,
                             jvm: &mut Jvm<'jvm>,
                         ) -> duchess::Result<'jvm, Self::Output<'jvm>> {
@@ -495,11 +495,11 @@ impl ClassInfo {
             {
                 type Output<'jvm> = #output_ty;
 
-                fn execute_with<'jvm>(
+                fn execute<'jvm>(
                     self,
                     jvm: &mut Jvm<'jvm>,
                 ) -> duchess::Result<'jvm, Self::Output<'jvm>> {
-                    let this = self.this.execute_with(jvm)?;
+                    let this = self.this.execute(jvm)?;
                     let this = this.as_ref().as_raw();
 
                     #(#prepare_inputs)*

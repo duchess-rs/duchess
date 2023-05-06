@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use crate::{jvm::JavaObjectExt, raw::HasEnvPtr, JavaObject, Jvm, JvmOp, Local};
+use crate::{jvm::JavaObjectExt, raw::HasEnvPtr, JavaObject, JvmOp, Local};
 
 /// A trait to represent safe upcast operations for a [`JavaObject`].
 ///
@@ -39,16 +39,6 @@ where
             _marker: PhantomData,
         }
     }
-
-    pub fn execute<'jvm>(
-        self,
-        jvm: &mut Jvm<'jvm>,
-    ) -> crate::Result<'jvm, Result<Local<'jvm, To>, J::Output<'jvm>>>
-    where
-        J: JvmOp,
-    {
-        self.execute_with(jvm)
-    }
 }
 
 impl<J, From, To> JvmOp for TryDowncast<J, From, To>
@@ -60,11 +50,8 @@ where
 {
     type Output<'jvm> = Result<Local<'jvm, To>, J::Output<'jvm>>;
 
-    fn execute_with<'jvm>(
-        self,
-        jvm: &mut crate::Jvm<'jvm>,
-    ) -> crate::Result<'jvm, Self::Output<'jvm>> {
-        let instance = self.op.execute_with(jvm)?;
+    fn execute<'jvm>(self, jvm: &mut crate::Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
+        let instance = self.op.execute(jvm)?;
         let instance_raw = instance.as_ref().as_raw();
 
         let class = To::class(jvm)?;
@@ -115,13 +102,6 @@ where
             _marker: PhantomData,
         }
     }
-
-    pub fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Local<'jvm, To>>
-    where
-        J: JvmOp,
-    {
-        self.execute_with(jvm)
-    }
 }
 
 impl<J, From, To> JvmOp for AsUpcast<J, From, To>
@@ -133,11 +113,8 @@ where
 {
     type Output<'jvm> = Local<'jvm, To>;
 
-    fn execute_with<'jvm>(
-        self,
-        jvm: &mut crate::Jvm<'jvm>,
-    ) -> crate::Result<'jvm, Self::Output<'jvm>> {
-        let instance = self.op.execute_with(jvm)?;
+    fn execute<'jvm>(self, jvm: &mut crate::Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
+        let instance = self.op.execute(jvm)?;
 
         if cfg!(debug_assertions) {
             let class = To::class(jvm)?;
