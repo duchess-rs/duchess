@@ -37,15 +37,14 @@ identity_jvm_op! {
     [R: JavaObject] &R,
     [R: JavaObject] &Local<'_, R>,
     [R: JavaObject] &Global<R>,
-
-    [] &str,
-    [] &String,
 }
 
 /// Types that are able to be used as a Java `T`, either because they will produce a Java `T` (e.g. [`JvmOp`]s that
 /// produce a `T`) or because we can convert into them via a JNI call.
 ///
-/// This is intended to be used as a shorthand trait alias in Duchess fn definitions, like
+/// **Don't implement this directly.** Instead, implement `JvmOp`. This trait is intended
+/// to be used as a shorthand trait alias in Duchess fn definitions, like
+///
 /// ```ignore
 /// fn my_java_call(a: impl IntoJava<JavaString>, b: impl IntoJava<JavaArray<i8>>) -> impl JvmOp {
 ///    // ...

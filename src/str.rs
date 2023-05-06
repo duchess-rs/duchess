@@ -1,19 +1,14 @@
 use std::ffi::CString;
 
 use crate::{
-    error::check_exception,
-    java::lang::String as JavaString,
-    jvm::JavaObjectExt,
-    ops::{IntoJava, IntoRust},
-    plumbing::HasEnvPtr,
-    raw::ObjectPtr,
-    Error, Jvm, JvmOp, Local,
+    error::check_exception, java::lang::String as JavaString, jvm::JavaObjectExt, ops::IntoRust,
+    plumbing::HasEnvPtr, raw::ObjectPtr, Error, Jvm, JvmOp, Local,
 };
 
-impl IntoJava<JavaString> for &str {
+impl JvmOp for &str {
     type Output<'jvm> = Local<'jvm, JavaString>;
 
-    fn into_java<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Local<'jvm, JavaString>> {
+    fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Local<'jvm, JavaString>> {
         let encoded = cesu8::to_java_cesu8(self);
         // SAFETY: cesu8 encodes interior nul bytes as 0xC080
         let c_string = unsafe { CString::from_vec_unchecked(encoded.into_owned()) };
@@ -31,11 +26,11 @@ impl IntoJava<JavaString> for &str {
     }
 }
 
-impl IntoJava<JavaString> for String {
+impl JvmOp for String {
     type Output<'jvm> = Local<'jvm, JavaString>;
 
-    fn into_java<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Local<'jvm, JavaString>> {
-        <&str as IntoJava<JavaString>>::into_java(&self, jvm)
+    fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Local<'jvm, JavaString>> {
+        <&str as JvmOp>::execute(&self, jvm)
     }
 }
 

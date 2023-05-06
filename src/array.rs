@@ -4,7 +4,6 @@ use crate::{
     cast::Upcast,
     error::check_exception,
     java::{self, lang::Class},
-    ops::IntoJava,
     plumbing::JavaObjectExt,
     raw::{HasEnvPtr, ObjectPtr},
     Error, IntoRust, JavaObject, JavaType, Jvm, JvmOp, Local, ScalarMethod,
@@ -75,10 +74,10 @@ where
 macro_rules! primivite_array {
     ($([$rust:ty]: $java_name:literal $java_ty:ident $new_fn:ident $get_fn:ident $set_fn:ident,)*) => {
         $(
-            impl IntoJava<JavaArray<$rust>> for &[$rust] {
+            impl JvmOp for &[$rust] {
                 type Output<'jvm> = Local<'jvm, JavaArray<$rust>>;
 
-                fn into_java<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
+                fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
                     let Ok(len) = self.len().try_into() else {
                         return Err(Error::SliceTooLong(self.len()))
                     };
