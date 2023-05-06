@@ -45,9 +45,9 @@ where
         jvm: &mut Jvm<'jvm>,
     ) -> crate::Result<'jvm, Result<Local<'jvm, To>, J::Output<'jvm>>>
     where
-        J: JvmOp<Input<'jvm> = ()>,
+        J: JvmOp,
     {
-        self.execute_with(jvm, ())
+        self.execute_with(jvm)
     }
 }
 
@@ -58,15 +58,13 @@ where
     From: JavaObject,
     To: Upcast<From>,
 {
-    type Input<'jvm> = J::Input<'jvm>;
     type Output<'jvm> = Result<Local<'jvm, To>, J::Output<'jvm>>;
 
     fn execute_with<'jvm>(
         self,
         jvm: &mut crate::Jvm<'jvm>,
-        input: J::Input<'jvm>,
     ) -> crate::Result<'jvm, Self::Output<'jvm>> {
-        let instance = self.op.execute_with(jvm, input)?;
+        let instance = self.op.execute_with(jvm)?;
         let instance_raw = instance.as_ref().as_raw();
 
         let class = To::class(jvm)?;
@@ -120,9 +118,9 @@ where
 
     pub fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Local<'jvm, To>>
     where
-        J: JvmOp<Input<'jvm> = ()>,
+        J: JvmOp,
     {
-        self.execute_with(jvm, ())
+        self.execute_with(jvm)
     }
 }
 
@@ -133,15 +131,13 @@ where
     From: Upcast<To>,
     To: JavaObject,
 {
-    type Input<'jvm> = J::Input<'jvm>;
     type Output<'jvm> = Local<'jvm, To>;
 
     fn execute_with<'jvm>(
         self,
         jvm: &mut crate::Jvm<'jvm>,
-        input: J::Input<'jvm>,
     ) -> crate::Result<'jvm, Self::Output<'jvm>> {
-        let instance = self.op.execute_with(jvm, input)?;
+        let instance = self.op.execute_with(jvm)?;
 
         if cfg!(debug_assertions) {
             let class = To::class(jvm)?;

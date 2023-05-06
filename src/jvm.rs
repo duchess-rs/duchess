@@ -20,7 +20,6 @@ use once_cell::sync::OnceCell;
 /// over into the JVM, so the more you can chain together your jvm-ops,
 /// the better.
 pub trait JvmOp: Sized {
-    type Input<'jvm>;
     type Output<'jvm>;
 
     fn assert_not_null<T>(self) -> NotNull<Self>
@@ -66,7 +65,6 @@ pub trait JvmOp: Sized {
     fn execute_with<'jvm>(
         self,
         jvm: &mut Jvm<'jvm>,
-        arg: Self::Input<'jvm>,
     ) -> crate::Result<'jvm, Self::Output<'jvm>>;
 }
 

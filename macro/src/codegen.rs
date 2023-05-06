@@ -313,13 +313,11 @@ impl ClassInfo {
                         #(#java_class_generics: duchess::JavaObject,)*
                         #(#input_names : #input_traits,)*
                     {
-                        type Input<'jvm> = ();
                         type Output<'jvm> = Local<'jvm, #ty>;
 
                         fn execute_with<'jvm>(
                             self,
                             jvm: &mut Jvm<'jvm>,
-                            (): (),
                         ) -> duchess::Result<'jvm, Self::Output<'jvm>> {
                             #(#prepare_inputs)*
 
@@ -495,15 +493,13 @@ impl ClassInfo {
                 #(#java_class_generics: duchess::JavaObject,)*
                 #(#sig_where_clauses,)*
             {
-                type Input<'jvm> = This::Input<'jvm>;
                 type Output<'jvm> = #output_ty;
 
                 fn execute_with<'jvm>(
                     self,
                     jvm: &mut Jvm<'jvm>,
-                    input: This::Input<'jvm>,
                 ) -> duchess::Result<'jvm, Self::Output<'jvm>> {
-                    let this = self.this.execute_with(jvm, input)?;
+                    let this = self.this.execute_with(jvm)?;
                     let this = this.as_ref().as_raw();
 
                     #(#prepare_inputs)*

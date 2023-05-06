@@ -20,15 +20,13 @@ where
     J: for<'jvm> JvmOp<Output<'jvm> = Option<Local<'jvm, T>>>,
     T: JavaObject,
 {
-    type Input<'jvm> = J::Input<'jvm>;
     type Output<'jvm> = Local<'jvm, T>;
 
     fn execute_with<'jvm>(
         self,
         jvm: &mut crate::Jvm<'jvm>,
-        input: J::Input<'jvm>,
     ) -> crate::Result<'jvm, Self::Output<'jvm>> {
-        let j = self.j.execute_with(jvm, input)?;
+        let j = self.j.execute_with(jvm)?;
         j.ok_or(Error::NullDeref)
     }
 }

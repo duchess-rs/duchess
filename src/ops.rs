@@ -9,10 +9,9 @@ macro_rules! identity_jvm_op {
     ($([$($param:tt)*] $t:ty,)*) => {
         $(
             impl<$($param)*> JvmOp for $t {
-                type Input<'jvm> = ();
                 type Output<'jvm> = Self;
 
-                fn execute_with<'jvm>(self, _jvm: &mut Jvm<'jvm>, (): ()) -> crate::Result<'jvm, Self::Output<'jvm>> {
+                fn execute_with<'jvm>(self, _jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
                     Ok(self)
                 }
             }
@@ -65,13 +64,13 @@ pub trait IntoJava<T: JavaObject> {
 impl<J, T> IntoJava<T> for J
 where
     T: JavaObject,
-    for<'jvm> J: JvmOp<Input<'jvm> = ()>,
+    for<'jvm> J: JvmOp,
     for<'jvm> J::Output<'jvm>: AsRef<T>,
 {
     type Output<'jvm> = <J as JvmOp>::Output<'jvm>;
 
     fn into_java<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
-        self.execute_with(jvm, ())
+        self.execute_with(jvm)
     }
 }
 
@@ -86,19 +85,17 @@ pub trait IntoRust<T> {
 /// A [`JvmOp`] that produces a [`Local`] reference to a `T` object.
 /// Local references are values that are only valid in this JNI call.
 /// They can be converted to [`Global`] references.
-pub trait IntoLocal<T: JavaObject>:
-    for<'jvm> JvmOp<Input<'jvm> = (), Output<'jvm> = Local<'jvm, T>>
-{
+pub trait IntoLocal<T: JavaObject>: for<'jvm> JvmOp<Output<'jvm> = Local<'jvm, T>> {
     fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Local<'jvm, T>>;
 }
 
 impl<J, T> IntoLocal<T> for J
 where
     T: JavaObject,
-    J: for<'jvm> JvmOp<Input<'jvm> = (), Output<'jvm> = Local<'jvm, T>>,
+    J: for<'jvm> JvmOp<Output<'jvm> = Local<'jvm, T>>,
 {
     fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Local<'jvm, T>> {
-        self.execute_with(jvm, ())
+        self.execute_with(jvm)
     }
 }
 
@@ -107,7 +104,7 @@ where
 /// Local references are values that are only valid in this JNI call.
 /// They can be converted to [`Global`] references.
 pub trait IntoOptLocal<T: JavaObject>:
-    for<'jvm> JvmOp<Input<'jvm> = (), Output<'jvm> = Option<Local<'jvm, T>>>
+    for<'jvm> JvmOp<Output<'jvm> = Option<Local<'jvm, T>>>
 {
     fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Option<Local<'jvm, T>>>;
 }
@@ -115,25 +112,25 @@ pub trait IntoOptLocal<T: JavaObject>:
 impl<J, T> IntoOptLocal<T> for J
 where
     T: JavaObject,
-    J: for<'jvm> JvmOp<Input<'jvm> = (), Output<'jvm> = Option<Local<'jvm, T>>>,
+    J: for<'jvm> JvmOp<Output<'jvm> = Option<Local<'jvm, T>>>,
 {
     fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Option<Local<'jvm, T>>> {
-        self.execute_with(jvm, ())
+        self.execute_with(jvm)
     }
 }
 
 /// A [`JvmOp`] that produces a scalar value, like `i8` or `i32`.
-pub trait IntoScalar<T: JavaScalar>: for<'jvm> JvmOp<Input<'jvm> = (), Output<'jvm> = T> {
+pub trait IntoScalar<T: JavaScalar>: for<'jvm> JvmOp<Output<'jvm> = T> {
     fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, T>;
 }
 
 impl<J, T> IntoScalar<T> for J
 where
     T: JavaScalar,
-    J: for<'jvm> JvmOp<Input<'jvm> = (), Output<'jvm> = T>,
+    J: for<'jvm> JvmOp<Output<'jvm> = T>,
 {
     fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, T> {
-        self.execute_with(jvm, ())
+        self.execute_with(jvm)
     }
 }
 
@@ -141,7 +138,7 @@ where
 pub trait IntoVoid: for<'jvm> JvmOp<Output<'jvm> = ()> {
     fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, ()>
     where
-        Self: JvmOp<Input<'jvm> = ()>;
+        Self: JvmOp;
 }
 
 impl<J> IntoVoid for J
@@ -150,9 +147,9 @@ where
 {
     fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, ()>
     where
-        Self: JvmOp<Input<'jvm> = ()>,
+        Self: JvmOp,
     {
-        self.execute_with(jvm, ())
+        self.execute_with(jvm)
     }
 }
 
@@ -161,7 +158,7 @@ pub trait JavaMethod<B, T>
 where
     B: JvmOp,
     T: JavaObject,
-    for<'jvm> Self: JvmOp<Input<'jvm> = B::Input<'jvm>, Output<'jvm> = Option<Local<'jvm, T>>>,
+    for<'jvm> Self: JvmOp<Output<'jvm> = Option<Local<'jvm, T>>>,
 {
 }
 
@@ -169,7 +166,7 @@ impl<J, B, T> JavaMethod<B, T> for J
 where
     B: JvmOp,
     T: JavaObject,
-    for<'jvm> Self: JvmOp<Input<'jvm> = B::Input<'jvm>, Output<'jvm> = Option<Local<'jvm, T>>>,
+    for<'jvm> Self: JvmOp<Output<'jvm> = Option<Local<'jvm, T>>>,
 {
 }
 
@@ -178,7 +175,7 @@ pub trait ScalarMethod<B, T>
 where
     B: JvmOp,
     T: JavaScalar,
-    for<'jvm> Self: JvmOp<Input<'jvm> = B::Input<'jvm>, Output<'jvm> = T>,
+    for<'jvm> Self: JvmOp<Output<'jvm> = T>,
 {
 }
 
@@ -186,7 +183,7 @@ impl<J, B, T> ScalarMethod<B, T> for J
 where
     B: JvmOp,
     T: JavaScalar,
-    for<'jvm> Self: JvmOp<Input<'jvm> = B::Input<'jvm>, Output<'jvm> = T>,
+    for<'jvm> Self: JvmOp<Output<'jvm> = T>,
 {
 }
 
@@ -194,13 +191,13 @@ where
 pub trait VoidMethod<B>
 where
     B: JvmOp,
-    for<'jvm> Self: JvmOp<Input<'jvm> = B::Input<'jvm>, Output<'jvm> = ()>,
+    for<'jvm> Self: JvmOp<Output<'jvm> = ()>,
 {
 }
 
 impl<J, B> VoidMethod<B> for J
 where
     B: JvmOp,
-    for<'jvm> Self: JvmOp<Input<'jvm> = B::Input<'jvm>, Output<'jvm> = ()>,
+    for<'jvm> Self: JvmOp<Output<'jvm> = ()>,
 {
 }

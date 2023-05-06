@@ -41,11 +41,11 @@ impl IntoJava<JavaString> for String {
 
 impl<J> IntoRust<String> for J
 where
-    for<'jvm> J: JvmOp<Input<'jvm> = ()>,
+    for<'jvm> J: JvmOp,
     for<'jvm> J::Output<'jvm>: AsRef<JavaString>,
 {
     fn into_rust<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, String> {
-        let output = self.execute_with(jvm, ())?;
+        let output = self.execute_with(jvm)?;
         let str_raw = output.as_ref().as_raw();
 
         let env = jvm.env();

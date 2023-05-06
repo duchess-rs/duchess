@@ -58,15 +58,10 @@ where
     for<'jvm> This::Output<'jvm>: AsRef<JavaArray<T>>,
     T: JavaType,
 {
-    type Input<'jvm> = This::Input<'jvm>;
     type Output<'jvm> = jni_sys::jsize;
 
-    fn execute_with<'jvm>(
-        self,
-        jvm: &mut Jvm<'jvm>,
-        input: Self::Input<'jvm>,
-    ) -> crate::Result<'jvm, Self::Output<'jvm>> {
-        let this = self.this.execute_with(jvm, input)?;
+    fn execute_with<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
+        let this = self.this.execute_with(jvm)?;
         let this = this.as_ref().as_raw();
 
         let len = unsafe {
@@ -115,11 +110,11 @@ macro_rules! primivite_array {
 
             impl<J> IntoRust<Vec<$rust>> for J
             where
-                for<'jvm> J: JvmOp<Input<'jvm> = ()>,
+                for<'jvm> J: JvmOp,
                 for<'jvm> J::Output<'jvm>: AsRef<JavaArray<$rust>>,
             {
                 fn into_rust<'jvm>(self, jvm: &mut Jvm<'jvm>) -> $crate::Result<'jvm, Vec<$rust>> {
-                    let array = self.execute_with(jvm, ())?;
+                    let array = self.execute_with(jvm)?;
                     let array = jvm.local(array.as_ref());
 
                     let len = array.length().execute(jvm)?;
