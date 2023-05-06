@@ -2,7 +2,6 @@ use crate::{
     cast::{AsUpcast, TryDowncast, Upcast},
     catch::{CatchNone, Catching},
     find::find_class,
-    inspect::{ArgOp, Inspect},
     java::lang::{Class, ClassExt, Throwable},
     not_null::NotNull,
     raw::{self, EnvPtr, HasEnvPtr, JvmPtr, ObjectPtr},
@@ -24,19 +23,6 @@ use once_cell::sync::OnceCell;
 pub trait JvmOp: Sized {
     type Input<'jvm>;
     type Output<'jvm>;
-
-    /// "Inspect" executes an operation on this value that results in unit
-    /// and then yields up this value again for further use. If the result
-    /// of `self` is the java value `x`, then `self.inspect(|x| x.foo()).bar()`
-    /// is equivalent to the Java code `x.foo(); return x.bar()`.
-    fn inspect<K>(self, op: impl FnOnce(ArgOp<Self>) -> K) -> Inspect<Self, K>
-    where
-        for<'jvm> Self::Output<'jvm>: CloneIn<'jvm>,
-        K: JvmOp,
-        for<'jvm> K: JvmOp<Input<'jvm> = Self::Output<'jvm>, Output<'jvm> = ()>,
-    {
-        Inspect::new(self, op)
-    }
 
     /// Start a set of catch blocks that can handle exceptions thrown by `self`. Multiple
     /// blocks can be added via [`Catching::catch`] for different exception classes, as well as

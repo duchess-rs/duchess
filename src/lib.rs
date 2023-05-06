@@ -5,7 +5,6 @@ mod cast;
 mod catch;
 mod error;
 mod find;
-mod inspect;
 mod jvm;
 mod libjvm;
 mod not_null;
