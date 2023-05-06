@@ -1,6 +1,5 @@
 use crate::{
     cast::{AsUpcast, TryDowncast, Upcast},
-    catch::{CatchNone, Catching},
     find::find_class,
     java::lang::{Class, ClassExt, Throwable},
     not_null::NotNull,
@@ -23,13 +22,6 @@ use once_cell::sync::OnceCell;
 pub trait JvmOp: Sized {
     type Input<'jvm>;
     type Output<'jvm>;
-
-    /// Start a set of catch blocks that can handle exceptions thrown by `self`. Multiple
-    /// blocks can be added via [`Catching::catch`] for different exception classes, as well as
-    /// a finally block.
-    fn catching(self) -> Catching<Self, CatchNone> {
-        Catching::new(self)
-    }
 
     fn assert_not_null<T>(self) -> NotNull<Self>
     where
