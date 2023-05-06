@@ -133,7 +133,7 @@ pub struct ClassInfo {
     pub name: DotId,
     pub kind: ClassKind,
     pub generics: Vec<Generic>,
-    pub extends: Option<ClassRef>,
+    pub extends: Vec<ClassRef>,
     pub implements: Vec<ClassRef>,
     pub constructors: Vec<Constructor>,
     pub fields: Vec<Field>,

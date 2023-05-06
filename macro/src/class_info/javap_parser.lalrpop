@@ -24,17 +24,17 @@ ReflectedClassInfo: ReflectedClassInfo = {
 
 ClassName: DotId = {
     <Id> => DotId::from(<>),
-    DotId => <>,  
+    DotId => <>,
 };
 
 #[inline]
 ClassInfoInline: ClassInfo = {
-    Header? 
-    <l:Flags> <k:ClassKind> <n:ClassName> 
+    Header?
+    <l:Flags> <k:ClassKind> <n:ClassName>
         <g:Generics>
-        <e:("extends" <ClassRef>)?>
+        <e:("extends" <Comma<ClassRef>>)?>
         <i:("implements" <Comma<ClassRef>>)?>
-    "{" 
+    "{"
         <f:Field*>
         <m:MemberFunction*>
     "}" => {
@@ -52,7 +52,7 @@ ClassInfoInline: ClassInfo = {
             name: n,
             kind: k,
             generics: g,
-            extends: e,
+            extends: e.unwrap_or(vec![]),
             implements: i.unwrap_or(vec![]),
             constructors,
             methods,
