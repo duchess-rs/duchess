@@ -27,7 +27,7 @@ duchess::java_package! {
     class BuildStep { * }
 }
 
-fn main() -> duchess::GlobalResult<()> {
+fn run_logger() -> duchess::GlobalResult<()> {
     // FIXME: conflict between interface trait (LoggerExt) and class trait (BuilderExt)
     use crate::log::BuildStepExt;
     use crate::log::LoggerExt;
@@ -47,4 +47,13 @@ fn main() -> duchess::GlobalResult<()> {
         logger.add_event(&event).execute(jvm)?;
         Ok(())
     })
+}
+
+fn main() -> duchess::GlobalResult<()> {
+    run_logger()
+}
+
+#[test]
+fn test() -> duchess::GlobalResult<()> {
+    run_logger()
 }
