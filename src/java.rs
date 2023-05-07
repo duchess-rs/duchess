@@ -111,7 +111,12 @@ mod auto {
             public abstract int indexOf(java.lang.Object);
             public abstract int lastIndexOf(java.lang.Object);
             public abstract java.util.List<E> subList(int, int);
-            public static <E> java.util.List<E> of(E...);
+
+            // FIXME: Java generics from static methods are totally
+            // disjoint from the enclosing Self type, but not in Rust.
+            // How do we bridge this gap most ergonomically?
+            //
+            // public static <E> java.util.List<E> of(E...);
         }
 
         public class java.util.ArrayList<E> implements java.util.List<E> {
