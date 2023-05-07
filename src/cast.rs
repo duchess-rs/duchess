@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use crate::{jvm::JavaObjectExt, raw::HasEnvPtr, refs::AsJRef, JavaObject, JvmOp, Local};
+use crate::{jvm::JavaObjectExt, raw::HasEnvPtr, refs::AsJRef, BaseJRef, JavaObject, JvmOp, Local};
 
 /// A trait to represent safe upcast operations for a [`JavaObject`].
 ///
@@ -12,12 +12,12 @@ use crate::{jvm::JavaObjectExt, raw::HasEnvPtr, refs::AsJRef, JavaObject, JvmOp,
 /// XX: having to impl `Upcast<T>` for T on each struct is pretty annoying to get `AsJRef<T>` to work without conflicts
 pub unsafe trait Upcast<S: JavaObject>: JavaObject {}
 
-pub struct TryDowncast<J, From, To> {
+pub struct TryDowncast<J, To> {
     op: J,
-    _marker: PhantomData<(From, To)>,
+    _marker: PhantomData<To>,
 }
 
-impl<J: Clone, From, To> Clone for TryDowncast<J, From, To> {
+impl<J: Clone, To> Clone for TryDowncast<J, To> {
     fn clone(&self) -> Self {
         Self {
             op: self.op.clone(),
@@ -26,12 +26,11 @@ impl<J: Clone, From, To> Clone for TryDowncast<J, From, To> {
     }
 }
 
-impl<J, From, To> TryDowncast<J, From, To>
+impl<J, To> TryDowncast<J, To>
 where
     J: JvmOp,
-    for<'jvm> J::Output<'jvm>: AsJRef<From>,
-    From: JavaObject,
-    To: Upcast<From>,
+    for<'jvm> J::Output<'jvm>: BaseJRef,
+    To: for<'jvm> Upcast<<J::Output<'jvm> as BaseJRef>::Java>,
 {
     pub(crate) fn new(op: J) -> Self {
         Self {
@@ -41,18 +40,17 @@ where
     }
 }
 
-impl<J, From, To> JvmOp for TryDowncast<J, From, To>
+impl<J, To> JvmOp for TryDowncast<J, To>
 where
     J: JvmOp,
-    for<'jvm> J::Output<'jvm>: AsJRef<From>,
-    From: JavaObject,
-    To: Upcast<From>,
+    for<'jvm> J::Output<'jvm>: BaseJRef,
+    To: for<'jvm> Upcast<<J::Output<'jvm> as BaseJRef>::Java>,
 {
     type Output<'jvm> = Result<Local<'jvm, To>, J::Output<'jvm>>;
 
     fn execute<'jvm>(self, jvm: &mut crate::Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
         let instance = self.op.execute(jvm)?;
-        let instance_raw = instance.as_jref()?.as_raw();
+        let instance_raw = instance.base_jref()?.as_raw();
 
         let class = To::class(jvm)?;
         let class_raw = class.as_raw();
@@ -67,7 +65,7 @@ where
 
         if is_inst {
             // SAFETY: just shown that jobject instanceof To::class
-            let casted = unsafe { std::mem::transmute::<&From, &To>(instance.as_jref()?) };
+            let casted = unsafe { std::mem::transmute::<&_, &To>(instance.base_jref()?) };
             Ok(Ok(jvm.local(casted)))
         } else {
             Ok(Err(instance))
@@ -75,12 +73,12 @@ where
     }
 }
 
-pub struct AsUpcast<J, From, To> {
+pub struct AsUpcast<J, To> {
     op: J,
-    _marker: PhantomData<(From, To)>,
+    _marker: PhantomData<To>,
 }
 
-impl<J: Clone, From, To> Clone for AsUpcast<J, From, To> {
+impl<J: Clone, To> Clone for AsUpcast<J, To> {
     fn clone(&self) -> Self {
         Self {
             op: self.op.clone(),
@@ -89,11 +87,10 @@ impl<J: Clone, From, To> Clone for AsUpcast<J, From, To> {
     }
 }
 
-impl<J, From, To> AsUpcast<J, From, To>
+impl<J, To> AsUpcast<J, To>
 where
     J: JvmOp,
-    for<'jvm> J::Output<'jvm>: AsJRef<From>,
-    From: Upcast<To>,
+    for<'jvm> J::Output<'jvm>: AsJRef<To>,
     To: JavaObject,
 {
     pub(crate) fn new(op: J) -> Self {
@@ -104,11 +101,10 @@ where
     }
 }
 
-impl<J, From, To> JvmOp for AsUpcast<J, From, To>
+impl<J, To> JvmOp for AsUpcast<J, To>
 where
     J: JvmOp,
-    for<'jvm> J::Output<'jvm>: AsJRef<From>,
-    From: Upcast<To>,
+    for<'jvm> J::Output<'jvm>: AsJRef<To>,
     To: JavaObject,
 {
     type Output<'jvm> = Local<'jvm, To>;
@@ -130,7 +126,7 @@ where
         }
 
         // Safety: From: Upcast<To>
-        Ok(jvm.local(unsafe { std::mem::transmute::<&From, &To>(instance.as_jref()?) }))
+        Ok(jvm.local(instance.as_jref()?))
     }
 }
 
@@ -188,7 +184,7 @@ macro_rules! by_type {
                 unreachable!()
             }
             $(
-                else if let Ok($var) = obj.try_downcast::<_, $class>().execute($jvm)? {
+                else if let Ok($var) = obj.try_downcast::<$class>().execute($jvm)? {
                     $arm
                 }
             )*

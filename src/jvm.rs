@@ -5,7 +5,7 @@ use crate::{
     java::lang::{Class, ClassExt, Throwable},
     not_null::NotNull,
     raw::{self, EnvPtr, HasEnvPtr, JvmPtr, ObjectPtr},
-    thread, AsJRef, Error, Global, GlobalResult, Local,
+    thread, AsJRef, BaseJRef, Error, Global, GlobalResult, Local,
 };
 
 use std::{ffi::CStr, fmt::Display, ptr::NonNull};
@@ -41,11 +41,10 @@ pub trait JvmOp: Sized {
     ///    return Err(x);
     /// }
     /// ```
-    fn try_downcast<From, To>(self) -> TryDowncast<Self, From, To>
+    fn try_downcast<To>(self) -> TryDowncast<Self, To>
     where
-        for<'jvm> Self::Output<'jvm>: AsJRef<From>,
-        From: JavaObject,
-        To: Upcast<From>,
+        for<'jvm> Self::Output<'jvm>: BaseJRef,
+        To: for<'jvm> Upcast<<Self::Output<'jvm> as BaseJRef>::Java>,
     {
         TryDowncast::new(self)
     }
@@ -54,10 +53,9 @@ pub trait JvmOp: Sized {
     /// methods defined on any of its super classes or interfaces it implements,
     /// but this can be used to "force" the output of the operation to be typed
     /// as an explicit super type `To`.
-    fn upcast<From, To>(self) -> AsUpcast<Self, From, To>
+    fn upcast<To>(self) -> AsUpcast<Self, To>
     where
-        for<'jvm> Self::Output<'jvm>: AsJRef<From>,
-        From: Upcast<To>,
+        for<'jvm> Self::Output<'jvm>: AsJRef<To>,
         To: JavaObject,
     {
         AsUpcast::new(self)

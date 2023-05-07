@@ -1,8 +1,7 @@
-use duchess::java::lang::{Throwable, ThrowableExt};
+use duchess::java::lang::ThrowableExt;
 use duchess::java::util::{ArrayList, ArrayListExt, HashMap as JavaHashMap, MapExt};
-use std::collections::HashMap;
-
 use duchess::{prelude::*, Global, Jvm, Local};
+use std::collections::HashMap;
 
 // XX: should we automatically attach allow(dead_code)?
 #[allow(dead_code)]
@@ -102,27 +101,41 @@ impl HttpAuth {
                 Err(duchess::Error::Thrown(exception)) => {
                     // XX: is this kind of type switching better handled by a macro?
                     Ok(Err(
-                        // XX: why can't we infer the <Throwable, ? 
-                        if let Ok(x) = exception.try_downcast::<Throwable, java_auth::AuthenticationExceptionUnauthenticated>().execute(jvm)? {
+                        // XX: why can't we infer the <Throwable, ?
+                        if let Ok(x) = exception
+                            .try_downcast::<java_auth::AuthenticationExceptionUnauthenticated>()
+                            .execute(jvm)?
+                        {
                             let message = x.user_message().assert_not_null().into_rust(jvm)?;
                             AuthenticateError::Unathenticated(message)
                         // XX: should we add a .is_instance() alias for try_downcast().is_ok()?
-                        } else if exception.try_downcast::<Throwable, java_auth::AuthenticationExceptionInvalidSecurityToken>().execute(jvm)?.is_ok() {
+                        } else if exception
+                            .try_downcast::<java_auth::AuthenticationExceptionInvalidSecurityToken>(
+                            )
+                            .execute(jvm)?
+                            .is_ok()
+                        {
                             AuthenticateError::InvalidSecurityToken
-                        } else if exception.try_downcast::<Throwable, java_auth::AuthenticationExceptionInvalidSignature>().execute(jvm)?.is_ok() {
+                        } else if exception
+                            .try_downcast::<java_auth::AuthenticationExceptionInvalidSignature>()
+                            .execute(jvm)?
+                            .is_ok()
+                        {
                             AuthenticateError::InvalidSignature
                         } else {
-                            let message = exception.get_message().assert_not_null().into_rust(jvm)?;
+                            let message =
+                                exception.get_message().assert_not_null().into_rust(jvm)?;
                             AuthenticateError::InternalError(message)
-                        }
+                        },
                     ))
                 }
-                // XX: do we want to hide null derefs and other JNI problems? or should they get converted to something 
+                // XX: do we want to hide null derefs and other JNI problems? or should they get converted to something
                 // visible to the user?
                 Err(e) => Err(e),
             }
-        // XX: we should implement a helpful Display/Debug for Error that isn't just "Thrown"
-        }).unwrap()
+            // XX: we should implement a helpful Display/Debug for Error that isn't just "Thrown"
+        })
+        .unwrap()
     }
 
     pub fn authorize(
@@ -136,13 +149,13 @@ impl HttpAuth {
                 Ok(()) => Ok(Ok(())),
                 Err(duchess::Error::Thrown(exception)) => Ok(Err(
                     if let Ok(x) = exception
-                        .try_downcast::<Throwable, java_auth::AuthorizationExceptionDenied>()
+                        .try_downcast::<java_auth::AuthorizationExceptionDenied>()
                         .execute(jvm)?
                     {
-                        let message = x.user_message().assert_not_null().into_rust(jvm)?;
+                        let message = x.user_message().into_rust(jvm)?;
                         AuthorizeError::Denied(message)
                     } else {
-                        let message = exception.get_message().assert_not_null().into_rust(jvm)?;
+                        let message = exception.get_message().into_rust(jvm)?;
                         AuthorizeError::InternalError(message)
                     },
                 )),
