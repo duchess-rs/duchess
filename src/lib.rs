@@ -13,6 +13,7 @@ mod refs;
 mod raw;
 mod ref_;
 mod str;
+mod to_rust;
 mod thread;
 
 /// Contains reusable declarations for classes distributed by the JDK under the `java.*` packages.
@@ -25,6 +26,7 @@ pub use jvm::JavaType;
 pub use jvm::Jvm;
 pub use ref_::{Global, Local};
 pub use refs::{AsJRef, BaseJRef};
+pub use to_rust::IntoRust;
 
 pub use prelude::*;
 
@@ -33,12 +35,13 @@ pub mod codegen_deps {
     pub use once_cell;
 }
 
+/// Contains traits with methods expected to be invoked by end-users.
 pub mod prelude {
     pub use crate::cast::by_type;
     pub use crate::jvm::JvmOp;
     pub use crate::ops::{
-        IntoJava, IntoLocal, IntoOptLocal, IntoRust, IntoScalar, IntoVoid, JavaMethod,
-        ScalarMethod, VoidMethod,
+        IntoJava, IntoLocal, IntoOptLocal, IntoScalar, IntoVoid, JavaMethod, ScalarMethod,
+        VoidMethod,
     };
 }
 

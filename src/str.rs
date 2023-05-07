@@ -1,8 +1,8 @@
 use std::ffi::CString;
 
 use crate::{
-    error::check_exception, java::lang::String as JavaString, jvm::JavaObjectExt, ops::IntoRust,
-    plumbing::HasEnvPtr, raw::ObjectPtr, AsJRef, Error, Jvm, JvmOp, Local,
+    error::check_exception, java::lang::String as JavaString, jvm::JavaObjectExt,
+    plumbing::HasEnvPtr, raw::ObjectPtr, to_rust::IntoRust, AsJRef, Error, Jvm, JvmOp, Local,
 };
 
 impl JvmOp for &str {

@@ -8,8 +8,8 @@ use thiserror::Error;
 use crate::AsJRef;
 use crate::{
     java::lang::{Throwable, ThrowableExt},
-    ops::IntoRust,
     raw::{HasEnvPtr, ObjectPtr},
+    to_rust::IntoRust,
     Global, Jvm, JvmOp, Local,
 };
 
