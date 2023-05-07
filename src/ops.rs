@@ -38,6 +38,8 @@ identity_jvm_op! {
     [R: JavaObject] &R,
     [R: JavaObject] &Local<'_, R>,
     [R: JavaObject] &Global<R>,
+    [R: JavaObject] &Option<Local<'_, R>>,
+    [R: JavaObject] &Option<Global<R>>,
 }
 
 /// Types that are able to be used as a Java `T`, either because they will produce a Java `T` (e.g. [`JvmOp`]s that

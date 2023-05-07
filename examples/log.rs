@@ -39,13 +39,9 @@ fn one_big_call() -> duchess::GlobalResult<()> {
         log::Logger::new()
             .add_event(
                 log::Event::builder()
-                    .assert_not_null()
                     .with_time(java::util::Date::new())
-                    .assert_not_null()
                     .with_name("foo")
-                    .assert_not_null()
-                    .build()
-                    .assert_not_null(),
+                    .build(),
             )
             .execute(jvm)?;
         Ok(())
@@ -63,13 +59,9 @@ fn local_ref_and_two_calls() -> duchess::GlobalResult<()> {
     duchess::Jvm::with(|jvm| {
         let logger = log::Logger::new().execute(jvm)?;
         let event = log::Event::builder()
-            .assert_not_null()
             .with_time(java::util::Date::new())
-            .assert_not_null()
             .with_name("foo")
-            .assert_not_null()
             .build()
-            .assert_not_null()
             .execute(jvm)?;
         logger.add_event(&event).execute(jvm)?;
         logger.add_event(&event).execute(jvm)?;
@@ -89,13 +81,9 @@ fn global_ref_and_two_calls() -> duchess::GlobalResult<()> {
 
     duchess::Jvm::with(|jvm| {
         let event = log::Event::builder()
-            .assert_not_null()
             .with_time(java::util::Date::new())
-            .assert_not_null()
             .with_name("foo")
-            .assert_not_null()
             .build()
-            .assert_not_null()
             .execute(jvm)?;
         logger.add_event(&event).execute(jvm)?;
         logger.add_event(&event).execute(jvm)?;

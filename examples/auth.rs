@@ -197,7 +197,7 @@ impl HttpRequest {
 }
 
 impl Authenticated {
-    // XX: &java_auth:Authenticated doesn't work with AuthenticatedExt::account_id(), nor does impl AsRef<>
+    // XX: &java_auth:Authenticated doesn't work with AuthenticatedExt::account_id(), nor does impl AsJRef<>
     // error[E0599]: the method `account_id` exists for reference `&Authenticated`, but its trait bounds were not satisfied
     //     --> examples/auth.rs:122:31
     //     |

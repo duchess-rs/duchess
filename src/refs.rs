@@ -58,6 +58,20 @@ where
     }
 }
 
+impl<T> BaseJRef for Option<T>
+where
+    T: BaseJRef,
+{
+    type Java = T::Java;
+
+    fn base_jref(&self) -> Result<&T::Java, NullJRef> {
+        match self {
+            Some(r) => r.base_jref(),
+            None => Err(NullJRef),
+        }
+    }
+}
+
 impl<T> From<NullJRef> for Error<T>
 where
     T: AsJRef<Throwable>,
