@@ -6,7 +6,7 @@ use crate::{
     java::{self, lang::Class},
     plumbing::JavaObjectExt,
     raw::{HasEnvPtr, ObjectPtr},
-    Error, IntoRust, JavaObject, JavaType, Jvm, JvmOp, Local, ScalarMethod,
+    AsJRef, Error, IntoRust, JavaObject, JavaType, Jvm, JvmOp, Local, ScalarMethod,
 };
 
 pub struct JavaArray<T: JavaType> {
@@ -33,7 +33,7 @@ pub trait JavaArrayExt<T: JavaType>: JvmOp {
 impl<This, T> JavaArrayExt<T> for This
 where
     This: JvmOp,
-    for<'jvm> This::Output<'jvm>: AsRef<JavaArray<T>>,
+    for<'jvm> This::Output<'jvm>: AsJRef<JavaArray<T>>,
     T: JavaType,
 {
     type Length = Length<Self, T>;
@@ -54,14 +54,14 @@ pub struct Length<This, T> {
 impl<This, T> JvmOp for Length<This, T>
 where
     This: JvmOp,
-    for<'jvm> This::Output<'jvm>: AsRef<JavaArray<T>>,
+    for<'jvm> This::Output<'jvm>: AsJRef<JavaArray<T>>,
     T: JavaType,
 {
     type Output<'jvm> = jni_sys::jsize;
 
     fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
         let this = self.this.execute(jvm)?;
-        let this = this.as_ref().as_raw();
+        let this = this.as_jref()?.as_raw();
 
         let len = unsafe {
             jvm.env()
@@ -110,11 +110,11 @@ macro_rules! primivite_array {
             impl<J> IntoRust<Vec<$rust>> for J
             where
                 for<'jvm> J: JvmOp,
-                for<'jvm> J::Output<'jvm>: AsRef<JavaArray<$rust>>,
+                for<'jvm> J::Output<'jvm>: AsJRef<JavaArray<$rust>>,
             {
                 fn into_rust<'jvm>(self, jvm: &mut Jvm<'jvm>) -> $crate::Result<'jvm, Vec<$rust>> {
                     let array = self.execute(jvm)?;
-                    let array = jvm.local(array.as_ref());
+                    let array = jvm.local(array.as_jref()?);
 
                     let len = array.length().execute(jvm)?;
                     let mut vec = Vec::<$rust>::with_capacity(len as usize);

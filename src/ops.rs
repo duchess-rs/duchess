@@ -1,6 +1,7 @@
 use crate::jvm::JavaScalar;
 use crate::jvm::Jvm;
 use crate::jvm::JvmOp;
+use crate::AsJRef;
 use crate::Global;
 use crate::JavaObject;
 use crate::Local;
@@ -55,7 +56,7 @@ identity_jvm_op! {
 /// my_java_call(a, b).execute(&jvm)?;
 /// ```
 pub trait IntoJava<T: JavaObject> {
-    type Output<'jvm>: AsRef<T>;
+    type Output<'jvm>: AsJRef<T>;
 
     fn into_java<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>>;
 }
@@ -64,7 +65,7 @@ impl<J, T> IntoJava<T> for J
 where
     T: JavaObject,
     for<'jvm> J: JvmOp,
-    for<'jvm> J::Output<'jvm>: AsRef<T>,
+    for<'jvm> J::Output<'jvm>: AsJRef<T>,
 {
     type Output<'jvm> = <J as JvmOp>::Output<'jvm>;
 

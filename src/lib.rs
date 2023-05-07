@@ -9,6 +9,7 @@ mod jvm;
 mod libjvm;
 mod not_null;
 mod ops;
+mod refs;
 mod raw;
 mod ref_;
 mod str;
@@ -23,6 +24,7 @@ pub use jvm::JavaObject;
 pub use jvm::JavaType;
 pub use jvm::Jvm;
 pub use ref_::{Global, Local};
+pub use refs::{AsJRef, BaseJRef};
 
 pub use prelude::*;
 
@@ -48,5 +50,6 @@ pub mod plumbing {
     pub use crate::find::{find_class, find_constructor, find_method};
     pub use crate::global::GlobalOp;
     pub use crate::jvm::JavaObjectExt;
+    pub use crate::refs::NullJRef;
     pub use crate::raw::{FromJniValue, HasEnvPtr, IntoJniValue, MethodPtr, ObjectPtr};
 }

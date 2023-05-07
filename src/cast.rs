@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use crate::{jvm::JavaObjectExt, raw::HasEnvPtr, JavaObject, JvmOp, Local};
+use crate::{jvm::JavaObjectExt, raw::HasEnvPtr, refs::AsJRef, JavaObject, JvmOp, Local};
 
 /// A trait to represent safe upcast operations for a [`JavaObject`].
 ///
@@ -9,7 +9,7 @@ use crate::{jvm::JavaObjectExt, raw::HasEnvPtr, JavaObject, JvmOp, Local};
 /// Inherits the rules of [`JavaObject`], but also `S` must be a valid superclass or implemented interface of `Self`.
 /// XX: would this actually allow unsafe behavior in a JNI call? or is it already checked/enforced?
 ///
-/// XX: having to impl `Upcast<T>` for T on each struct is pretty annoying to get `AsRef<T>` to work without conflicts
+/// XX: having to impl `Upcast<T>` for T on each struct is pretty annoying to get `AsJRef<T>` to work without conflicts
 pub unsafe trait Upcast<S: JavaObject>: JavaObject {}
 
 pub struct TryDowncast<J, From, To> {
@@ -29,7 +29,7 @@ impl<J: Clone, From, To> Clone for TryDowncast<J, From, To> {
 impl<J, From, To> TryDowncast<J, From, To>
 where
     J: JvmOp,
-    for<'jvm> J::Output<'jvm>: AsRef<From>,
+    for<'jvm> J::Output<'jvm>: AsJRef<From>,
     From: JavaObject,
     To: Upcast<From>,
 {
@@ -44,7 +44,7 @@ where
 impl<J, From, To> JvmOp for TryDowncast<J, From, To>
 where
     J: JvmOp,
-    for<'jvm> J::Output<'jvm>: AsRef<From>,
+    for<'jvm> J::Output<'jvm>: AsJRef<From>,
     From: JavaObject,
     To: Upcast<From>,
 {
@@ -52,7 +52,7 @@ where
 
     fn execute<'jvm>(self, jvm: &mut crate::Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
         let instance = self.op.execute(jvm)?;
-        let instance_raw = instance.as_ref().as_raw();
+        let instance_raw = instance.as_jref()?.as_raw();
 
         let class = To::class(jvm)?;
         let class_raw = class.as_raw();
@@ -67,7 +67,7 @@ where
 
         if is_inst {
             // SAFETY: just shown that jobject instanceof To::class
-            let casted = unsafe { std::mem::transmute::<&From, &To>(instance.as_ref()) };
+            let casted = unsafe { std::mem::transmute::<&From, &To>(instance.as_jref()?) };
             Ok(Ok(jvm.local(casted)))
         } else {
             Ok(Err(instance))
@@ -92,7 +92,7 @@ impl<J: Clone, From, To> Clone for AsUpcast<J, From, To> {
 impl<J, From, To> AsUpcast<J, From, To>
 where
     J: JvmOp,
-    for<'jvm> J::Output<'jvm>: AsRef<From>,
+    for<'jvm> J::Output<'jvm>: AsJRef<From>,
     From: Upcast<To>,
     To: JavaObject,
 {
@@ -107,7 +107,7 @@ where
 impl<J, From, To> JvmOp for AsUpcast<J, From, To>
 where
     J: JvmOp,
-    for<'jvm> J::Output<'jvm>: AsRef<From>,
+    for<'jvm> J::Output<'jvm>: AsJRef<From>,
     From: Upcast<To>,
     To: JavaObject,
 {
@@ -120,7 +120,7 @@ where
             let class = To::class(jvm)?;
             let class_raw = class.as_raw();
 
-            let instance_raw = instance.as_ref().as_raw();
+            let instance_raw = instance.as_jref()?.as_raw();
             assert!(unsafe {
                 jvm.env().invoke(
                     |env| env.IsInstanceOf,
@@ -130,7 +130,7 @@ where
         }
 
         // Safety: From: Upcast<To>
-        Ok(jvm.local(unsafe { std::mem::transmute::<&From, &To>(instance.as_ref()) }))
+        Ok(jvm.local(unsafe { std::mem::transmute::<&From, &To>(instance.as_jref()?) }))
     }
 }
 

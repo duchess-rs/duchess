@@ -1,11 +1,11 @@
 use crate::{
     cast::{AsUpcast, TryDowncast, Upcast},
-    global::{GlobalOp, IntoGlobal},
     find::find_class,
+    global::{GlobalOp, IntoGlobal},
     java::lang::{Class, ClassExt, Throwable},
     not_null::NotNull,
     raw::{self, EnvPtr, HasEnvPtr, JvmPtr, ObjectPtr},
-    thread, Error, Global, GlobalResult, Local,
+    thread, AsJRef, Error, Global, GlobalResult, Local,
 };
 
 use std::{ffi::CStr, fmt::Display, ptr::NonNull};
@@ -43,7 +43,7 @@ pub trait JvmOp: Sized {
     /// ```
     fn try_downcast<From, To>(self) -> TryDowncast<Self, From, To>
     where
-        for<'jvm> Self::Output<'jvm>: AsRef<From>,
+        for<'jvm> Self::Output<'jvm>: AsJRef<From>,
         From: JavaObject,
         To: Upcast<From>,
     {
@@ -56,7 +56,7 @@ pub trait JvmOp: Sized {
     /// as an explicit super type `To`.
     fn upcast<From, To>(self) -> AsUpcast<Self, From, To>
     where
-        for<'jvm> Self::Output<'jvm>: AsRef<From>,
+        for<'jvm> Self::Output<'jvm>: AsJRef<From>,
         From: Upcast<To>,
         To: JavaObject,
     {
@@ -267,6 +267,7 @@ pub trait JavaObjectExt: Sized {
     unsafe fn from_raw<'a>(ptr: ObjectPtr) -> &'a Self;
     fn as_raw(&self) -> ObjectPtr;
 }
+
 impl<T: JavaObject> JavaObjectExt for T {
     unsafe fn from_raw<'a>(ptr: ObjectPtr) -> &'a Self {
         // XX: safety

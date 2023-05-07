@@ -177,6 +177,17 @@ impl ClassInfo {
                     }
                 }
 
+                impl<#(#java_class_generics,)*> BaseJRef for #struct_name<#(#java_class_generics,)*>
+                where
+                    #(#java_class_generics: duchess::JavaObject,)*
+                {
+                    type Java = Self;
+
+                    fn base_jref(&self) -> std::prelude::v1::Result<&Self, NullJRef> {
+                        Ok(self)
+                    }
+                }
+
                 #upcast_impls
 
                 impl< #(#java_class_generics,)* > #this_ty
@@ -196,7 +207,7 @@ impl ClassInfo {
                 impl<This, #(#java_class_generics,)*> #ext_trait_name<#(#java_class_generics,)*> for This
                 where
                     This: JvmOp,
-                    for<'jvm> This::Output<'jvm>: AsRef<#this_ty>,
+                    for<'jvm> This::Output<'jvm>: duchess::AsJRef<#this_ty>,
                     #(#java_class_generics: duchess::JavaObject,)*
                 {
                     #(#trait_impl_methods)*
@@ -506,7 +517,7 @@ impl ClassInfo {
             for #rust_method_type_name<This, #(#method_struct_generics),*>
             where
                 This: JvmOp,
-                for<'jvm> This::Output<'jvm>: AsRef<#this_ty>,
+                for<'jvm> This::Output<'jvm>: duchess::AsJRef<#this_ty>,
                 #(#input_names: #input_traits,)*
                 #(#java_class_generics: duchess::JavaObject,)*
                 #(#sig_where_clauses,)*
@@ -518,7 +529,8 @@ impl ClassInfo {
                     jvm: &mut Jvm<'jvm>,
                 ) -> duchess::Result<'jvm, Self::Output<'jvm>> {
                     let this = self.this.execute(jvm)?;
-                    let this = this.as_ref().as_raw();
+                    let this: & #this_ty = this.as_jref()?;
+                    let this = this.as_raw();
 
                     #(#prepare_inputs)*
 
@@ -748,7 +760,7 @@ impl ClassInfo {
                 ),
                 NonRepeatingType::Ref(_) => quote_spanned!(self.span =>
                     let #input_name = self.#input_name.into_java(jvm)?;
-                    let #input_name = #input_name.as_ref();
+                    let #input_name = #input_name.as_jref()?;
                 ),
             })
             .collect()
@@ -803,7 +815,7 @@ impl Signature {
                 for e in &g.extends {
                     let ty = s.class_ref_ty(e)?;
                     s.where_clauses
-                        .push(quote_spanned!(s.span => #ident : AsRef<#ty>));
+                        .push(quote_spanned!(s.span => #ident : duchess::AsJRef<#ty>));
                 }
             }
             Ok(())
@@ -986,7 +998,7 @@ impl Signature {
             RefType::Extends(ty) => {
                 let g = self.fresh_generic()?;
                 let e = self.java_ref_ty(ty)?;
-                self.push_where_bound(quote_spanned!(self.span => #g : AsRef<#e>));
+                self.push_where_bound(quote_spanned!(self.span => #g : duchess::AsJRef<#e>));
                 Ok(quote_spanned!(self.span => #g))
             }
             RefType::Super(_) => {
