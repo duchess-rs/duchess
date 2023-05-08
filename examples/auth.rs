@@ -1,6 +1,6 @@
 use duchess::java::lang::ThrowableExt;
 use duchess::java::util::{ArrayList, ArrayListExt, HashMap as JavaHashMap, MapExt};
-use duchess::{prelude::*, Global, Jvm, Local, ToRust};
+use duchess::{java, prelude::*, Global, Jvm, Local, ToRust};
 use std::collections::HashMap;
 use thiserror::Error;
 
@@ -125,38 +125,13 @@ impl JvmOp for &HttpRequest {
     type Output<'jvm> = Local<'jvm, java_auth::HttpRequest>;
 
     fn execute_with<'jvm>(self, jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, Self::Output<'jvm>> {
-        // XX: we should provide utils for constructing java maps and lists
-        let java_params = JavaHashMap::new().execute_with(jvm)?;
-        for (param, values) in &self.params {
-            let java_values = ArrayList::new().execute_with(jvm)?;
-            for value in values {
-                // XX: can we remove explicit .as_str()?
-                java_values.add(value.as_str()).execute_with(jvm)?;
-            }
-            java_params
-                .put(param.as_str(), &java_values)
-                .execute_with(jvm)?;
-        }
-
-        let java_headers = JavaHashMap::new().execute_with(jvm)?;
-        for (header, values) in &self.headers {
-            let java_values = ArrayList::new().execute_with(jvm)?;
-            for value in values {
-                java_values.add(value.as_str()).execute_with(jvm)?;
-            }
-            java_headers
-                .put(header.as_str(), &java_values)
-                .execute_with(jvm)?;
-        }
-
-        // XX: should we allow &[u8] to work automatically for byte[]?
         let body_hash_signed = self.body_hash.iter().map(|&b| b as i8).collect::<Vec<_>>();
         java_auth::HttpRequest::new(
-            self.verb.as_str(),
-            self.path.as_str(),
-            body_hash_signed.as_slice(),
-            &java_params,
-            &java_headers,
+            self.verb.to_java::<java::lang::String>(),
+            self.path.to_java::<java::lang::String>(),
+            body_hash_signed.to_java::<java::Array<i8>>(),
+            self.params.to_java::<java::util::Map<java::lang::String, java::util::List<java::lang::String>>>(),
+            self.headers.to_java::<java::util::Map<java::lang::String, java::util::List<java::lang::String>>>(),
         )
         .execute_with(jvm)
     }

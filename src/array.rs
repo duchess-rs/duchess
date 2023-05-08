@@ -6,6 +6,7 @@ use crate::{
     java::{self, lang::Class},
     plumbing::JavaObjectExt,
     raw::{HasEnvPtr, ObjectPtr},
+    to_java::ToJavaImpl,
     AsJRef, Error, JDeref, JavaObject, JavaType, Jvm, JvmOp, Local, Nullable, ScalarMethod, ToRust,
     TryJDeref,
 };
@@ -120,6 +121,24 @@ macro_rules! primivite_array {
                             len
                         )));
                     }
+                }
+            }
+
+            impl ToJavaImpl<java::Array<$rust>> for [$rust] {
+                fn to_java_impl<'jvm>(
+                    rust: &Self,
+                    jvm: &mut Jvm<'jvm>,
+                ) -> crate::Result<'jvm, Option<Local<'jvm, java::Array<$rust>>>> {
+                    Ok(Some(rust.execute_with(jvm)?))
+                }
+            }
+
+            impl ToJavaImpl<java::Array<$rust>> for Vec<$rust> {
+                fn to_java_impl<'jvm>(
+                    rust: &Self,
+                    jvm: &mut Jvm<'jvm>,
+                ) -> crate::Result<'jvm, Option<Local<'jvm, java::Array<$rust>>>> {
+                    Ok(Some(rust.execute_with(jvm)?))
                 }
             }
 

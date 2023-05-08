@@ -13,6 +13,7 @@ mod refs;
 mod raw;
 mod ref_;
 mod str;
+mod to_java;
 mod to_rust;
 mod try_catch;
 mod thread;
@@ -28,7 +29,7 @@ pub use jvm::Jvm;
 pub use ref_::{Global, Local};
 pub use refs::{AsJRef, JDeref, NullJRef, Nullable, TryJDeref};
 pub use to_rust::ToRust;
-pub use try_catch::{TryCatch};
+pub use try_catch::TryCatch;
 
 pub use prelude::*;
 
@@ -45,6 +46,7 @@ pub mod prelude {
         IntoJava, IntoLocal, IntoOptLocal, IntoScalar, IntoVoid, JavaMethod, ScalarMethod,
         VoidMethod,
     };
+    pub use crate::to_java::ToJava;
 }
 
 /// Internal module containing non-semver protected
