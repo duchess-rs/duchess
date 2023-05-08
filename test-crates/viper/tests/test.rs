@@ -4,8 +4,7 @@ use std::sync::Once;
 static INIT: Once = Once::new();
 
 fn setup_tests() {
-    let classpath = std::env::var("CLASSPATH").unwrap();
-    duchess::Jvm::builder().add_classpath(classpath).launch(|_jvm| Ok(())).unwrap();
+    duchess::Jvm::builder().try_launch().unwrap();
 }
 
 #[test]

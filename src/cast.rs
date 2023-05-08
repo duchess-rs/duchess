@@ -81,7 +81,7 @@ where
         };
 
         if is_inst {
-            // XX: Safety: just shown that jobject instanceof To::class
+            // SAFETY: just shown that jobject instanceof To::class
             let casted = unsafe { std::mem::transmute::<&From, &To>(instance.as_ref()) };
             Ok(Ok(jvm.local(casted)))
         } else {

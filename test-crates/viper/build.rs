@@ -1,6 +1,7 @@
-use std::{env, io, fs, path};
+use std::{env, fs, io, path};
 
-static JAR_URL: &str = "https://github.com/viperproject/viperserver/releases/download/v.23.01-release/viperserver.jar";
+static JAR_URL: &str =
+    "https://github.com/viperproject/viperserver/releases/download/v.23.01-release/viperserver.jar";
 
 fn main() {
     let out_dir_string = env::var("OUT_DIR").unwrap();
