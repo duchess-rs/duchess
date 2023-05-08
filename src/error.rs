@@ -44,7 +44,6 @@ pub enum Error<T: AsRef<Throwable>> {
     #[error(transparent)]
     UnableToLoadLibjvm(#[from] Box<dyn std::error::Error + Send + 'static>),
 
-    /// XX: name?
     #[error("{0}")]
     JvmInternal(String),
 }
