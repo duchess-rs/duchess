@@ -110,34 +110,12 @@ impl HttpAuth {
         authn: &Authenticated,
         authz: &AuthorizeRequest,
     ) -> Result<(), AuthorizeError> {
-        Jvm::with(
-            |jvm| match self.0.authorize(authn, authz).execute_with(jvm) {
-                Ok(()) => Ok(Ok(())),
-                Err(duchess::Error::Thrown(exception)) => Ok(Err(
-                    if let Ok(x) = exception
-                        .try_downcast::<java_auth::AuthorizationExceptionDenied>()
-                        .execute_with(jvm)?
-                    {
-                        let message = x
-                            .user_message()
-                            .assert_not_null()
-                            .to_rust()
-                            .execute_with(jvm)?;
-                        AuthorizeError::Denied(message)
-                    } else {
-                        let message = exception
-                            .get_message()
-                            .assert_not_null()
-                            .to_rust()
-                            .execute_with(jvm)?;
-                        AuthorizeError::InternalError(message)
-                    },
-                )),
-
-                Err(e) => Err(e),
-            },
-        )
-        .unwrap()
+        self.0
+            .authorize(authn, authz)
+            .catch::<duchess::java::lang::Throwable>()
+            .to_rust()
+            .execute()
+            .unwrap()
     }
 }
 
@@ -234,6 +212,29 @@ impl ToRust<AuthenticateError> for duchess::java::lang::Throwable {
                 .to_rust()
                 .execute_with(jvm)?;
             Ok(AuthenticateError::InternalError(message))
+        }
+    }
+}
+
+impl ToRust<AuthorizeError> for duchess::java::lang::Throwable {
+    fn to_rust<'jvm>(&self, jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, AuthorizeError> {
+        if let Ok(x) = self
+            .try_downcast::<java_auth::AuthorizationExceptionDenied>()
+            .execute_with(jvm)?
+        {
+            let message = x
+                .user_message()
+                .assert_not_null()
+                .to_rust()
+                .execute_with(jvm)?;
+            Ok(AuthorizeError::Denied(message))
+        } else {
+            let message = self
+                .get_message()
+                .assert_not_null()
+                .to_rust()
+                .execute_with(jvm)?;
+            Ok(AuthorizeError::InternalError(message))
         }
     }
 }

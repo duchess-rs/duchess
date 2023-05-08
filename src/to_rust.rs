@@ -10,6 +10,28 @@ pub trait ToRust<R> {
     fn to_rust<'jvm>(&self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, R>;
 }
 
+macro_rules! identity_rust_op {
+    ($($t:ty,)*) => {
+        $(
+            impl ToRust<$t> for $t {
+                fn to_rust<'jvm>(&self, _jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, $t> {
+                    Ok(*self)
+                }
+            }
+        )*
+    }
+}
+
+identity_rust_op! {
+    (),
+    bool,
+    u16, // java char
+    i8,
+    i16,
+    i32,
+    i64,
+}
+
 impl<O, E, JO, JE> ToRust<Result<O, E>> for Result<JO, JE>
 where
     JO: ToRust<O>,
