@@ -5,7 +5,7 @@ use crate::{
     java::lang::{Class, ClassExt, Throwable},
     not_null::NotNull,
     raw::{self, EnvPtr, HasEnvPtr, JvmPtr, ObjectPtr},
-    thread, AsJRef, BaseJRef, Error, Global, GlobalResult, Local,
+    thread, AsJRef, TryJDeref, Error, Global, GlobalResult, Local,
 };
 
 use std::{ffi::CStr, fmt::Display, ptr::NonNull};
@@ -43,8 +43,8 @@ pub trait JvmOp: Sized {
     /// ```
     fn try_downcast<To>(self) -> TryDowncast<Self, To>
     where
-        for<'jvm> Self::Output<'jvm>: BaseJRef,
-        To: for<'jvm> Upcast<<Self::Output<'jvm> as BaseJRef>::Java>,
+        for<'jvm> Self::Output<'jvm>: TryJDeref,
+        To: for<'jvm> Upcast<<Self::Output<'jvm> as TryJDeref>::Java>,
     {
         TryDowncast::new(self)
     }

@@ -1,72 +1,114 @@
 use crate::{cast::Upcast, java::lang::Throwable, Error, Global, JavaObject, Local};
 
 /// Possibly null reference to a Java object.
-pub trait AsJRef<U>: BaseJRef {
-    fn as_jref(&self) -> Result<&U, NullJRef>;
+pub trait AsJRef<U>: TryJDeref {
+    fn as_jref(&self) -> Nullable<&U>;
 }
 
+/// Marker type used to indicate an attempt to dereference a null java reference.
+/// See [`TryJDeref`][] trait.
 pub struct NullJRef;
+
+pub type Nullable<T> = Result<T, NullJRef>;
 
 impl<'jvm, T, U> AsJRef<U> for T
 where
-    T: BaseJRef,
+    T: TryJDeref,
     T::Java: Upcast<U>,
     U: JavaObject,
 {
-    fn as_jref(&self) -> Result<&U, NullJRef> {
-        let this = self.base_jref()?;
+    fn as_jref(&self) -> Nullable<&U> {
+        let this = self.try_jderef()?;
         Ok(unsafe { std::mem::transmute(this) })
     }
 }
 
-/// Possibly null reference to a Java object.
-pub trait BaseJRef {
+/// Reference to a Java object that may or may not be null.
+/// Implemented both by non-null references like `Global<java::lang::Object>`
+/// or `&java::lang::Object` and by maybe-null references like `Option<Global<java::lang::Object>>`.
+pub trait TryJDeref {
+    /// The Java type (e.g., [`java::lang::Object`][`crate::java::lang::Object`]).
     type Java: JavaObject;
-    fn base_jref(&self) -> Result<&Self::Java, NullJRef>;
+
+    /// Dereference to a plain reference to the java object, or `Err` if it is null.
+    fn try_jderef(&self) -> Nullable<&Self::Java>;
 }
 
-impl<T> BaseJRef for &T
+/// Reference to a Java object that cannot be null (e.g., `Global<java::lang::Object>`).
+pub trait JDeref: TryJDeref {
+    /// Dereference to a plain reference to the java object.
+    fn jderef(&self) -> &Self::Java;
+}
+
+impl<T> TryJDeref for &T
 where
-    T: BaseJRef,
+    T: TryJDeref,
 {
     type Java = T::Java;
 
-    fn base_jref(&self) -> Result<&T::Java, NullJRef> {
-        T::base_jref(self)
+    fn try_jderef(&self) -> Nullable<&T::Java> {
+        T::try_jderef(self)
     }
 }
 
-impl<T> BaseJRef for Local<'_, T>
+impl<T> JDeref for &T
+where
+    T: JDeref,
+{
+    fn jderef(&self) -> &T::Java {
+        T::jderef(self)
+    }
+}
+
+impl<T> TryJDeref for Local<'_, T>
 where
     T: JavaObject,
 {
     type Java = T;
 
-    fn base_jref(&self) -> Result<&T, NullJRef> {
+    fn try_jderef(&self) -> Nullable<&T> {
         Ok(self)
     }
 }
 
-impl<T> BaseJRef for Global<T>
+impl<T> JDeref for Local<'_, T>
+where
+    T: JavaObject,
+{
+    fn jderef(&self) -> &T {
+        self
+    }
+}
+
+impl<T> TryJDeref for Global<T>
 where
     T: JavaObject,
 {
     type Java = T;
 
-    fn base_jref(&self) -> Result<&T, NullJRef> {
+    fn try_jderef(&self) -> Nullable<&T> {
         Ok(self)
     }
 }
 
-impl<T> BaseJRef for Option<T>
+impl<T> JDeref for Global<T>
 where
-    T: BaseJRef,
+    T: JavaObject,
+{
+    fn jderef(&self) -> &T {
+        self
+    }
+}
+
+impl<T> TryJDeref for Option<T>
+where
+    T: TryJDeref,
 {
     type Java = T::Java;
 
-    fn base_jref(&self) -> Result<&T::Java, NullJRef> {
+    fn try_jderef(&self) -> Result<&T::Java, NullJRef> {
         match self {
-            Some(r) => r.base_jref(),
+            Some(r) => r.try_jderef(),
             None => Err(NullJRef),
         }
     }

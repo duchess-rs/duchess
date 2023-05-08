@@ -6,7 +6,8 @@ use crate::{
     java::{self, lang::Class},
     plumbing::JavaObjectExt,
     raw::{HasEnvPtr, ObjectPtr},
-    AsJRef, Error, IntoRust, JavaObject, JavaType, Jvm, JvmOp, Local, ScalarMethod,
+    AsJRef, Error, IntoRust, JDeref, JavaObject, JavaType, Jvm, JvmOp, Local, Nullable,
+    ScalarMethod, TryJDeref,
 };
 
 pub struct JavaArray<T: JavaType> {
@@ -21,8 +22,23 @@ unsafe impl<T: JavaType> JavaObject for JavaArray<T> {
 
 // Upcasts
 unsafe impl<T: JavaType> Upcast<JavaArray<T>> for JavaArray<T> {}
+
 // all arrays extend Object
 unsafe impl<T: JavaType> Upcast<java::lang::Object> for JavaArray<T> {}
+
+impl<T: JavaType> JDeref for JavaArray<T> {
+    fn jderef(&self) -> &Self {
+        self
+    }
+}
+
+impl<T: JavaType> TryJDeref for JavaArray<T> {
+    type Java = Self;
+
+    fn try_jderef(&self) -> Nullable<&Self> {
+        Ok(self)
+    }
+}
 
 // array.length isn't a normal field or method, so hand-generating the traits
 pub trait JavaArrayExt<T: JavaType>: JvmOp {

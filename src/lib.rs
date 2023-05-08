@@ -25,7 +25,7 @@ pub use jvm::JavaObject;
 pub use jvm::JavaType;
 pub use jvm::Jvm;
 pub use ref_::{Global, Local};
-pub use refs::{AsJRef, BaseJRef};
+pub use refs::{AsJRef, JDeref, NullJRef, Nullable, TryJDeref};
 pub use to_rust::IntoRust;
 
 pub use prelude::*;

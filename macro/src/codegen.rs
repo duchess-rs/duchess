@@ -177,13 +177,22 @@ impl ClassInfo {
                     }
                 }
 
-                impl<#(#java_class_generics,)*> BaseJRef for #struct_name<#(#java_class_generics,)*>
+                impl<#(#java_class_generics,)*> JDeref for #struct_name<#(#java_class_generics,)*>
+                where
+                    #(#java_class_generics: duchess::JavaObject,)*
+                {
+                    fn jderef(&self) -> &Self {
+                        self
+                    }
+                }
+
+                impl<#(#java_class_generics,)*> TryJDeref for #struct_name<#(#java_class_generics,)*>
                 where
                     #(#java_class_generics: duchess::JavaObject,)*
                 {
                     type Java = Self;
 
-                    fn base_jref(&self) -> std::prelude::v1::Result<&Self, NullJRef> {
+                    fn try_jderef(&self) -> Nullable<&Self> {
                         Ok(self)
                     }
                 }

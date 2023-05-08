@@ -1,6 +1,8 @@
 use std::marker::PhantomData;
 
-use crate::{jvm::JavaObjectExt, raw::HasEnvPtr, refs::AsJRef, BaseJRef, JavaObject, JvmOp, Local};
+use crate::{
+    jvm::JavaObjectExt, raw::HasEnvPtr, refs::AsJRef, JavaObject, JvmOp, Local, TryJDeref,
+};
 
 /// A trait to represent safe upcast operations for a [`JavaObject`].
 ///
@@ -29,8 +31,8 @@ impl<J: Clone, To> Clone for TryDowncast<J, To> {
 impl<J, To> TryDowncast<J, To>
 where
     J: JvmOp,
-    for<'jvm> J::Output<'jvm>: BaseJRef,
-    To: for<'jvm> Upcast<<J::Output<'jvm> as BaseJRef>::Java>,
+    for<'jvm> J::Output<'jvm>: TryJDeref,
+    To: for<'jvm> Upcast<<J::Output<'jvm> as TryJDeref>::Java>,
 {
     pub(crate) fn new(op: J) -> Self {
         Self {
@@ -43,14 +45,14 @@ where
 impl<J, To> JvmOp for TryDowncast<J, To>
 where
     J: JvmOp,
-    for<'jvm> J::Output<'jvm>: BaseJRef,
-    To: for<'jvm> Upcast<<J::Output<'jvm> as BaseJRef>::Java>,
+    for<'jvm> J::Output<'jvm>: TryJDeref,
+    To: for<'jvm> Upcast<<J::Output<'jvm> as TryJDeref>::Java>,
 {
     type Output<'jvm> = Result<Local<'jvm, To>, J::Output<'jvm>>;
 
     fn execute<'jvm>(self, jvm: &mut crate::Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
         let instance = self.op.execute(jvm)?;
-        let instance_raw = instance.base_jref()?.as_raw();
+        let instance_raw = instance.try_jderef()?.as_raw();
 
         let class = To::class(jvm)?;
         let class_raw = class.as_raw();
@@ -65,7 +67,7 @@ where
 
         if is_inst {
             // SAFETY: just shown that jobject instanceof To::class
-            let casted = unsafe { std::mem::transmute::<&_, &To>(instance.base_jref()?) };
+            let casted = unsafe { std::mem::transmute::<&_, &To>(instance.try_jderef()?) };
             Ok(Ok(jvm.local(casted)))
         } else {
             Ok(Err(instance))
