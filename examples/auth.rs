@@ -1,6 +1,5 @@
 use duchess::java::lang::ThrowableExt;
 use duchess::java::util::{ArrayList, ArrayListExt, HashMap as JavaHashMap, MapExt};
-use duchess::IntoRust;
 use duchess::{prelude::*, Global, Jvm, Local};
 use std::collections::HashMap;
 
@@ -107,7 +106,8 @@ impl HttpAuth {
                             .try_downcast::<java_auth::AuthenticationExceptionUnauthenticated>()
                             .execute(jvm)?
                         {
-                            let message = x.user_message().assert_not_null().into_rust(jvm)?;
+                            let message =
+                                x.user_message().assert_not_null().to_rust().execute(jvm)?;
                             AuthenticateError::Unathenticated(message)
                         // XX: should we add a .is_instance() alias for try_downcast().is_ok()?
                         } else if exception
@@ -124,8 +124,11 @@ impl HttpAuth {
                         {
                             AuthenticateError::InvalidSignature
                         } else {
-                            let message =
-                                exception.get_message().assert_not_null().into_rust(jvm)?;
+                            let message = exception
+                                .get_message()
+                                .assert_not_null()
+                                .to_rust()
+                                .execute(jvm)?;
                             AuthenticateError::InternalError(message)
                         },
                     ))
@@ -153,10 +156,14 @@ impl HttpAuth {
                         .try_downcast::<java_auth::AuthorizationExceptionDenied>()
                         .execute(jvm)?
                     {
-                        let message = x.user_message().into_rust(jvm)?;
+                        let message = x.user_message().assert_not_null().to_rust().execute(jvm)?;
                         AuthorizeError::Denied(message)
                     } else {
-                        let message = exception.get_message().into_rust(jvm)?;
+                        let message = exception
+                            .get_message()
+                            .assert_not_null()
+                            .to_rust()
+                            .execute(jvm)?;
                         AuthorizeError::InternalError(message)
                     },
                 )),
@@ -221,15 +228,15 @@ impl Authenticated {
     //     |               doesn't satisfy `ferris::Authenticated: duchess::JvmOp`
     //     |               doesn't satisfy `ferris::Authenticated: ferris::AuthenticatedExt`
     //  ...
-    // 122 |         let account_id = auth.account_id().assert_not_null().into_rust(jvm)?;
+    // 122 |         let account_id = auth.account_id().assert_not_null().to_rust().execute(jvm)?;
     //     |                               ^^^^^^^^^^ method cannot be called on `&Authenticated` due to unsatisfied trait bounds
     //     |
     fn from_java<'jvm>(
         jvm: &mut Jvm<'jvm>,
         auth: Local<'jvm, java_auth::Authenticated>,
     ) -> duchess::Result<'jvm, Self> {
-        let account_id = auth.account_id().assert_not_null().into_rust(jvm)?;
-        let user = auth.user().assert_not_null().into_rust(jvm)?;
+        let account_id = auth.account_id().assert_not_null().to_rust().execute(jvm)?;
+        let user = auth.user().assert_not_null().to_rust().execute(jvm)?;
         let state = jvm.global(&*auth);
         Ok(Self {
             account_id,

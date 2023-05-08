@@ -9,7 +9,6 @@ use crate::AsJRef;
 use crate::{
     java::lang::{Throwable, ThrowableExt},
     raw::{HasEnvPtr, ObjectPtr},
-    to_rust::IntoRust,
     Global, Jvm, JvmOp, Local,
 };
 
@@ -52,7 +51,11 @@ pub enum Error<T: AsJRef<Throwable>> {
 fn try_extract_message(exception: &impl AsJRef<Throwable>) -> String {
     let message = Jvm::with(|jvm| {
         let exception = jvm.local(exception.as_jref()?);
-        exception.to_string().assert_not_null().into_rust(jvm)
+        exception
+            .to_string()
+            .assert_not_null()
+            .to_rust()
+            .execute(jvm)
     });
     message.unwrap_or_else(|_| "<unable to get exception message>".into())
 }

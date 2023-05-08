@@ -2,7 +2,7 @@ use std::ffi::CString;
 
 use crate::{
     error::check_exception, java::lang::String as JavaString, jvm::JavaObjectExt,
-    plumbing::HasEnvPtr, raw::ObjectPtr, to_rust::IntoRust, AsJRef, Error, Jvm, JvmOp, Local,
+    plumbing::HasEnvPtr, raw::ObjectPtr, to_rust::ToRust, Error, Jvm, JvmOp, Local,
 };
 
 impl JvmOp for &str {
@@ -34,14 +34,11 @@ impl JvmOp for String {
     }
 }
 
-impl<J> IntoRust<String> for J
-where
-    for<'jvm> J: JvmOp,
-    for<'jvm> J::Output<'jvm>: AsJRef<JavaString>,
-{
-    fn into_rust<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, String> {
-        let output = self.execute(jvm)?;
-        let str_raw = output.as_jref()?.as_raw();
+impl ToRust for JavaString {
+    type Rust = String;
+
+    fn to_rust<'jvm>(&self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, String> {
+        let str_raw = self.as_raw();
 
         let env = jvm.env();
 

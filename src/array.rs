@@ -6,8 +6,8 @@ use crate::{
     java::{self, lang::Class},
     plumbing::JavaObjectExt,
     raw::{HasEnvPtr, ObjectPtr},
-    AsJRef, Error, IntoRust, JDeref, JavaObject, JavaType, Jvm, JvmOp, Local, Nullable,
-    ScalarMethod, TryJDeref,
+    AsJRef, Error, JDeref, JavaObject, JavaType, Jvm, JvmOp, Local, Nullable, ScalarMethod, ToRust,
+    TryJDeref,
 };
 
 pub struct JavaArray<T: JavaType> {
@@ -123,22 +123,17 @@ macro_rules! primivite_array {
                 }
             }
 
-            impl<J> IntoRust<Vec<$rust>> for J
-            where
-                for<'jvm> J: JvmOp,
-                for<'jvm> J::Output<'jvm>: AsJRef<JavaArray<$rust>>,
-            {
-                fn into_rust<'jvm>(self, jvm: &mut Jvm<'jvm>) -> $crate::Result<'jvm, Vec<$rust>> {
-                    let array = self.execute(jvm)?;
-                    let array = jvm.local(array.as_jref()?);
+            impl ToRust for JavaArray<$rust> {
+                type Rust = Vec<$rust>;
 
-                    let len = array.length().execute(jvm)?;
+                fn to_rust<'jvm>(&self, jvm: &mut Jvm<'jvm>) -> $crate::Result<'jvm, Vec<$rust>> {
+                    let len = self.length().execute(jvm)?;
                     let mut vec = Vec::<$rust>::with_capacity(len as usize);
 
                     unsafe {
                         jvm.env().invoke(|env| env.$get_fn, |env, f| f(
                             env,
-                            array.as_raw().as_ptr(),
+                            self.as_raw().as_ptr(),
                             0,
                             len,
                             vec.as_mut_ptr().cast::<jni_sys::$java_ty>(),

@@ -5,7 +5,8 @@ use crate::{
     java::lang::{Class, ClassExt, Throwable},
     not_null::NotNull,
     raw::{self, EnvPtr, HasEnvPtr, JvmPtr, ObjectPtr},
-    thread, AsJRef, TryJDeref, Error, Global, GlobalResult, Local,
+    to_rust::ToRustOp,
+    thread, AsJRef, JDeref, ToRust, TryJDeref, Error, Global, GlobalResult, Local,
 };
 
 use std::{ffi::CStr, fmt::Display, ptr::NonNull};
@@ -69,6 +70,16 @@ pub trait JvmOp: Sized {
         for<'jvm> <Self as JvmOp>::Output<'jvm>: IntoGlobal<'jvm>,
     {
         GlobalOp::new(self)
+    }
+
+    /// Given a JVM op that returns some Java type, convert it to its Rust equivalent
+    /// (e.g., from a Java String to a Rust string).
+    fn to_rust<J>(self) -> ToRustOp<Self>
+    where
+        for<'jvm> Self::Output<'jvm>: JDeref<Java = J>,
+        J: ToRust,
+    {
+        ToRustOp::new(self)
     }
 
     fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>>;
