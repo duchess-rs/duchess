@@ -6,8 +6,8 @@ use crate::{
     not_null::NotNull,
     raw::{self, EnvPtr, HasEnvPtr, JvmPtr, ObjectPtr},
     to_rust::ToRustOp,
-    try_catch::{CatchNone, TryCatch},
-    thread, AsJRef, JDeref, ToRust, TryJDeref, Error, Global, GlobalResult, Local,
+    try_catch::TryCatch,
+    thread, AsJRef, ToRust, TryJDeref, Error, Global, GlobalResult, Local,
 };
 
 use std::{ffi::CStr, fmt::Display, ptr::NonNull};
@@ -73,9 +73,9 @@ pub trait JvmOp: Sized {
         GlobalOp::new(self)
     }
 
-    fn try_catch<E>(self) -> TryCatch<Self, CatchNone, E>
+    fn catch<J>(self) -> TryCatch<Self, J>
     where
-        E: std::error::Error,
+        J: Upcast<Throwable>,
     {
         TryCatch::new(self)
     }
@@ -84,8 +84,7 @@ pub trait JvmOp: Sized {
     /// (e.g., from a Java String to a Rust string).
     fn to_rust<R>(self) -> ToRustOp<Self, R>
     where
-        for<'jvm> Self::Output<'jvm>: JDeref,
-        for<'jvm> <Self::Output<'jvm> as TryJDeref>::Java: ToRust<R>,
+        for<'jvm> Self::Output<'jvm>: ToRust<R>,
     {
         ToRustOp::new(self)
     }
