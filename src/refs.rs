@@ -1,7 +1,7 @@
 use crate::{cast::Upcast, java::lang::Throwable, Error, Global, JavaObject, Local};
 
 /// Possibly null reference to a Java object.
-pub trait AsJRef<U> {
+pub trait AsJRef<U>: BaseJRef {
     fn as_jref(&self) -> Result<&U, NullJRef>;
 }
 
