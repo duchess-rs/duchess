@@ -35,7 +35,7 @@ fn compute(
     object: &java::lang::Object,
 ) -> impl IntoJava<java::lang::String> {
     // in here you can call back to JVM too
-    let data = this.data().execute(jvm);
+    let data = this.data().execute_with(jvm);
     format!("Hello from Rust {data}")
 }
 ```

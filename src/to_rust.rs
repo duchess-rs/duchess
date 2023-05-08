@@ -90,8 +90,8 @@ where
 {
     type Output<'jvm> = R;
 
-    fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
-        let java = self.this.execute(jvm)?;
+    fn execute_with<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
+        let java = self.this.execute_with(jvm)?;
         let rust = ToRust::to_rust(&java, jvm)?;
         Ok(rust)
     }

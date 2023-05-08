@@ -92,7 +92,7 @@ pub enum AuthorizeError {
 impl HttpAuth {
     pub fn new() -> duchess::GlobalResult<Self> {
         let auth = Jvm::with(|jvm| {
-            let auth = java_auth::HttpAuth::new().execute(jvm)?;
+            let auth = java_auth::HttpAuth::new().execute_with(jvm)?;
             Ok(jvm.global(&*auth))
         })?;
         Ok(Self(auth))
@@ -105,7 +105,7 @@ impl HttpAuth {
                 .assert_not_null()
                 .catch::<duchess::java::lang::Throwable>()
                 .to_rust()
-                .execute(jvm)
+                .execute_with(jvm)
         })
         .unwrap()
     }
@@ -115,27 +115,33 @@ impl HttpAuth {
         authn: &Authenticated,
         authz: &AuthorizeRequest,
     ) -> Result<(), AuthorizeError> {
-        Jvm::with(|jvm| match self.0.authorize(authn, authz).execute(jvm) {
-            Ok(()) => Ok(Ok(())),
-            Err(duchess::Error::Thrown(exception)) => Ok(Err(
-                if let Ok(x) = exception
-                    .try_downcast::<java_auth::AuthorizationExceptionDenied>()
-                    .execute(jvm)?
-                {
-                    let message = x.user_message().assert_not_null().to_rust().execute(jvm)?;
-                    AuthorizeError::Denied(message)
-                } else {
-                    let message = exception
-                        .get_message()
-                        .assert_not_null()
-                        .to_rust()
-                        .execute(jvm)?;
-                    AuthorizeError::InternalError(message)
-                },
-            )),
+        Jvm::with(
+            |jvm| match self.0.authorize(authn, authz).execute_with(jvm) {
+                Ok(()) => Ok(Ok(())),
+                Err(duchess::Error::Thrown(exception)) => Ok(Err(
+                    if let Ok(x) = exception
+                        .try_downcast::<java_auth::AuthorizationExceptionDenied>()
+                        .execute_with(jvm)?
+                    {
+                        let message = x
+                            .user_message()
+                            .assert_not_null()
+                            .to_rust()
+                            .execute_with(jvm)?;
+                        AuthorizeError::Denied(message)
+                    } else {
+                        let message = exception
+                            .get_message()
+                            .assert_not_null()
+                            .to_rust()
+                            .execute_with(jvm)?;
+                        AuthorizeError::InternalError(message)
+                    },
+                )),
 
-            Err(e) => Err(e),
-        })
+                Err(e) => Err(e),
+            },
+        )
         .unwrap()
     }
 }
@@ -145,27 +151,29 @@ impl HttpAuth {
 impl JvmOp for &HttpRequest {
     type Output<'jvm> = Local<'jvm, java_auth::HttpRequest>;
 
-    fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, Self::Output<'jvm>> {
+    fn execute_with<'jvm>(self, jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, Self::Output<'jvm>> {
         // XX: we should provide utils for constructing java maps and lists
-        let java_params = JavaHashMap::new().execute(jvm)?;
+        let java_params = JavaHashMap::new().execute_with(jvm)?;
         for (param, values) in &self.params {
-            let java_values = ArrayList::new().execute(jvm)?;
+            let java_values = ArrayList::new().execute_with(jvm)?;
             for value in values {
                 // XX: can we remove explicit .as_str()?
-                java_values.add(value.as_str()).execute(jvm)?;
+                java_values.add(value.as_str()).execute_with(jvm)?;
             }
-            java_params.put(param.as_str(), &java_values).execute(jvm)?;
+            java_params
+                .put(param.as_str(), &java_values)
+                .execute_with(jvm)?;
         }
 
-        let java_headers = JavaHashMap::new().execute(jvm)?;
+        let java_headers = JavaHashMap::new().execute_with(jvm)?;
         for (header, values) in &self.headers {
-            let java_values = ArrayList::new().execute(jvm)?;
+            let java_values = ArrayList::new().execute_with(jvm)?;
             for value in values {
-                java_values.add(value.as_str()).execute(jvm)?;
+                java_values.add(value.as_str()).execute_with(jvm)?;
             }
             java_headers
                 .put(header.as_str(), &java_values)
-                .execute(jvm)?;
+                .execute_with(jvm)?;
         }
 
         // XX: should we allow &[u8] to work automatically for byte[]?
@@ -177,15 +185,19 @@ impl JvmOp for &HttpRequest {
             &java_params,
             &java_headers,
         )
-        .execute(jvm)
+        .execute_with(jvm)
     }
 }
 
 impl ToRust<Authenticated> for java_auth::Authenticated {
     fn to_rust<'jvm>(&self, jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, Authenticated> {
-        let account_id = self.account_id().assert_not_null().to_rust().execute(jvm)?;
-        let user = self.user().assert_not_null().to_rust().execute(jvm)?;
-        let this = self.global().execute(jvm)?;
+        let account_id = self
+            .account_id()
+            .assert_not_null()
+            .to_rust()
+            .execute_with(jvm)?;
+        let user = self.user().assert_not_null().to_rust().execute_with(jvm)?;
+        let this = self.global().execute_with(jvm)?;
         Ok(Authenticated {
             account_id,
             user,
@@ -199,20 +211,24 @@ impl ToRust<AuthenticateError> for duchess::java::lang::Throwable {
         // XX: why can't we infer the <Throwable, ?
         if let Ok(x) = self
             .try_downcast::<java_auth::AuthenticationExceptionUnauthenticated>()
-            .execute(jvm)?
+            .execute_with(jvm)?
         {
-            let message = x.user_message().assert_not_null().to_rust().execute(jvm)?;
+            let message = x
+                .user_message()
+                .assert_not_null()
+                .to_rust()
+                .execute_with(jvm)?;
             Ok(AuthenticateError::InternalError(message))
         // XX: should we add a .is_instance() alias for try_downcast().is_ok()?
         } else if self
             .try_downcast::<java_auth::AuthenticationExceptionInvalidSecurityToken>()
-            .execute(jvm)?
+            .execute_with(jvm)?
             .is_ok()
         {
             Ok(AuthenticateError::InvalidSecurityToken)
         } else if self
             .try_downcast::<java_auth::AuthenticationExceptionInvalidSignature>()
-            .execute(jvm)?
+            .execute_with(jvm)?
             .is_ok()
         {
             Ok(AuthenticateError::InvalidSignature)
@@ -221,7 +237,7 @@ impl ToRust<AuthenticateError> for duchess::java::lang::Throwable {
                 .get_message()
                 .assert_not_null()
                 .to_rust()
-                .execute(jvm)?;
+                .execute_with(jvm)?;
             Ok(AuthenticateError::InternalError(message))
         }
     }
@@ -230,7 +246,7 @@ impl ToRust<AuthenticateError> for duchess::java::lang::Throwable {
 impl<'a> JvmOp for &'a Authenticated {
     type Output<'jvm> = &'a Global<java_auth::Authenticated>;
 
-    fn execute<'jvm>(self, _jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, Self::Output<'jvm>> {
+    fn execute_with<'jvm>(self, _jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, Self::Output<'jvm>> {
         Ok(&self.this)
     }
 }
@@ -238,12 +254,12 @@ impl<'a> JvmOp for &'a Authenticated {
 impl JvmOp for &AuthorizeRequest {
     type Output<'jvm> = Local<'jvm, java_auth::AuthorizeRequest>;
 
-    fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, Self::Output<'jvm>> {
-        let java_context = JavaHashMap::new().execute(jvm)?;
+    fn execute_with<'jvm>(self, jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, Self::Output<'jvm>> {
+        let java_context = JavaHashMap::new().execute_with(jvm)?;
         for (key, value) in &self.context {
             java_context
                 .put(key.as_str(), value.as_str())
-                .execute(jvm)?;
+                .execute_with(jvm)?;
         }
 
         java_auth::AuthorizeRequest::new(
@@ -251,7 +267,7 @@ impl JvmOp for &AuthorizeRequest {
             self.action.as_str(),
             &java_context,
         )
-        .execute(jvm)
+        .execute_with(jvm)
     }
 }
 

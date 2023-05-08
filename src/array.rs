@@ -75,8 +75,8 @@ where
 {
     type Output<'jvm> = jni_sys::jsize;
 
-    fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
-        let this = self.this.execute(jvm)?;
+    fn execute_with<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
+        let this = self.this.execute_with(jvm)?;
         let this = this.as_jref()?.as_raw();
 
         let len = unsafe {
@@ -93,7 +93,7 @@ macro_rules! primivite_array {
             impl JvmOp for &[$rust] {
                 type Output<'jvm> = Local<'jvm, JavaArray<$rust>>;
 
-                fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
+                fn execute_with<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
                     let Ok(len) = self.len().try_into() else {
                         return Err(Error::SliceTooLong(self.len()))
                     };
@@ -125,7 +125,7 @@ macro_rules! primivite_array {
 
             impl ToRust<Vec<$rust>> for JavaArray<$rust> {
                 fn to_rust<'jvm>(&self, jvm: &mut Jvm<'jvm>) -> $crate::Result<'jvm, Vec<$rust>> {
-                    let len = self.length().execute(jvm)?;
+                    let len = self.length().execute_with(jvm)?;
                     let mut vec = Vec::<$rust>::with_capacity(len as usize);
 
                     unsafe {

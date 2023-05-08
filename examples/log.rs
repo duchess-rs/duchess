@@ -43,7 +43,7 @@ fn one_big_call() -> duchess::GlobalResult<()> {
                     .with_name("foo")
                     .build(),
             )
-            .execute(jvm)?;
+            .execute_with(jvm)?;
         Ok(())
     })
 }
@@ -57,14 +57,14 @@ fn local_ref_and_two_calls() -> duchess::GlobalResult<()> {
     use crate::log::TimeStepExt;
 
     duchess::Jvm::with(|jvm| {
-        let logger = log::Logger::new().execute(jvm)?;
+        let logger = log::Logger::new().execute_with(jvm)?;
         let event = log::Event::builder()
             .with_time(java::util::Date::new())
             .with_name("foo")
             .build()
-            .execute(jvm)?;
-        logger.add_event(&event).execute(jvm)?;
-        logger.add_event(&event).execute(jvm)?;
+            .execute_with(jvm)?;
+        logger.add_event(&event).execute_with(jvm)?;
+        logger.add_event(&event).execute_with(jvm)?;
         Ok(())
     })
 }
@@ -77,16 +77,16 @@ fn global_ref_and_two_calls() -> duchess::GlobalResult<()> {
     use crate::log::NameStepExt;
     use crate::log::TimeStepExt;
 
-    let logger = duchess::Jvm::with(|jvm| log::Logger::new().global().execute(jvm))?;
+    let logger = duchess::Jvm::with(|jvm| log::Logger::new().global().execute_with(jvm))?;
 
     duchess::Jvm::with(|jvm| {
         let event = log::Event::builder()
             .with_time(java::util::Date::new())
             .with_name("foo")
             .build()
-            .execute(jvm)?;
-        logger.add_event(&event).execute(jvm)?;
-        logger.add_event(&event).execute(jvm)?;
+            .execute_with(jvm)?;
+        logger.add_event(&event).execute_with(jvm)?;
+        logger.add_event(&event).execute_with(jvm)?;
         Ok(())
     })
 }

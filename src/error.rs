@@ -55,7 +55,7 @@ fn try_extract_message(exception: &impl AsJRef<Throwable>) -> String {
             .to_string()
             .assert_not_null()
             .to_rust()
-            .execute(jvm)
+            .execute_with(jvm)
     });
     message.unwrap_or_else(|_| "<unable to get exception message>".into())
 }

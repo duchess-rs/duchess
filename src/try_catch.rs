@@ -31,12 +31,12 @@ where
 {
     type Output<'jvm> = Result<This::Output<'jvm>, Local<'jvm, J>>;
 
-    fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
-        match self.this.execute(jvm) {
+    fn execute_with<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
+        match self.this.execute_with(jvm) {
             Ok(v) => Ok(Ok(v)),
             Err(e) => match e {
                 crate::Error::Thrown(exception) => {
-                    if let Ok(exception) = exception.try_downcast::<J>().execute(jvm)? {
+                    if let Ok(exception) = exception.try_downcast::<J>().execute_with(jvm)? {
                         Ok(Err(exception))
                     } else {
                         Err(crate::Error::Thrown(exception))

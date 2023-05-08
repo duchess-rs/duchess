@@ -50,8 +50,11 @@ where
 {
     type Output<'jvm> = Result<Local<'jvm, To>, J::Output<'jvm>>;
 
-    fn execute<'jvm>(self, jvm: &mut crate::Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
-        let instance = self.op.execute(jvm)?;
+    fn execute_with<'jvm>(
+        self,
+        jvm: &mut crate::Jvm<'jvm>,
+    ) -> crate::Result<'jvm, Self::Output<'jvm>> {
+        let instance = self.op.execute_with(jvm)?;
         let instance_raw = instance.try_jderef()?.as_raw();
 
         let class = To::class(jvm)?;
@@ -111,8 +114,11 @@ where
 {
     type Output<'jvm> = Local<'jvm, To>;
 
-    fn execute<'jvm>(self, jvm: &mut crate::Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
-        let instance = self.op.execute(jvm)?;
+    fn execute_with<'jvm>(
+        self,
+        jvm: &mut crate::Jvm<'jvm>,
+    ) -> crate::Result<'jvm, Self::Output<'jvm>> {
+        let instance = self.op.execute_with(jvm)?;
 
         if cfg!(debug_assertions) {
             let class = To::class(jvm)?;
@@ -145,10 +151,10 @@ where
 ///     duchess::by_type! {
 ///         with jvm match x => {
 ///             java::lang::String as string => {
-///                 println!("Got a string with {} chars", string.length().execute(jvm)?);
+///                 println!("Got a string with {} chars", string.length().execute_with(jvm)?);
 ///             },
 ///             java::lang::Throwable as throwable => {
-///                 throwable.print_stack_trace().execute(jvm)?;
+///                 throwable.print_stack_trace().execute_with(jvm)?;
 ///             },
 ///             else {
 ///                 println!("Got something that wasn't a String or a Throwable");
@@ -186,7 +192,7 @@ macro_rules! by_type {
                 unreachable!()
             }
             $(
-                else if let Ok($var) = obj.try_downcast::<$class>().execute($jvm)? {
+                else if let Ok($var) = obj.try_downcast::<$class>().execute_with($jvm)? {
                     $arm
                 }
             )*

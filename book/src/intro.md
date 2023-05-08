@@ -22,7 +22,7 @@ duchess::with_jvm(|jvm| {
     MyClass::new()
         .some_builder_method(44)
         .some_other_method("Hello, world")
-        .execute(jvm);
+        .execute_with(jvm);
 })
 ```
 

@@ -82,13 +82,13 @@ use com::widgard::{Factory, FactoryExt};
 
 duchess::Jvm::with(|jvm| {
     // Constructors are `Type::new`...
-    let f = Factory::new().execute(jvm);
+    let f = Factory::new().execute_with(jvm);
 
     // ...method names are converted to snake-case...    
-    let w = f.produce_widget().execute(jvm);
+    let w = f.produce_widget().execute_with(jvm);
 
     // ...references to Java objects are passed with `&`.
-    f.consume_widget(&w).execute(jvm);
+    f.consume_widget(&w).execute_with(jvm);
 })
 ```
 
@@ -104,10 +104,10 @@ Because jvm-ops are lazy, you can also chain them together:
 use com::widgard::{Factory, FactoryExt};
 
 duchess::Jvm::with(|jvm| {
-    let f = Factory::new().execute(jvm);
+    let f = Factory::new().execute_with(jvm);
 
     // Consume and produce the widget in one step:
-    f.consume_widget(f.produce_widget()).execute(jvm);
+    f.consume_widget(f.produce_widget()).execute_with(jvm);
 })
 ```
 
@@ -119,7 +119,7 @@ use com::widgard::{Factory, FactoryExt};
 duchess::Jvm::with(|jvm| {
     Factory::new()
         .inspect(|f| f.consume_widget(f.produce_widget()))
-        .execute(jvm);
+        .execute_with(jvm);
 })
 ```
 

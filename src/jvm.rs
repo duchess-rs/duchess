@@ -89,7 +89,7 @@ pub trait JvmOp: Sized {
         ToRustOp::new(self)
     }
 
-    fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>>;
+    fn execute_with<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>>;
 }
 
 /// This trait is only implemented for `()`; it allows the `JvmOp::execute` method to only
@@ -304,7 +304,10 @@ pub unsafe trait JavaType: 'static {
 
 unsafe impl<T: JavaObject> JavaType for T {
     fn array_class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Local<'jvm, Class>> {
-        T::class(jvm)?.array_type().assert_not_null().execute(jvm)
+        T::class(jvm)?
+            .array_type()
+            .assert_not_null()
+            .execute_with(jvm)
     }
 }
 

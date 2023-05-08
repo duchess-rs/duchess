@@ -12,7 +12,7 @@ macro_rules! identity_jvm_op {
             impl<$($param)*> JvmOp for $t {
                 type Output<'jvm> = Self;
 
-                fn execute<'jvm>(self, _jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
+                fn execute_with<'jvm>(self, _jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
                     Ok(self)
                 }
             }
@@ -72,7 +72,7 @@ where
     type Output<'jvm> = <J as JvmOp>::Output<'jvm>;
 
     fn into_java<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
-        self.execute(jvm)
+        self.execute_with(jvm)
     }
 }
 
