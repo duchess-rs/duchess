@@ -2,6 +2,7 @@ use duchess::java::lang::ThrowableExt;
 use duchess::java::util::{ArrayList, ArrayListExt, HashMap as JavaHashMap, MapExt};
 use duchess::{prelude::*, Global, Jvm, Local, ToRust};
 use std::collections::HashMap;
+use thiserror::Error;
 
 // XX: should we automatically attach allow(dead_code)?
 #[allow(dead_code)]
@@ -63,11 +64,15 @@ pub struct Authenticated {
     this: Global<java_auth::Authenticated>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum AuthenticateError {
+    #[error("Unathenticated({0})")]
     Unathenticated(String),
+    #[error("InvalidSecurityToken")]
     InvalidSecurityToken,
+    #[error("InvalidSignature")]
     InvalidSignature,
+    #[error("InternalError({0})")]
     InternalError(String),
 }
 
