@@ -82,10 +82,10 @@ pub trait JvmOp: Sized {
 
     /// Given a JVM op that returns some Java type, convert it to its Rust equivalent
     /// (e.g., from a Java String to a Rust string).
-    fn to_rust<J>(self) -> ToRustOp<Self>
+    fn to_rust<R>(self) -> ToRustOp<Self, R>
     where
-        for<'jvm> Self::Output<'jvm>: JDeref<Java = J>,
-        J: ToRust,
+        for<'jvm> Self::Output<'jvm>: JDeref,
+        for<'jvm> <Self::Output<'jvm> as TryJDeref>::Java: ToRust<R>,
     {
         ToRustOp::new(self)
     }

@@ -35,7 +35,7 @@ where
 {
     pub fn catch<J>(self) -> TryCatch<This, impl CatchBlock<E>, E>
     where
-        J: Upcast<Throwable> + ToRust<Rust = E>,
+        J: Upcast<Throwable> + ToRust<E>,
     {
         let TryCatch {
             this,
@@ -46,7 +46,7 @@ where
             this,
             catch_block: CatchSome {
                 or_else: catch_block,
-                phantom: PhantomData::<J>,
+                phantom: PhantomData::<(J, E)>,
             },
             phantom: PhantomData,
         }
@@ -102,27 +102,27 @@ where
     }
 }
 
-pub struct CatchSome<J, C>
+pub struct CatchSome<J, C, E>
 where
-    J: Upcast<Throwable> + ToRust,
-    C: CatchBlock<J::Rust>,
+    J: Upcast<Throwable> + ToRust<E>,
+    C: CatchBlock<E>,
 {
     /// Catch block to try if this one doesn't work.
     or_else: C,
 
-    phantom: PhantomData<J>,
+    phantom: PhantomData<(J, E)>,
 }
 
-impl<J, C> CatchBlock<J::Rust> for CatchSome<J, C>
+impl<J, C, E> CatchBlock<E> for CatchSome<J, C, E>
 where
-    J: Upcast<Throwable> + ToRust,
-    C: CatchBlock<J::Rust>,
+    J: Upcast<Throwable> + ToRust<E>,
+    C: CatchBlock<E>,
 {
     fn try_catch<'jvm>(
         self,
         jvm: &mut Jvm<'jvm>,
         error: &Throwable,
-    ) -> crate::Result<'jvm, Option<J::Rust>> {
+    ) -> crate::Result<'jvm, Option<E>> {
         match error.try_downcast::<J>().execute(jvm)? {
             Ok(error) => {
                 let rust_data = J::to_rust(&error, jvm)?;

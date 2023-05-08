@@ -227,10 +227,8 @@ impl JvmOp for &HttpRequest {
     }
 }
 
-impl ToRust for java_auth::Authenticated {
-    type Rust = Authenticated;
-
-    fn to_rust<'jvm>(&self, jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, Self::Rust> {
+impl ToRust<Authenticated> for java_auth::Authenticated {
+    fn to_rust<'jvm>(&self, jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, Authenticated> {
         let account_id = self.account_id().assert_not_null().to_rust().execute(jvm)?;
         let user = self.user().assert_not_null().to_rust().execute(jvm)?;
         let this = self.global().execute(jvm)?;
@@ -242,10 +240,8 @@ impl ToRust for java_auth::Authenticated {
     }
 }
 
-impl ToRust for java_auth::AuthenticationExceptionUnauthenticated {
-    type Rust = AuthenticateError;
-
-    fn to_rust<'jvm>(&self, jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, Self::Rust> {
+impl ToRust<AuthenticateError> for java_auth::AuthenticationExceptionUnauthenticated {
+    fn to_rust<'jvm>(&self, jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, AuthenticateError> {
         let message = self
             .user_message()
             .assert_not_null()
@@ -255,18 +251,14 @@ impl ToRust for java_auth::AuthenticationExceptionUnauthenticated {
     }
 }
 
-impl ToRust for java_auth::AuthenticationExceptionInvalidSecurityToken {
-    type Rust = AuthenticateError;
-
-    fn to_rust<'jvm>(&self, _jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, Self::Rust> {
+impl ToRust<AuthenticateError> for java_auth::AuthenticationExceptionInvalidSecurityToken {
+    fn to_rust<'jvm>(&self, _jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, AuthenticateError> {
         Ok(AuthenticateError::InvalidSecurityToken)
     }
 }
 
-impl ToRust for java_auth::AuthenticationExceptionInvalidSignature {
-    type Rust = AuthenticateError;
-
-    fn to_rust<'jvm>(&self, _jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, Self::Rust> {
+impl ToRust<AuthenticateError> for java_auth::AuthenticationExceptionInvalidSignature {
+    fn to_rust<'jvm>(&self, _jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, AuthenticateError> {
         Ok(AuthenticateError::InvalidSignature)
     }
 }

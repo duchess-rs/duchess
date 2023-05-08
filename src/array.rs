@@ -123,9 +123,7 @@ macro_rules! primivite_array {
                 }
             }
 
-            impl ToRust for JavaArray<$rust> {
-                type Rust = Vec<$rust>;
-
+            impl ToRust<Vec<$rust>> for JavaArray<$rust> {
                 fn to_rust<'jvm>(&self, jvm: &mut Jvm<'jvm>) -> $crate::Result<'jvm, Vec<$rust>> {
                     let len = self.length().execute(jvm)?;
                     let mut vec = Vec::<$rust>::with_capacity(len as usize);

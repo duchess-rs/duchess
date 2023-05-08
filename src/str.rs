@@ -34,9 +34,7 @@ impl JvmOp for String {
     }
 }
 
-impl ToRust for JavaString {
-    type Rust = String;
-
+impl ToRust<String> for JavaString {
     fn to_rust<'jvm>(&self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, String> {
         let str_raw = self.as_raw();
 
