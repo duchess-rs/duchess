@@ -35,17 +35,16 @@ fn one_big_call() -> duchess::GlobalResult<()> {
     use crate::log::NameStepExt;
     use crate::log::TimeStepExt;
 
-    duchess::Jvm::with(|jvm| {
-        log::Logger::new()
-            .add_event(
-                log::Event::builder()
-                    .with_time(java::util::Date::new())
-                    .with_name("foo")
-                    .build(),
-            )
-            .execute_with(jvm)?;
-        Ok(())
-    })
+    log::Logger::new()
+        .add_event(
+            log::Event::builder()
+                .with_time(java::util::Date::new())
+                .with_name("foo")
+                .build(),
+        )
+        .execute()?;
+
+    Ok(())
 }
 
 #[test]
@@ -77,7 +76,7 @@ fn global_ref_and_two_calls() -> duchess::GlobalResult<()> {
     use crate::log::NameStepExt;
     use crate::log::TimeStepExt;
 
-    let logger = duchess::Jvm::with(|jvm| log::Logger::new().global().execute_with(jvm))?;
+    let logger = log::Logger::new().global().execute()?;
 
     duchess::Jvm::with(|jvm| {
         let event = log::Event::builder()
@@ -90,4 +89,27 @@ fn global_ref_and_two_calls() -> duchess::GlobalResult<()> {
         Ok(())
     })
 }
+
+#[test]
+fn global_ref_and_chained_calls() -> duchess::GlobalResult<()> {
+    // FIXME: conflict between interface trait (LoggerExt) and class trait (BuilderExt)
+    use crate::log::BuildStepExt;
+    use crate::log::LoggerExt;
+    use crate::log::NameStepExt;
+    use crate::log::TimeStepExt;
+
+    let logger = log::Logger::new().global().execute()?;
+
+    logger
+        .add_event(
+            log::Event::builder()
+                .with_time(java::util::Date::new())
+                .with_name("foo")
+                .build(),
+        )
+        .execute()?;
+
+    Ok(())
+}
+
 fn main() {}

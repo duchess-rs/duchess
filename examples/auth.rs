@@ -91,23 +91,18 @@ pub enum AuthorizeError {
 
 impl HttpAuth {
     pub fn new() -> duchess::GlobalResult<Self> {
-        let auth = Jvm::with(|jvm| {
-            let auth = java_auth::HttpAuth::new().execute_with(jvm)?;
-            Ok(jvm.global(&*auth))
-        })?;
+        let auth = java_auth::HttpAuth::new().global().execute()?;
         Ok(Self(auth))
     }
 
     pub fn authenticate(&self, request: &HttpRequest) -> Result<Authenticated, AuthenticateError> {
-        Jvm::with(|jvm| {
-            self.0
-                .authenticate(request)
-                .assert_not_null()
-                .catch::<duchess::java::lang::Throwable>()
-                .to_rust()
-                .execute_with(jvm)
-        })
-        .unwrap()
+        self.0
+            .authenticate(request)
+            .assert_not_null()
+            .catch::<duchess::java::lang::Throwable>()
+            .to_rust()
+            .execute()
+            .unwrap()
     }
 
     pub fn authorize(

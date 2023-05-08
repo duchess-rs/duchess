@@ -80,15 +80,14 @@ Once you've created the Java package, you can create java objects and invoke the
 // We need to use `FactoryExt` to call methods on factory:
 use com::widgard::{Factory, FactoryExt};
 
-duchess::Jvm::with(|jvm| {
-    // Constructors are `Type::new`...
-    let f = Factory::new().execute_with(jvm);
+// Constructors are `Type::new`...
+let f = Factory::new().execute();
 
-    // ...method names are converted to snake-case...    
-    let w = f.produce_widget().execute_with(jvm);
+// ...method names are converted to snake-case...    
+let w = f.produce_widget().execute();
 
-    // ...references to Java objects are passed with `&`.
-    f.consume_widget(&w).execute_with(jvm);
+// ...references to Java objects are passed with `&`.
+f.consume_widget(&w).execute();
 })
 ```
 
@@ -103,12 +102,10 @@ Because jvm-ops are lazy, you can also chain them together:
 ```rust
 use com::widgard::{Factory, FactoryExt};
 
-duchess::Jvm::with(|jvm| {
-    let f = Factory::new().execute_with(jvm);
+let f = Factory::new().execute();
 
-    // Consume and produce the widget in one step:
-    f.consume_widget(f.produce_widget()).execute_with(jvm);
-})
+// Consume and produce the widget in one step:
+f.consume_widget(f.produce_widget()).execute();
 ```
 
 In fact, using the `inspect` combinator, we can go further:

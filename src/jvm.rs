@@ -89,6 +89,18 @@ pub trait JvmOp: Sized {
         ToRustOp::new(self)
     }
 
+    /// Execute the jvm op, starting a JVM instance if necessary.
+    /// To use this method, the result type cannot be tied to the JVM.
+    /// Typically this is achieved by a call to [`to_rust()`][`Self::to_rust`],
+    /// but if you wish to hold on to a reference to a JVM object,
+    /// you can use [`global()`][`Self::global`] to create a global reference.
+    fn execute<R>(self) -> crate::GlobalResult<R>
+    where
+        for<'jvm> Self: JvmOp<Output<'jvm> = R>,
+    {
+        Jvm::with(|jvm| self.execute_with(jvm))
+    }
+
     fn execute_with<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>>;
 }
 
