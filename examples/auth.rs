@@ -100,53 +100,57 @@ impl HttpAuth {
 
     pub fn authenticate(&self, request: &HttpRequest) -> Result<Authenticated, AuthenticateError> {
         Jvm::with(|jvm| {
-            match self
-                .0
+            self.0
                 .authenticate(request)
                 .assert_not_null()
                 .to_rust()
+                .try_catch()
+                .catch::<java_auth::AuthenticationExceptionUnauthenticated>()
+                .catch::<java_auth::AuthenticationExceptionInvalidSecurityToken>()
+                .catch::<java_auth::AuthenticationExceptionInvalidSignature>()
+                // FIXME: can't handle the "other" case this way without some "not obviously derivable" code
                 .execute(jvm)
-            {
-                Ok(auth) => Ok(Ok(auth)),
-                Err(duchess::Error::Thrown(exception)) => {
-                    // XX: is this kind of type switching better handled by a macro?
-                    Ok(Err(
-                        // XX: why can't we infer the <Throwable, ?
-                        if let Ok(x) = exception
-                            .try_downcast::<java_auth::AuthenticationExceptionUnauthenticated>()
-                            .execute(jvm)?
-                        {
-                            let message =
-                                x.user_message().assert_not_null().to_rust().execute(jvm)?;
-                            AuthenticateError::Unathenticated(message)
-                        // XX: should we add a .is_instance() alias for try_downcast().is_ok()?
-                        } else if exception
-                            .try_downcast::<java_auth::AuthenticationExceptionInvalidSecurityToken>(
-                            )
-                            .execute(jvm)?
-                            .is_ok()
-                        {
-                            AuthenticateError::InvalidSecurityToken
-                        } else if exception
-                            .try_downcast::<java_auth::AuthenticationExceptionInvalidSignature>()
-                            .execute(jvm)?
-                            .is_ok()
-                        {
-                            AuthenticateError::InvalidSignature
-                        } else {
-                            let message = exception
-                                .get_message()
-                                .assert_not_null()
-                                .to_rust()
-                                .execute(jvm)?;
-                            AuthenticateError::InternalError(message)
-                        },
-                    ))
-                }
-                // XX: do we want to hide null derefs and other JNI problems? or should they get converted to something
-                // visible to the user?
-                Err(e) => Err(e),
-            }
+            // {
+            //     Ok(auth) => Ok(Ok(auth)),
+            //     Err(duchess::Error::Thrown(exception)) => {
+            //         // XX: is this kind of type switching better handled by a macro?
+            //         Ok(Err(
+            //             // XX: why can't we infer the <Throwable, ?
+            //             if let Ok(x) = exception
+            //                 .try_downcast::<java_auth::AuthenticationExceptionUnauthenticated>()
+            //                 .execute(jvm)?
+            //             {
+            //                 let message =
+            //                     x.user_message().assert_not_null().to_rust().execute(jvm)?;
+
+            //             // XX: should we add a .is_instance() alias for try_downcast().is_ok()?
+            //             } else if exception
+            //                 .try_downcast::<java_auth::AuthenticationExceptionInvalidSecurityToken>(
+            //                 )
+            //                 .execute(jvm)?
+            //                 .is_ok()
+            //             {
+            //                 AuthenticateError::InvalidSecurityToken
+            //             } else if exception
+            //                 .try_downcast::<java_auth::AuthenticationExceptionInvalidSignature>()
+            //                 .execute(jvm)?
+            //                 .is_ok()
+            //             {
+            //                 AuthenticateError::InvalidSignature
+            //             } else {
+            //                 let message = exception
+            //                     .get_message()
+            //                     .assert_not_null()
+            //                     .to_rust()
+            //                     .execute(jvm)?;
+            //                 AuthenticateError::InternalError(message)
+            //             },
+            //         ))
+            //     }
+            //     // XX: do we want to hide null derefs and other JNI problems? or should they get converted to something
+            //     // visible to the user?
+            //     Err(e) => Err(e),
+            // }
             // XX: we should implement a helpful Display/Debug for Error that isn't just "Thrown"
         })
         .unwrap()
@@ -238,10 +242,39 @@ impl ToRust for java_auth::Authenticated {
     }
 }
 
+impl ToRust for java_auth::AuthenticationExceptionUnauthenticated {
+    type Rust = AuthenticateError;
+
+    fn to_rust<'jvm>(&self, jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, Self::Rust> {
+        let message = self
+            .user_message()
+            .assert_not_null()
+            .to_rust()
+            .execute(jvm)?;
+        Ok(AuthenticateError::Unathenticated(message))
+    }
+}
+
+impl ToRust for java_auth::AuthenticationExceptionInvalidSecurityToken {
+    type Rust = AuthenticateError;
+
+    fn to_rust<'jvm>(&self, _jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, Self::Rust> {
+        Ok(AuthenticateError::InvalidSecurityToken)
+    }
+}
+
+impl ToRust for java_auth::AuthenticationExceptionInvalidSignature {
+    type Rust = AuthenticateError;
+
+    fn to_rust<'jvm>(&self, _jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, Self::Rust> {
+        Ok(AuthenticateError::InvalidSignature)
+    }
+}
+
 impl<'a> JvmOp for &'a Authenticated {
     type Output<'jvm> = &'a Global<java_auth::Authenticated>;
 
-    fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, Self::Output<'jvm>> {
+    fn execute<'jvm>(self, _jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, Self::Output<'jvm>> {
         Ok(&self.this)
     }
 }

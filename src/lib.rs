@@ -14,6 +14,7 @@ mod raw;
 mod ref_;
 mod str;
 mod to_rust;
+mod try_catch;
 mod thread;
 
 /// Contains reusable declarations for classes distributed by the JDK under the `java.*` packages.
@@ -27,6 +28,7 @@ pub use jvm::Jvm;
 pub use ref_::{Global, Local};
 pub use refs::{AsJRef, JDeref, NullJRef, Nullable, TryJDeref};
 pub use to_rust::ToRust;
+pub use try_catch::{CatchBlock, CatchNone, CatchSome, TryCatch};
 
 pub use prelude::*;
 

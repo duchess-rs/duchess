@@ -6,6 +6,7 @@ use crate::{
     not_null::NotNull,
     raw::{self, EnvPtr, HasEnvPtr, JvmPtr, ObjectPtr},
     to_rust::ToRustOp,
+    try_catch::{CatchNone, TryCatch},
     thread, AsJRef, JDeref, ToRust, TryJDeref, Error, Global, GlobalResult, Local,
 };
 
@@ -70,6 +71,13 @@ pub trait JvmOp: Sized {
         for<'jvm> <Self as JvmOp>::Output<'jvm>: IntoGlobal<'jvm>,
     {
         GlobalOp::new(self)
+    }
+
+    fn try_catch<E>(self) -> TryCatch<Self, CatchNone, E>
+    where
+        E: std::error::Error,
+    {
+        TryCatch::new(self)
     }
 
     /// Given a JVM op that returns some Java type, convert it to its Rust equivalent
