@@ -728,13 +728,13 @@ impl ClassInfo {
     }
 
     fn struct_name(&self) -> Ident {
-        let tail = self.name.class_name();
-        Ident::new(&tail, self.span)
+        self.name.class_name().to_ident(self.span)
     }
 
     fn ext_trait_name(&self) -> Ident {
-        let tail = self.name.class_name();
-        Ident::new(&format!("{tail}Ext"), self.span)
+        let mut id = self.name.class_name().clone();
+        id.data.push_str("Ext");
+        id.to_ident(self.span)
     }
 
     fn class_generic_names(&self) -> Vec<Ident> {

@@ -16,6 +16,9 @@ duchess::java_package! {
 
     package viper.silver.reporter;
     interface Reporter {}
+    class "NoopReporter$" {
+        static viper.silver.reporter."NoopReporter$" "MODULE$";
+    }
 
     package viper.silicon;
     class Silicon {
