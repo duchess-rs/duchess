@@ -33,6 +33,7 @@ mod dynlib {
             let lib = unsafe { Library::new(path) }?;
             let JNI_CreateJavaVM = *unsafe { lib.get(b"JNI_CreateJavaVM\0") }?;
             let JNI_GetCreatedJavaVMs = *unsafe { lib.get(b"JNI_GetCreatedJavaVMs\0") }?;
+            std::mem::forget(lib); // We keep the JVM (and therefore libjvm) around through the end of the process
             Ok(Libjvm {
                 JNI_CreateJavaVM,
                 JNI_GetCreatedJavaVMs,

@@ -96,6 +96,8 @@ pub(crate) fn try_create_jvm<'a>(
             let Some(jvm) = JvmPtr::new(jvm) else {
                 return Err(Error::JvmInternal("JNI_CreateJavaVM returned null pointer".into()));
             };
+            // Undo default attaching of current thread like the jni crate does
+            unsafe { jvm.detach_thread() }?;
             Ok(jvm)
         }
         jni_sys::JNI_EEXIST => Err(Error::JvmAlreadyExists),
