@@ -2,13 +2,7 @@ use std::{marker::PhantomData, ops::Deref, ptr::NonNull};
 
 use crate::jvm::JavaObjectExt;
 use crate::thread;
-use crate::{
-    cast::Upcast,
-    jvm::CloneIn,
-    plumbing::ObjectPtr,
-    raw::{EnvPtr, JvmPtr},
-    JavaObject, Jvm,
-};
+use crate::{cast::Upcast, jvm::CloneIn, plumbing::ObjectPtr, raw::EnvPtr, JavaObject, Jvm};
 
 /// An owned local reference to a non-null Java object of type `T`. The reference will be freed when
 /// dropped. Cannot be shared across threads or [`Jvm::with`] invocations.
@@ -70,7 +64,6 @@ impl<T: JavaObject> Deref for Local<'_, T> {
 
 /// An owned global reference to a non-null Java object of type `T`. The reference will be freed when dropped.
 pub struct Global<T: JavaObject> {
-    jvm: JvmPtr,
     obj: ObjectPtr,
     _marker: PhantomData<T>,
 }
@@ -83,26 +76,27 @@ impl<T: JavaObject> Global<T> {
     /// The caller must ensure that `obj` points to a Java object that is an instance of `T` (or its subclasses), is a
     /// a live, global reference, will not later be deleted (including through another call to `from_raw()`), and will
     /// not dereferenced after the returned [`Global`] is dropped.
-    pub(crate) unsafe fn from_raw(jvm: JvmPtr, obj: ObjectPtr) -> Self {
+    pub(crate) unsafe fn from_raw(obj: ObjectPtr) -> Self {
         Self {
-            jvm,
             obj,
             _marker: PhantomData,
         }
     }
 
     /// Creates a *new* global reference to `obj` in the current frame via a `NewGlobalRef` JNI call.
-    pub(crate) fn new(jvm: JvmPtr, env: EnvPtr<'_>, obj: &T) -> Self {
+    pub(crate) fn new(env: EnvPtr<'_>, obj: &T) -> Self {
         // SAFETY: The JavaObject trait contract ensures that &T points to a Java object that is an instance of T.
         unsafe {
             let new_ref = env.invoke(|e| e.NewGlobalRef, |e, f| f(e, obj.as_raw().as_ptr()));
-            Self::from_raw(jvm, NonNull::new(new_ref).unwrap().into())
+            Self::from_raw(NonNull::new(new_ref).unwrap().into())
         }
     }
 }
 
 impl<T: JavaObject> Drop for Global<T> {
     fn drop(&mut self) {
+        let jvm = crate::jvm::unwrap_global_jvm();
+
         // SAFETY: Global owns the global ref and it's no longer possible to dereference the object pointer.
         let delete = |env: EnvPtr<'_>| unsafe {
             env.invoke(
@@ -111,11 +105,11 @@ impl<T: JavaObject> Drop for Global<T> {
             )
         };
 
-        match unsafe { self.jvm.env() } {
+        match unsafe { jvm.env() } {
             Ok(Some(env)) => delete(env),
             Ok(None) => {
                 // SAFETY: jvm is a valid pointer since duchess will not deinitialize a JVM once created
-                match unsafe { thread::attach(self.jvm) } {
+                match unsafe { thread::attach(jvm) } {
                     Ok(mut attached) => delete(attached.env()),
                     Err(err) => {
                         tracing::warn!(?err, "unable to attach current thread to delete global ref")
@@ -184,7 +178,7 @@ impl<R: JavaObject> Global<R> {
         S: JavaObject + 'static,
     {
         // SAFETY: From the Upcast trait contract, we know R is also an instance of S
-        let upcast = unsafe { Global::<S>::from_raw(self.jvm, self.obj) };
+        let upcast = unsafe { Global::<S>::from_raw(self.obj) };
         upcast
     }
 }

@@ -111,10 +111,17 @@ fn get_or_default_init_jvm() -> crate::GlobalResult<JvmPtr> {
     }
 }
 
-pub struct Jvm<'jvm> {
-    jvm: JvmPtr,
-    env: EnvPtr<'jvm>,
+/// Get the global [`JvmPtr`] assuming that the JVM has already been initialized. Expected to be used with values
+/// that only can have been derived from an existing JVM.
+///
+/// # Panics
+///
+/// Panics if the JVM wasn't initialized.
+pub(crate) fn unwrap_global_jvm() -> JvmPtr {
+    *GLOBAL_JVM.get().expect("JVM can't be unset")
 }
+
+pub struct Jvm<'jvm>(EnvPtr<'jvm>);
 
 impl<'jvm> Jvm<'jvm> {
     pub fn builder() -> JvmBuilder {
@@ -133,11 +140,7 @@ impl<'jvm> Jvm<'jvm> {
         // SAFTEY: we won't deinitialize the JVM while the guard is live
         let mut guard = unsafe { thread::attach(jvm)? };
 
-        let mut jvm = Jvm {
-            jvm,
-            env: guard.env(),
-        };
-
+        let mut jvm = Jvm(guard.env());
         op(&mut jvm).map_err(|e| e.into_global(&mut jvm))
     }
 
@@ -145,20 +148,20 @@ impl<'jvm> Jvm<'jvm> {
     where
         R: JavaObject,
     {
-        Local::new(self.env, r)
+        Local::new(self.0, r)
     }
 
     pub fn global<R>(&mut self, r: &R) -> Global<R>
     where
         R: JavaObject,
     {
-        Global::new(self.jvm, self.env, r)
+        Global::new(self.0, r)
     }
 }
 
 impl<'jvm> HasEnvPtr<'jvm> for Jvm<'jvm> {
     fn env(&self) -> EnvPtr<'jvm> {
-        self.env
+        self.0
     }
 }
 
