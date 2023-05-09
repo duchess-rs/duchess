@@ -26,7 +26,7 @@ unsafe impl<T: JavaType> Upcast<java::lang::Object> for JavaArray<T> {}
 
 // array.length isn't a normal field or method, so hand-generating the traits
 pub trait JavaArrayExt<T: JavaType>: JvmOp {
-    type Length: ScalarMethod<Self, jni_sys::jsize>;
+    type Length: ScalarMethod<jni_sys::jsize>;
     fn length(self) -> Self::Length;
 }
 

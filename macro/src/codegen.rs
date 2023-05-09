@@ -768,13 +768,13 @@ impl Signature {
         self.forbid_capture(|this| match ty.as_ref().map(|ty| ty.to_non_repeating()) {
             Some(NonRepeatingType::Ref(ty)) => {
                 let t = this.java_ref_ty(&ty)?;
-                Ok(quote_spanned!(this.span => duchess::JavaMethod<Self, #t>))
+                Ok(quote_spanned!(this.span => duchess::JavaMethod<#t>))
             }
             Some(NonRepeatingType::Scalar(ty)) => {
                 let t = this.java_scalar_ty(&ty);
-                Ok(quote_spanned!(this.span => duchess::ScalarMethod<Self, #t>))
+                Ok(quote_spanned!(this.span => duchess::ScalarMethod<#t>))
             }
-            None => Ok(quote_spanned!(this.span => duchess::VoidMethod<Self>)),
+            None => Ok(quote_spanned!(this.span => duchess::VoidMethod)),
         })
     }
 

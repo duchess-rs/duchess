@@ -124,51 +124,41 @@ pub trait IntoVoid: for<'jvm> JvmOp<Output<'jvm> = ()> {}
 
 impl<J> IntoVoid for J where J: for<'jvm> JvmOp<Output<'jvm> = ()> {}
 
-/// A java method, invoked on `B`, that returns a `T` object.
-pub trait JavaMethod<B, T>
+/// A java method that returns a `T` object (when executed).
+pub trait JavaMethod<T>
 where
-    B: JvmOp,
     T: JavaObject,
     for<'jvm> Self: JvmOp<Output<'jvm> = Option<Local<'jvm, T>>>,
 {
 }
 
-impl<J, B, T> JavaMethod<B, T> for J
+impl<J, T> JavaMethod<T> for J
 where
-    B: JvmOp,
     T: JavaObject,
     for<'jvm> Self: JvmOp<Output<'jvm> = Option<Local<'jvm, T>>>,
 {
 }
 
-/// A java method, invoked on `B`, that returns a scalar value of type `T`.
-pub trait ScalarMethod<B, T>
+/// A java method that returns a scalar value of type `T` when executed.
+pub trait ScalarMethod<T>
 where
-    B: JvmOp,
     T: JavaScalar,
     for<'jvm> Self: JvmOp<Output<'jvm> = T>,
 {
 }
 
-impl<J, B, T> ScalarMethod<B, T> for J
+impl<J, T> ScalarMethod<T> for J
 where
-    B: JvmOp,
     T: JavaScalar,
     for<'jvm> Self: JvmOp<Output<'jvm> = T>,
 {
 }
 
-/// A java method, invoked on `B`, that returns void.
-pub trait VoidMethod<B>
+/// A java method that returns void when executed.
+pub trait VoidMethod
 where
-    B: JvmOp,
     for<'jvm> Self: JvmOp<Output<'jvm> = ()>,
 {
 }
 
-impl<J, B> VoidMethod<B> for J
-where
-    B: JvmOp,
-    for<'jvm> Self: JvmOp<Output<'jvm> = ()>,
-{
-}
+impl<J> VoidMethod for J where for<'jvm> Self: JvmOp<Output<'jvm> = ()> {}
