@@ -110,7 +110,7 @@ impl ClassInfo {
             .methods
             .iter()
             .filter(|m| !m.flags.is_static)
-            .map(|m| self.method(m))
+            .map(|m| self.object_method(m))
             .collect::<Result<_, _>>()?;
 
         let method_structs: Vec<_> = object_methods.iter().map(|m| &m.method_struct).collect();
@@ -171,7 +171,12 @@ impl ClassInfo {
 
                 #upcast_impls
 
-                #(#constructors)*
+                impl< #(#java_class_generics,)* > #this_ty
+                where
+                    #(#java_class_generics: duchess::JavaObject,)*
+                {
+                    #(#constructors)*
+                }
 
                 #(#method_structs)*
 
@@ -283,43 +288,39 @@ impl ClassInfo {
         let descriptor = Literal::string(&constructor.descriptor());
 
         let output = quote_spanned!(self.span =>
-            impl< #(#java_class_generics,)* > #ty
-            where
-                #(#java_class_generics: duchess::JavaObject,)*
-            {
-                pub fn new(
-                    #(#input_names : impl #input_traits,)*
-                ) -> impl #output_trait {
-                    #[allow(non_camel_case_types)]
-                    struct Impl<
+            pub fn new(
+                #(#input_names : impl #input_traits,)*
+            ) -> impl #output_trait {
+                #[allow(non_camel_case_types)]
+                struct Impl<
+                    #(#java_class_generics,)*
+                    #(#input_names),*
+                > {
+                    #(#input_names: #input_names,)*
+                    phantom: std::marker::PhantomData<(
                         #(#java_class_generics,)*
-                        #(#input_names),*
-                    > {
-                        #(#input_names: #input_names,)*
-                        phantom: std::marker::PhantomData<(
-                            #(#java_class_generics,)*
-                        )>,
-                    }
+                    )>,
+                }
 
-                    #[allow(non_camel_case_types)]
-                    impl<
-                        #(#java_class_generics,)*
-                        #(#input_names,)*
-                    > JvmOp for Impl<
-                        #(#java_class_generics,)*
-                        #(#input_names,)*
-                    >
-                    where
-                        #(#java_class_generics: duchess::JavaObject,)*
-                        #(#input_names : #input_traits,)*
-                    {
-                        type Output<'jvm> = Local<'jvm, #ty>;
+                #[allow(non_camel_case_types)]
+                impl<
+                    #(#java_class_generics,)*
+                    #(#input_names,)*
+                > JvmOp for Impl<
+                    #(#java_class_generics,)*
+                    #(#input_names,)*
+                >
+                where
+                    #(#java_class_generics: duchess::JavaObject,)*
+                    #(#input_names : #input_traits,)*
+                {
+                    type Output<'jvm> = Local<'jvm, #ty>;
 
-                        fn execute<'jvm>(
-                            self,
-                            jvm: &mut Jvm<'jvm>,
-                        ) -> duchess::Result<'jvm, Self::Output<'jvm>> {
-                            #(#prepare_inputs)*
+                    fn execute<'jvm>(
+                        self,
+                        jvm: &mut Jvm<'jvm>,
+                    ) -> duchess::Result<'jvm, Self::Output<'jvm>> {
+                        #(#prepare_inputs)*
 
                             let class = <#ty>::class(jvm)?;
 
@@ -357,10 +358,9 @@ impl ClassInfo {
                         }
                     }
 
-                    Impl {
-                        #(#input_names: #input_names,)*
-                        phantom: Default::default()
-                    }
+                Impl {
+                    #(#input_names: #input_names,)*
+                    phantom: Default::default()
                 }
             }
         );
@@ -371,7 +371,15 @@ impl ClassInfo {
         Ok(output)
     }
 
-    fn method(&self, method: &Method) -> Result<MethodOutput, SpanError> {
+    /// Generates code for instance methods.
+    ///
+    ///
+    /// NB. This function (particularly the JvmOp impl) has significant overlap with `static_method`,
+    /// so if you make changes here, you may well need changes there. The two are just different enough
+    /// however that combining them did not seem profitable.
+    fn object_method(&self, method: &Method) -> Result<MethodOutput, SpanError> {
+        assert!(!method.flags.is_static);
+
         let mut sig = Signature::new(&method.name, self.span, &self.generics)
             .with_internal_generics(&method.generics)?;
 
