@@ -3,6 +3,7 @@
 mod array;
 mod cast;
 mod error;
+mod global;
 mod find;
 mod jvm;
 mod libjvm;
@@ -45,6 +46,7 @@ pub mod plumbing {
     pub use crate::cast::Upcast;
     pub use crate::error::check_exception;
     pub use crate::find::{find_class, find_constructor, find_method};
+    pub use crate::global::GlobalOp;
     pub use crate::jvm::JavaObjectExt;
     pub use crate::raw::{FromJniValue, HasEnvPtr, IntoJniValue, MethodPtr, ObjectPtr};
 }

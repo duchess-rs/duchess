@@ -1,5 +1,6 @@
 use crate::{
     cast::{AsUpcast, TryDowncast, Upcast},
+    global::{GlobalOp, IntoGlobal},
     find::find_class,
     java::lang::{Class, ClassExt, Throwable},
     not_null::NotNull,
@@ -60,6 +61,16 @@ pub trait JvmOp: Sized {
         To: JavaObject,
     {
         AsUpcast::new(self)
+    }
+
+    /// Given a JVM op that creates a local reference, convert the local reference
+    /// into a global one. Global JVM references can be held as long as you like
+    /// within
+    fn global(self) -> GlobalOp<Self>
+    where
+        for<'jvm> <Self as JvmOp>::Output<'jvm>: IntoGlobal<'jvm>,
+    {
+        GlobalOp::new(self)
     }
 
     fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>>;

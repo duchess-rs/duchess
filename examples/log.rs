@@ -52,7 +52,7 @@ fn one_big_call() -> duchess::GlobalResult<()> {
 }
 
 #[test]
-fn two_calls() -> duchess::GlobalResult<()> {
+fn local_ref_and_two_calls() -> duchess::GlobalResult<()> {
     // FIXME: conflict between interface trait (LoggerExt) and class trait (BuilderExt)
     use crate::log::BuildStepExt;
     use crate::log::LoggerExt;
@@ -70,8 +70,33 @@ fn two_calls() -> duchess::GlobalResult<()> {
             .assert_not_null()
             .execute(jvm)?;
         logger.add_event(&event).execute(jvm)?;
+        logger.add_event(&event).execute(jvm)?;
         Ok(())
     })
 }
 
+#[test]
+fn global_ref_and_two_calls() -> duchess::GlobalResult<()> {
+    // FIXME: conflict between interface trait (LoggerExt) and class trait (BuilderExt)
+    use crate::log::BuildStepExt;
+    use crate::log::LoggerExt;
+    use crate::log::NameStepExt;
+    use crate::log::TimeStepExt;
+
+    let logger = duchess::Jvm::with(|jvm| log::Logger::new().global().execute(jvm))?;
+
+    duchess::Jvm::with(|jvm| {
+        let event = log::Builder::new()
+            .with_time(java::util::Date::new())
+            .assert_not_null()
+            .with_name("foo")
+            .assert_not_null()
+            .build()
+            .assert_not_null()
+            .execute(jvm)?;
+        logger.add_event(&event).execute(jvm)?;
+        logger.add_event(&event).execute(jvm)?;
+        Ok(())
+    })
+}
 fn main() {}
