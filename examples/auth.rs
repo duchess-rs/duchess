@@ -25,9 +25,18 @@ mod java_auth {
 
     // XX: can be removed when we automatically look through extends/implements
     use duchess::java;
-    unsafe impl duchess::plumbing::Upcast<java::lang::Throwable> for AuthenticationExceptionUnauthenticated {}
-    unsafe impl duchess::plumbing::Upcast<java::lang::Throwable> for AuthenticationExceptionInvalidSecurityToken {}
-    unsafe impl duchess::plumbing::Upcast<java::lang::Throwable> for AuthenticationExceptionInvalidSignature {}
+    unsafe impl duchess::plumbing::Upcast<java::lang::Throwable>
+        for AuthenticationExceptionUnauthenticated
+    {
+    }
+    unsafe impl duchess::plumbing::Upcast<java::lang::Throwable>
+        for AuthenticationExceptionInvalidSecurityToken
+    {
+    }
+    unsafe impl duchess::plumbing::Upcast<java::lang::Throwable>
+        for AuthenticationExceptionInvalidSignature
+    {
+    }
     unsafe impl duchess::plumbing::Upcast<java::lang::Throwable> for AuthorizationExceptionDenied {}
 
     pub use auth::*;

@@ -143,14 +143,7 @@ impl ClassInfo {
             const _: () = {
                 use duchess::{
                     *,
-                    codegen_deps::{
-                        once_cell::sync::OnceCell,
-                        jni::{
-                            objects::{AutoLocal, JMethodID, JClass, JValue, JValueGen},
-                            signature::{ReturnType, Primitive},
-                            sys::jvalue,
-                        },
-                    },
+                    codegen_deps::once_cell::sync::OnceCell,
                     plumbing::*,
                     prelude::*,
                 };
@@ -243,13 +236,10 @@ impl ClassInfo {
         quote_spanned! {
             self.span =>
             fn class<'jvm>(jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, Local<'jvm, java::lang::Class>> {
-                let env = jvm.to_env();
-
                 static CLASS: OnceCell<Global<java::lang::Class>> = OnceCell::new();
                 let global = CLASS.get_or_try_init::<_, duchess::Error<Local<java::lang::Throwable>>>(|| {
-                    let class = with_jni_env(env, |env| env.find_class(#jni_class_name))?;
-                    let global = with_jni_env(env, |env| env.new_global_ref(class))?;
-                    Ok(unsafe { Global::from_jni(global) })
+                    let class = find_class(jvm, #jni_class_name)?;
+                    Ok(jvm.global(&class))
                 })?;
                 Ok(jvm.local(global))
             }
@@ -274,10 +264,14 @@ impl ClassInfo {
 
         let java_class_generics = self.class_generic_names();
 
-        let descriptor = constructor.descriptor();
+        let jni_descriptor = jni_c_str(constructor.descriptor(), self.span);
 
         // Code to convert each input appropriately
         let prepare_inputs = self.prepare_inputs(&input_names, &constructor.argument_tys);
+
+        // for debugging JVM invocation failures
+        let name = Literal::string(&self.name.to_string());
+        let descriptor = Literal::string(&constructor.descriptor());
 
         let output = quote_spanned!(self.span =>
             impl< #(#java_class_generics,)* > #ty
@@ -321,28 +315,38 @@ impl ClassInfo {
                             #(#prepare_inputs)*
 
                             let class = <#ty>::class(jvm)?;
-                            let class = class.as_jobject();
-                            let class: &JClass = (&*class).into();
-
-                            let env = jvm.to_env();
 
                             // Cache the method id for the constructor -- note that we only have one cache
                             // no matter how many generic monomorphizations there are. This makes sense
                             // given Java's erased-based generics system.
-                            static CONSTRUCTOR: OnceCell<JMethodID> = OnceCell::new();
+                            static CONSTRUCTOR: OnceCell<MethodPtr> = OnceCell::new();
                             let constructor = CONSTRUCTOR.get_or_try_init(|| {
-                                with_jni_env(env, |env| env.get_method_id(class, "<init>", #descriptor))
+                                find_constructor(jvm, &class, #jni_descriptor)
                             })?;
 
-                            let o = with_jni_env(env, |env| unsafe {
-                                env.new_object_unchecked(class, *constructor, &[
-                                    #(JValue::from(#input_names).as_jni(),)*
-                                ])
-                            })?;
+                            let env = jvm.env();
+                            let obj = unsafe {
+                                env.invoke(|env| env.NewObjectA, |env, f| f(
+                                    env,
+                                    class.as_raw().as_ptr(),
+                                    constructor.as_ptr(),
+                                    [
+                                        #(#input_names.into_jni_value(),)*
+                                    ].as_ptr(),
+                                ))
+                            };
 
-                            Ok(unsafe {
-                                Local::from_jni(AutoLocal::new(o, &env))
-                            })
+                            if let Some(obj) = ObjectPtr::new(obj) {
+                                Ok(unsafe { Local::from_raw(env, obj) })
+                            } else {
+                                check_exception(jvm)?;
+                                // NewObjectA should only return a null pointer when an exception occurred in the
+                                // constructor, so reaching here is a strange JVM state
+                                Err(duchess::Error::JvmInternal(format!(
+                                    "failed to create new `{}` via constructor `{}`",
+                                    #name, #descriptor,
+                                )))
+                            }
                         }
                     }
 
@@ -378,14 +382,14 @@ impl ClassInfo {
 
         let output_ty = sig.output_type(&method.return_ty)?;
         let output_trait = sig.method_trait(&method.return_ty)?;
-        let jni_return_ty = sig.jni_return_ty(&method.return_ty)?;
+        let jni_call_fn = sig.jni_call_fn(&method.return_ty)?;
 
-        let descriptor = Literal::string(&method.descriptor());
+        let jni_descriptor = jni_c_str(&method.descriptor(), self.span);
 
         // Code to convert each input appropriately
         let prepare_inputs = self.prepare_inputs(&input_names, &method.argument_tys);
 
-        let method_str = Literal::string(&method.name);
+        let jni_method = jni_c_str(&*method.name, self.span);
 
         let rust_method_name = Ident::new(&method.name.to_snake_case(), self.span);
         let rust_method_type_name = Ident::new(&method.name.to_camel_case(), self.span);
@@ -491,31 +495,33 @@ impl ClassInfo {
                     input: This::Input<'jvm>,
                 ) -> duchess::Result<'jvm, Self::Output<'jvm>> {
                     let this = self.this.execute_with(jvm, input)?;
-                    let this: & #this_ty = this.as_ref();
-                    let this = this.as_jobject();
+                    let this = this.as_ref().as_raw();
 
                     #(#prepare_inputs)*
 
                     // Cache the method id for this method -- note that we only have one cache
                     // no matter how many generic monomorphizations there are. This makes sense
                     // given Java's erased-based generics system.
-                    static METHOD: OnceCell<JMethodID> = OnceCell::new();
+                    static METHOD: OnceCell<MethodPtr> = OnceCell::new();
                     let method = METHOD.get_or_try_init(|| {
                         let class = <#this_ty>::class(jvm)?;
-                        let class = class.as_jobject();
-                        let class: &JClass = (&*class).into();
-                        with_jni_env(jvm.to_env(), |env| env.get_method_id(class, #method_str, #descriptor))
+                        find_method(jvm, &class, #jni_method, #jni_descriptor)
                     })?;
 
-                    let env = jvm.to_env();
+                    let output = unsafe {
+                        jvm.env().invoke(|env| env.#jni_call_fn, |env, f| f(
+                            env,
+                            this.as_ptr(),
+                            method.as_ptr(),
+                            [
+                                #(#input_names.into_jni_value(),)*
+                            ].as_ptr(),
+                        ))
+                    };
+                    check_exception(jvm)?;
 
-                    let result = with_jni_env(env, |env| unsafe {
-                        env.call_method_unchecked(this, *method, #jni_return_ty, &[
-                            #(JValue::from(#input_names).as_jni(),)*
-                        ])
-                    })?;
-
-                    Ok(FromJValue::from_jvalue(jvm, result))
+                    let output: #output_ty = unsafe { FromJniValue::from_jni_value(jvm, output) };
+                    Ok(output)
                 }
             }
         );
@@ -559,9 +565,9 @@ impl ClassInfo {
         }
     }
 
-    /// Returns a class name with `/`, like `java/lang/Object`.
-    fn jni_class_name(&self) -> Literal {
-        self.name.to_jni_name(self.span)
+    /// Returns a class name with `/`, like `java/lang/Object` as a &CStr
+    fn jni_class_name(&self) -> TokenStream {
+        jni_c_str(self.name.to_jni_name(), self.span)
     }
 
     fn prepare_inputs(&self, input_names: &[Ident], input_types: &[Type]) -> Vec<TokenStream> {
@@ -575,7 +581,6 @@ impl ClassInfo {
                 NonRepeatingType::Ref(_) => quote_spanned!(self.span =>
                     let #input_name = self.#input_name.into_java(jvm)?;
                     let #input_name = #input_name.as_ref();
-                    let #input_name = &#input_name.as_jobject();
                 ),
             })
             .collect()
@@ -717,31 +722,31 @@ impl Signature {
         })
     }
 
-    fn jni_return_ty(&mut self, ty: &Option<Type>) -> Result<TokenStream, SpanError> {
-        match ty {
-            Some(Type::Ref(_)) => Ok(quote_spanned!(self.span => ReturnType::Object)),
-            Some(Type::Repeat(_)) => Err(SpanError {
-                span: self.span,
-                message: format!(
-                    "unsupported repeating method return type in `{}`",
-                    self.method_name
-                ),
-            }),
-            Some(Type::Scalar(scalar)) => {
-                let primitive = match scalar {
-                    ScalarType::Int => quote_spanned!(self.span => Primitive::Int),
-                    ScalarType::Long => quote_spanned!(self.span => Primitive::Long),
-                    ScalarType::Short => quote_spanned!(self.span => Primitive::Short),
-                    ScalarType::Byte => quote_spanned!(self.span => Primitive::Byte),
-                    ScalarType::F64 => quote_spanned!(self.span => Primitive::Double),
-                    ScalarType::F32 => quote_spanned!(self.span => Primitive::Float),
-                    ScalarType::Boolean => quote_spanned!(self.span => Primitive::Boolean),
-                    ScalarType::Char => quote_spanned!(self.span => Primitive::Char),
-                };
-                Ok(quote_spanned!(self.span => ReturnType::Primitive(#primitive)))
+    fn jni_call_fn(&mut self, ty: &Option<Type>) -> Result<Ident, SpanError> {
+        let f = match ty {
+            Some(Type::Ref(_)) => "CallObjectMethodA",
+            Some(Type::Repeat(_)) => {
+                return Err(SpanError {
+                    span: self.span,
+                    message: format!(
+                        "unsupported repeating method return type in `{}`",
+                        self.method_name
+                    ),
+                })
             }
-            None => Ok(quote_spanned!(self.span => ReturnType::Primitive(Primitive::Void))),
-        }
+            Some(Type::Scalar(scalar)) => match scalar {
+                ScalarType::Int => "CallIntMethodA",
+                ScalarType::Long => "CallLongMethodA",
+                ScalarType::Short => "CallShortMethodA",
+                ScalarType::Byte => "CallByteMethodA",
+                ScalarType::F64 => "CallDoubleMethodA",
+                ScalarType::F32 => "CallFloatMethodA",
+                ScalarType::Boolean => "CallBooleanMethodA",
+                ScalarType::Char => "CallCharMethodA",
+            },
+            None => "CallVoidMethodA",
+        };
+        Ok(Ident::new(f, self.span))
     }
 
     /// Returns an appropriate trait for a method that
@@ -831,20 +836,20 @@ impl Signature {
 }
 
 trait DotIdExt {
-    fn to_jni_name(&self, span: Span) -> Literal;
+    fn to_jni_name(&self) -> String;
     fn to_module_name(&self, span: Span) -> TokenStream;
 }
 
 impl DotIdExt for DotId {
-    fn to_jni_name(&self, _span: Span) -> Literal {
+    fn to_jni_name(&self) -> String {
         let (package_names, struct_name) = self.split();
         let mut output = String::new();
         for p in package_names {
             output.push_str(p);
-            output.push_str("/");
+            output.push('/');
         }
         output.push_str(struct_name);
-        Literal::string(&output)
+        output
     }
 
     fn to_module_name(&self, span: Span) -> TokenStream {
@@ -858,4 +863,13 @@ impl DotIdExt for DotId {
 
 trait GenericExt {
     fn to_where_clause(&self, span: Span) -> TokenStream;
+}
+
+fn jni_c_str(contents: impl Into<String>, span: Span) -> TokenStream {
+    let mut contents = contents.into().into_bytes();
+    // \0 isn't valid UTF-8, so don't need to check that contents doesn't contain interior nul bytes.
+    contents.push(0);
+
+    let byte_string = Literal::byte_string(&contents);
+    quote_spanned!(span => unsafe { ::std::ffi::CStr::from_bytes_with_nul_unchecked(#byte_string) })
 }

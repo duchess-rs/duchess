@@ -1,25 +1,16 @@
 use crate::{
     cast::{AsUpcast, TryDowncast, Upcast},
     catch::{CatchNone, Catching},
+    find::find_class,
     inspect::{ArgOp, Inspect},
     java::lang::{Class, ClassExt, Throwable},
     not_null::NotNull,
-    plumbing::{convert_non_throw_jni_error, with_jni_env},
-    IntoLocal,
+    raw::{self, EnvPtr, HasEnvPtr, JvmPtr, ObjectPtr},
+    thread, Error, Global, GlobalResult, IntoLocal, Local,
 };
 
-use std::{
-    borrow::Cow,
-    fmt::Display,
-    marker::PhantomData,
-    ops::{Deref, DerefMut},
-    ptr::NonNull,
-};
+use std::{ffi::CStr, fmt::Display, ptr::NonNull};
 
-use jni::{
-    objects::{AutoLocal, GlobalRef, JObject, JValueOwned},
-    sys, InitArgsBuilder, JNIEnv, JavaVM,
-};
 use once_cell::sync::OnceCell;
 
 /// A "jdk op" is a suspended operation that, when executed, will run
@@ -106,119 +97,137 @@ pub trait JvmOp: Sized {
 pub trait IsVoid: Default {}
 impl IsVoid for () {}
 
-static GLOBAL_JVM: OnceCell<JavaVM> = OnceCell::new();
+static GLOBAL_JVM: OnceCell<JvmPtr> = OnceCell::new();
 
-#[repr(transparent)]
-pub struct Jvm<'jvm> {
-    env: JNIEnv<'jvm>,
+fn get_or_default_init_jvm() -> crate::GlobalResult<JvmPtr> {
+    match GLOBAL_JVM.get() {
+        Some(jvm) => Ok(*jvm),
+        None => {
+            Jvm::builder().launch_or_use_existing()?;
+            Ok(*GLOBAL_JVM
+                .get()
+                .expect("launch_or_use_existing must set GLOBAL_JVM"))
+        }
+    }
 }
 
+/// Get the global [`JvmPtr`] assuming that the JVM has already been initialized. Expected to be used with values
+/// that only can have been derived from an existing JVM.
+///
+/// # Panics
+///
+/// Panics if the JVM wasn't initialized.
+pub(crate) fn unwrap_global_jvm() -> JvmPtr {
+    *GLOBAL_JVM.get().expect("JVM can't be unset")
+}
+
+pub struct Jvm<'jvm>(EnvPtr<'jvm>);
+
 impl<'jvm> Jvm<'jvm> {
-    fn get_or_default_init_jvm() -> crate::GlobalResult<&'static JavaVM> {
-        GLOBAL_JVM.get_or_try_init(|| {
-            let jvm = JvmBuilder::new().build_jvm()?;
-            Ok(jvm)
-        })
+    pub fn builder() -> JvmBuilder {
+        JvmBuilder::new()
     }
 
-    pub fn builder<'args>() -> JvmBuilder<'args> {
-        JvmBuilder::new()
+    pub fn attach_thread_permanently() -> crate::GlobalResult<()> {
+        thread::attach_permanently(get_or_default_init_jvm()?)?;
+        Ok(())
     }
 
     pub fn with<R>(
         op: impl for<'a> FnOnce(&mut Jvm<'a>) -> crate::Result<'a, R>,
     ) -> crate::GlobalResult<R> {
-        let guard = Self::get_or_default_init_jvm()?
-            .attach_current_thread()
-            .map_err(convert_non_throw_jni_error)?;
+        let jvm = get_or_default_init_jvm()?;
+        // SAFTEY: we won't deinitialize the JVM while the guard is live
+        let mut guard = unsafe { thread::attach(jvm)? };
 
-        // Safety condition: must not be used to create new references
-        // unless they are contained by `guard`. In this case, the
-        // cloned env is fully contained within the lifetime of `guard`
-        // and basically takes its place. The only purpose here is to
-        // avoid having two lifetime parameters on `Jvm`; trying to
-        // keep the interface simpler.
-        let env = unsafe { guard.unsafe_clone() };
-
-        op(&mut Jvm { env }).map_err(|e| {
-            e.into_global(&mut Jvm {
-                env: unsafe { guard.unsafe_clone() },
-            })
-        })
-    }
-
-    pub fn to_env(&mut self) -> &mut JNIEnv<'jvm> {
-        &mut self.env
+        let mut jvm = Jvm(guard.env());
+        op(&mut jvm).map_err(|e| e.into_global(&mut jvm))
     }
 
     pub fn local<R>(&mut self, r: &R) -> Local<'jvm, R>
     where
         R: JavaObject,
     {
-        let env = self.to_env();
-        unsafe {
-            let raw = r.as_jobject();
-            assert!(!raw.is_null());
-            let new_local_ref = env.new_local_ref(&*raw).unwrap();
-            assert!(!new_local_ref.is_null());
-            Local::from_jni(AutoLocal::new(new_local_ref, &env))
-        }
+        Local::new(self.0, r)
     }
 
     pub fn global<R>(&mut self, r: &R) -> Global<R>
     where
         R: JavaObject,
     {
-        let env = self.to_env();
-        unsafe {
-            let raw = r.as_jobject();
-            assert!(!raw.is_null());
-            let new_global_ref = env.new_global_ref(&*raw).unwrap();
-            assert!(!new_global_ref.is_null());
-            Global::from_jni(new_global_ref)
-        }
+        Global::new(self.0, r)
     }
 }
 
-pub struct JvmBuilder<'args> {
-    args_builder: InitArgsBuilder<'args>,
+impl<'jvm> HasEnvPtr<'jvm> for Jvm<'jvm> {
+    fn env(&self) -> EnvPtr<'jvm> {
+        self.0
+    }
 }
 
-impl<'args> JvmBuilder<'args> {
+pub struct JvmBuilder {
+    options: Vec<String>,
+    #[cfg(feature = "dylibjvm")]
+    libjvm_path: Option<std::path::PathBuf>,
+}
+
+impl JvmBuilder {
     fn new() -> Self {
-        let args_builder = InitArgsBuilder::new()
-            .version(jni::JNIVersion::V8)
-            .option("-Xcheck:jni");
-        JvmBuilder {
-            args_builder
+        let mut this = Self {
+            options: vec![],
+            #[cfg(feature = "dylibjvm")]
+            libjvm_path: None,
+        };
+
+        if cfg!(debug_assertions) {
+            this = this.custom("-Xcheck:jni");
         }
+        if let Ok(classpath) = std::env::var("CLASSPATH") {
+            this = this.add_classpath(classpath);
+        }
+
+        this
     }
 
-    pub fn add_classpath(mut self, classpath: impl Display) -> Self {
-        self.args_builder = self.args_builder.option(format!("-Djava.class.path={classpath}"));
+    pub fn add_classpath(self, classpath: impl Display) -> Self {
+        self.custom(format!("-Djava.class.path={classpath}"))
+    }
+
+    pub fn custom(mut self, opt_string: impl Into<String>) -> Self {
+        self.options.push(opt_string.into());
         self
     }
 
-    pub fn custom(mut self, opt_string: impl AsRef<str> + Into<Cow<'args, str>>) -> Self {
-        self.args_builder = self.args_builder.option(opt_string);
+    #[cfg(feature = "dylibjvm")]
+    pub fn load_libjvm_at(mut self, path: impl AsRef<std::path::Path>) -> Self {
+        self.libjvm_path = Some(path.as_ref().into());
         self
     }
 
-    fn build_jvm(self) -> crate::GlobalResult<JavaVM> {
-        let jvm_args = self.args_builder.build()?;
-        let jvm = JavaVM::new(jvm_args)?;
-        Ok(jvm)
+    /// Launch a new JVM, returning [`Error::JvmAlreadyExists`] if one already exists.
+    pub fn try_launch(self) -> GlobalResult<()> {
+        #[cfg(feature = "dylibjvm")]
+        if let Some(path) = self.libjvm_path {
+            crate::libjvm::libjvm_or_load_at(&path)?;
+        }
+
+        let jvm = raw::try_create_jvm(self.options.into_iter())?;
+        GLOBAL_JVM
+            .set(jvm)
+            .expect("tried to launch multiple JVMs through duchess");
+
+        Ok(())
     }
 
-    /// Launch a new JVM, returning an error if one already exists.
-    pub fn launch<R>(
-        self, op: impl for<'a> FnOnce(&mut Jvm<'a>) -> crate::Result<'a, R>,
-    ) -> crate::GlobalResult<R> {
-        let jvm = self.build_jvm()?;
-        // This unwrap never fails, because in case a JVM already exists `build_jvm` would have
-        // failed first.
-        GLOBAL_JVM.set(jvm).unwrap();
-        Jvm::with(op)
+    pub fn launch_or_use_existing(self) -> GlobalResult<()> {
+        match self.try_launch() {
+            Err(Error::JvmAlreadyExists) => {
+                let jvm = raw::jvm()?.expect("JVM should already exist");
+                GLOBAL_JVM.set(jvm).unwrap();
+                Ok(())
+            }
+            result => result,
+        }
     }
 }
 
@@ -255,34 +264,18 @@ pub trait JavaObjectExt: Sized {
     // We use an extension trait, instead of just declaring these functions on the main JavaObject
     // trait, to prevent trait implementors from overriding the implementation of these functions.
 
-    fn from_jobject<'a>(obj: &'a JObject<'a>) -> Option<&'a Self>;
-    fn as_jobject(&self) -> BorrowedJObject<'_>;
+    unsafe fn from_raw<'a>(ptr: ObjectPtr) -> &'a Self;
+    fn as_raw(&self) -> ObjectPtr;
 }
 impl<T: JavaObject> JavaObjectExt for T {
-    fn from_jobject<'a>(obj: &'a JObject<'a>) -> Option<&'a Self> {
-        // SAFETY: I *think* the cast is sound, because:
-        //
-        // 1. A pointer to a suitably aligned `sys::_jobject` should also satisfy Self's alignment
-        //    requirement (trait rule #3)
-        // 2. Self is a zero-sized type (trait rule #1), so there are no invalid bit patterns to
-        //    worry about.
-        // 3. Self is a zero-sized type (trait rule #1), so there's no actual memory region that is
-        //    subject to the aliasing rules.
-        //
-        // XXX: Please check my homework.
-        Some(unsafe { NonNull::new(obj.as_raw())?.cast().as_ref() })
+    unsafe fn from_raw<'a>(ptr: ObjectPtr) -> &'a Self {
+        // XX: safety
+        unsafe { ptr.as_ref() }
     }
 
-    fn as_jobject(&self) -> BorrowedJObject<'_> {
-        let raw = (self as *const Self).cast_mut().cast::<sys::_jobject>();
-
-        // SAFETY: the only way to get a `&Self` is by calling `Self::from_jobject` (trait rule #1),
-        // so reconstructing the original JObject passed to `from_jni` should also be safe.
-        let obj = unsafe { JObject::from_raw(raw) };
-
-        // We must wrap the JObject to prevent anyone from calling `delete_local_ref` on it;
-        // otherwise, `self` could become dangling
-        BorrowedJObject::new(obj)
+    fn as_raw(&self) -> ObjectPtr {
+        // XX: safety
+        unsafe { NonNull::new_unchecked((self as *const Self).cast_mut()).cast() }.into()
     }
 }
 
@@ -305,13 +298,13 @@ macro_rules! scalar {
         $(
             unsafe impl JavaType for $rust {
                 fn array_class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Local<'jvm, Class>> {
-                    let env = jvm.to_env();
-
+                    // XX: Safety
+                    const CLASS_NAME: &CStr = unsafe { CStr::from_bytes_with_nul_unchecked($array_class) };
                     static CLASS: OnceCell<Global<crate::java::lang::Class>> = OnceCell::new();
+
                     let global = CLASS.get_or_try_init::<_, crate::Error<Local<Throwable>>>(|| {
-                        let class = with_jni_env(env, |env| env.find_class($array_class))?;
-                        let global = with_jni_env(env, |env| env.new_global_ref(class))?;
-                        Ok(unsafe { Global::from_jni(global) })
+                        let class = find_class(jvm, CLASS_NAME)?;
+                        Ok(jvm.global(&class))
                     })?;
                     Ok(jvm.local(global))
                 }
@@ -323,171 +316,14 @@ macro_rules! scalar {
 }
 
 scalar! {
-    bool: "[Z",
-    i8:   "[B",
-    i16:  "[S",
-    i32:  "[I",
-    i64:  "[J",
-    f32:  "[F",
-    f64:  "[D",
-}
-
-/// A wrapper for a [JObject] that only allows access by reference. This prevents passing the
-/// wrapped `JObject` to `JNIEnv::delete_local_ref`.
-pub type BorrowedJObject<'a> = Jail<JObject<'a>>;
-
-/// A wrapper for a value that prevents the value from being moved out, while still allowing access
-/// by reference.
-pub struct Jail<T>(T);
-
-impl<T> Jail<T> {
-    pub fn new(value: T) -> Self {
-        Self(value)
-    }
-}
-impl<T> Deref for Jail<T> {
-    type Target = T;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-impl<T> DerefMut for Jail<T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-impl<T> AsRef<T> for Jail<T> {
-    fn as_ref(&self) -> &T {
-        &*self
-    }
-}
-impl<T> AsMut<T> for Jail<T> {
-    fn as_mut(&mut self) -> &mut T {
-        &mut *self
-    }
-}
-
-// I suspect we'll need to change these from type aliases to newtypes, for ergonomics sake, but for
-// now, they just work.
-
-/// An owned local reference to a non-null Java object of type `T`. The reference will be freed when
-/// dropped.
-pub type Local<'a, T> = OwnedRef<'a, AutoLocal<'a, JObject<'a>>, T>;
-
-/// An owned global reference to a non-null Java object of type `T`. The reference will be freed
-/// when dropped.
-pub type Global<T> = OwnedRef<'static, GlobalRef, T>;
-
-/// An *owned* JNI reference, either local or global, to a non-null Java object of type `T`. The
-/// underlying JNI reference is represented by type `J`, which is responsible for freeing the
-/// reference when dropped.
-///
-/// Typically, instead of using `OwnedRef` directly, you would use one of the type aliases, [Local]
-/// or [Global]. If you need a borrowed reference instead of an owned one, just use `&T`.
-#[repr(transparent)]
-pub struct OwnedRef<'a, J, T> {
-    inner: J,
-    phantom: PhantomData<&'a T>,
-}
-
-impl<J, T> OwnedRef<'_, J, T> {
-    /// Converts an underlying JNI reference into an [OwnedRef].
-    ///
-    /// # Safety
-    ///
-    /// `inner` must refer to a non-null Java object whose type is `T`.
-    pub unsafe fn from_jni(inner: J) -> Self {
-        Self {
-            inner,
-            phantom: PhantomData,
-        }
-    }
-}
-
-impl<'a, J, T> Deref for OwnedRef<'a, J, T>
-where
-    J: Deref<Target = JObject<'a>>,
-    T: JavaObject,
-{
-    type Target = T;
-    fn deref(&self) -> &Self::Target {
-        T::from_jobject(&*self.inner).expect("inner reference is null")
-    }
-}
-
-// pub(crate) trait IntoRawJObject {
-//     fn into_raw(self) -> sys::jobject;
-// }
-
-// impl IntoRawJObject for JObject<'_> {
-//     fn into_raw(self) -> sys::jobject {
-//         self.into_raw()
-//     }
-// }
-
-// impl IntoRawJObject for sys::jobject {
-//     fn into_raw(self) -> sys::jobject {
-//         self
-//     }
-// }
-
-// impl<R> IntoRawJObject for &R
-// where
-//     R: JavaObject,
-// {
-//     fn into_raw(self) -> sys::jobject {
-//         self.to_raw()
-//     }
-// }
-
-impl<'a, R, S> AsRef<S> for Local<'a, R>
-where
-    R: Upcast<S>,
-    S: JavaObject + 'a,
-{
-    fn as_ref(&self) -> &S {
-        // XX: Safety: repr(transparent) so OwnedRef<J, X> and OwnedRef<J, Y> have the same repr
-        let upcast: &Local<'a, S> = unsafe { std::mem::transmute(self) };
-        upcast
-    }
-}
-
-impl<'a, R> Local<'a, R> {
-    /// XX: Trying to map onto Into causes impl conflits
-    pub fn upcast<S>(self) -> Local<'a, S>
-    where
-        R: Upcast<S>,
-        S: JavaObject + 'a,
-    {
-        // XX: Safety: repr(transparent) so OwnedRef<J, X> and OwnedRef<J, Y> have the same repr
-        let upcast: Local<'a, S> = unsafe { std::mem::transmute(self) };
-        upcast
-    }
-}
-
-impl<R, S> AsRef<S> for Global<R>
-where
-    R: Upcast<S>,
-    S: JavaObject + 'static,
-{
-    fn as_ref(&self) -> &S {
-        // XX: Safety: repr(transparent) so OwnedRef<J, X> and OwnedRef<J, Y> have the same repr
-        let upcast: &Global<S> = unsafe { std::mem::transmute(self) };
-        upcast
-    }
-}
-
-impl<R> Global<R> {
-    /// XX: Trying to map onto Into causes impl conflits
-    pub fn upcast<S>(self) -> Global<S>
-    where
-        R: Upcast<S>,
-        S: JavaObject + 'static,
-    {
-        // XX: Safety: repr(transparent) so OwnedRef<J, X> and OwnedRef<J, Y> have the same repr
-        let upcast: Global<S> = unsafe { std::mem::transmute(self) };
-        upcast
-    }
+    bool: b"[Z\0",
+    i8:   b"[B\0",
+    i16:  b"[S\0",
+    u16:  b"[C\0",
+    i32:  b"[I\0",
+    i64:  b"[J\0",
+    f32:  b"[F\0",
+    f64:  b"[D\0",
 }
 
 pub trait CloneIn<'jvm> {
@@ -500,118 +336,5 @@ where
 {
     fn clone_in(&self, _jvm: &mut Jvm<'_>) -> Self {
         self.clone()
-    }
-}
-
-impl<'jvm, T> CloneIn<'jvm> for Local<'jvm, T>
-where
-    T: JavaObject,
-{
-    fn clone_in(&self, jvm: &mut Jvm<'jvm>) -> Self {
-        jvm.local(self)
-    }
-}
-
-impl<'jvm, T> CloneIn<'jvm> for Global<T>
-where
-    T: JavaObject,
-{
-    fn clone_in(&self, jvm: &mut Jvm<'jvm>) -> Self {
-        jvm.global(self)
-    }
-}
-
-pub trait FromJValue<'jvm> {
-    fn from_jvalue(jvm: &mut Jvm<'jvm>, value: JValueOwned<'jvm>) -> Self;
-}
-
-impl<'jvm, T> FromJValue<'jvm> for Option<Local<'jvm, T>>
-where
-    T: JavaObject,
-{
-    fn from_jvalue(jvm: &mut Jvm<'jvm>, value: JValueOwned<'jvm>) -> Self {
-        match value {
-            jni::objects::JValueGen::Object(o) => {
-                if o.is_null() {
-                    None
-                } else {
-                    let env = jvm.to_env();
-                    Some(unsafe { Local::from_jni(AutoLocal::new(o, &env)) })
-                }
-            }
-            _ => panic!("expected object, found {value:?})"),
-        }
-    }
-}
-
-impl<'jvm> FromJValue<'jvm> for () {
-    fn from_jvalue(_jvm: &mut Jvm<'jvm>, value: JValueOwned<'jvm>) -> Self {
-        match value {
-            jni::objects::JValueGen::Void => (),
-            _ => panic!("expected void, found {value:?})"),
-        }
-    }
-}
-
-impl<'jvm> FromJValue<'jvm> for i32 {
-    fn from_jvalue(_jvm: &mut Jvm<'jvm>, value: JValueOwned<'jvm>) -> Self {
-        match value {
-            jni::objects::JValueGen::Int(i) => i,
-            _ => panic!("expected void, found {value:?})"),
-        }
-    }
-}
-
-impl<'jvm> FromJValue<'jvm> for i64 {
-    fn from_jvalue(_jvm: &mut Jvm<'jvm>, value: JValueOwned<'jvm>) -> Self {
-        match value {
-            jni::objects::JValueGen::Long(i) => i,
-            _ => panic!("expected void, found {value:?})"),
-        }
-    }
-}
-
-impl<'jvm> FromJValue<'jvm> for i8 {
-    fn from_jvalue(_jvm: &mut Jvm<'jvm>, value: JValueOwned<'jvm>) -> Self {
-        match value {
-            jni::objects::JValueGen::Byte(i) => i,
-            _ => panic!("expected void, found {value:?})"),
-        }
-    }
-}
-
-impl<'jvm> FromJValue<'jvm> for i16 {
-    fn from_jvalue(_jvm: &mut Jvm<'jvm>, value: JValueOwned<'jvm>) -> Self {
-        match value {
-            jni::objects::JValueGen::Short(i) => i,
-            _ => panic!("expected void, found {value:?})"),
-        }
-    }
-}
-
-impl<'jvm> FromJValue<'jvm> for bool {
-    fn from_jvalue(_jvm: &mut Jvm<'jvm>, value: JValueOwned<'jvm>) -> Self {
-        match value {
-            jni::objects::JValueGen::Bool(i) => i != 0,
-            _ => panic!("expected void, found {value:?})"),
-        }
-    }
-}
-
-impl<'jvm> FromJValue<'jvm> for f32 {
-    fn from_jvalue(_jvm: &mut Jvm<'jvm>, value: JValueOwned<'jvm>) -> Self {
-        match value {
-            jni::objects::JValueGen::Float(i) => i,
-            _ => panic!("expected void, found {value:?})"),
-        }
-    }
-}
-
-impl<'jvm> FromJValue<'jvm> for f64 {
-    fn from_jvalue(_jvm: &mut Jvm<'jvm>, value: JValueOwned<'jvm>) -> Self {
-        match value {
-            jni::objects::JValueGen::Double(i) => i,
-            _ => panic!("expected void, found {value:?})"),
-        }
     }
 }

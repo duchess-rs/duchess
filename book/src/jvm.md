@@ -23,10 +23,6 @@ Jvm::builder()
     .add_classpath("bar")
     .memory()
     .custom("-X foobar")
-    .launch(|jvm| {
-
-    })
+    .launch_or_use_existing()
 ```
-
-Unlike the `with` command, the `launch` command panics if the JVM has already been started by some other thread.
 
