@@ -211,19 +211,35 @@ impl JvmBuilder {
             crate::libjvm::libjvm_or_load_at(&path)?;
         }
 
-        let jvm = raw::try_create_jvm(self.options.into_iter())?;
-        GLOBAL_JVM
-            .set(jvm)
-            .expect("tried to launch multiple JVMs through duchess");
+        let mut already_exists = true;
+        GLOBAL_JVM.get_or_try_init(|| {
+            // SAFETY: we're behind the GLOBAL_JVM lock and we won't race with other threads creating or finding an
+            // existing JVM.
+            let jvm = unsafe { raw::try_create_jvm(self.options.into_iter()) }?;
+            already_exists = false;
+            GlobalResult::Ok(jvm)
+        })?;
 
-        Ok(())
+        if already_exists {
+            Err(Error::JvmAlreadyExists)
+        } else {
+            Ok(())
+        }
     }
 
     pub fn launch_or_use_existing(self) -> GlobalResult<()> {
         match self.try_launch() {
             Err(Error::JvmAlreadyExists) => {
-                let jvm = raw::jvm()?.expect("JVM should already exist");
-                GLOBAL_JVM.set(jvm).unwrap();
+                // Two cases: (1) another thread successfully invoked try_launch() and we'll now get the pointer out of
+                // GLOBAL_JVM, or (2) the JVM was created by some non-duchess code and we'll now need to look it up with
+                // the existing_jvm() call.
+                GLOBAL_JVM.get_or_try_init(|| {
+                    // SAFETY: we're behind the GLOBAL_JVM lock and we won't race with other threads creating or finding
+                    // an existing JVM.
+                    GlobalResult::Ok(
+                        unsafe { raw::existing_jvm() }?.expect("JVM should already exist"),
+                    )
+                })?;
                 Ok(())
             }
             result => result,

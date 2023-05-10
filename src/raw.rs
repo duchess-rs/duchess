@@ -19,7 +19,11 @@ const VERSION: jni_sys::jint = jni_sys::JNI_VERSION_1_8;
 /// Get a [`JvmPtr`] to an already initialized JVM (if one exists).
 ///
 /// If the `dynlibjvm` feature is enabled and `libjvm` isn't already loaded, it will first force it to be loaded.
-pub(crate) fn jvm() -> GlobalResult<Option<JvmPtr>> {
+///
+/// # Safety
+///
+/// Caller must ensure that no two threads race to call this fn or [`try_create_jvm()`].
+pub(crate) unsafe fn existing_jvm() -> GlobalResult<Option<JvmPtr>> {
     let libjvm = crate::libjvm::libjvm_or_load()?;
 
     let mut jvms = [std::ptr::null_mut::<jni_sys::JavaVM>()];
@@ -53,7 +57,11 @@ pub(crate) fn jvm() -> GlobalResult<Option<JvmPtr>> {
 /// [`Error::JvmAlreadyExists`] if one already exists.
 ///
 /// If the `dynlibjvm` feature is enabled and `libjvm` isn't already loaded, it will first force it to be loaded.
-pub(crate) fn try_create_jvm<'a>(
+///
+/// # Safety
+///
+/// Caller must ensure that no two threads race to call this fn or [`jvm()`].
+pub(crate) unsafe fn try_create_jvm<'a>(
     options: impl IntoIterator<Item = String>,
 ) -> GlobalResult<JvmPtr> {
     let libjvm = crate::libjvm::libjvm_or_load()?;
