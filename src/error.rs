@@ -5,9 +5,9 @@ use std::{
 
 use thiserror::Error;
 
+use crate::AsJRef;
 use crate::{
     java::lang::{Throwable, ThrowableExt},
-    ops::IntoRust,
     raw::{HasEnvPtr, ObjectPtr},
     Global, Jvm, JvmOp, Local,
 };
@@ -21,7 +21,7 @@ pub type Result<'jvm, T> = result::Result<T, Error<Local<'jvm, Throwable>>>;
 pub type GlobalResult<T> = result::Result<T, Error<Global<Throwable>>>;
 
 #[derive(Error)]
-pub enum Error<T: AsRef<Throwable>> {
+pub enum Error<T: AsJRef<Throwable>> {
     /// A reference to an uncaught Java exception
     #[error("Java invocation threw: {}", try_extract_message(.0))]
     Thrown(T),
@@ -48,15 +48,22 @@ pub enum Error<T: AsRef<Throwable>> {
     JvmInternal(String),
 }
 
-fn try_extract_message(exception: impl AsRef<Throwable>) -> String {
+fn try_extract_message(exception: &impl AsJRef<Throwable>) -> String {
     let message = Jvm::with(|jvm| {
-        let exception = jvm.local(exception.as_ref());
-        exception.to_string().assert_not_null().into_rust(jvm)
+        let exception = jvm.local(exception.as_jref()?);
+        exception
+            .to_string()
+            .assert_not_null()
+            .to_rust()
+            .execute_with(jvm)
     });
     message.unwrap_or_else(|_| "<unable to get exception message>".into())
 }
 
-impl<T: AsRef<Throwable>> Debug for Error<T> {
+impl<T> Debug for Error<T>
+where
+    T: AsJRef<Throwable>,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Display::fmt(self, f)
     }

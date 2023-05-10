@@ -1,7 +1,7 @@
 mod auto {
     // Make current crate available as `duchess` for use by the generated code.
-    // NB. in documentation mode, the current crate is already available as duchess.
-    #[cfg(not(doc))]
+    // NB. in doctests, the current crate is already available as duchess.
+    #[cfg(not(doctest))]
     use crate as duchess;
 
     duchess_macro::java_package! {
@@ -111,7 +111,12 @@ mod auto {
             public abstract int indexOf(java.lang.Object);
             public abstract int lastIndexOf(java.lang.Object);
             public abstract java.util.List<E> subList(int, int);
-            public static <E> java.util.List<E> of(E...);
+
+            // FIXME: Java generics from static methods are totally
+            // disjoint from the enclosing Self type, but not in Rust.
+            // How do we bridge this gap most ergonomically?
+            //
+            // public static <E> java.util.List<E> of(E...);
         }
 
         public class java.util.ArrayList<E> implements java.util.List<E> {
@@ -209,6 +214,47 @@ mod auto {
             // public void forEach(java.util.function.BiConsumer<? super K, ? super V>);
             // public void replaceAll(java.util.function.BiFunction<? super K, ? super V, ? extends V>);
             public java.lang.Object clone();
+        }
+
+        public class java.util.Date { // implements java.io.Serializable, java.lang.Cloneable, java.lang.Comparable<java.util.Date> {
+            public java.util.Date();
+            //   public java.util.Date(long);
+            //   public java.util.Date(int, int, int);
+            //   public java.util.Date(int, int, int, int, int);
+            //   public java.util.Date(int, int, int, int, int, int);
+            //   public java.util.Date(java.lang.String);
+            // public java.lang.Object clone();
+            public static long UTC(int, int, int, int, int, int);
+            public static long parse(java.lang.String);
+            public int getYear();
+            public void setYear(int);
+            public int getMonth();
+            public void setMonth(int);
+            public int getDate();
+            public void setDate(int);
+            public int getDay();
+            public int getHours();
+            public void setHours(int);
+            public int getMinutes();
+            public void setMinutes(int);
+            public int getSeconds();
+            public void setSeconds(int);
+            public long getTime();
+            public void setTime(long);
+            public boolean before(java.util.Date);
+            public boolean after(java.util.Date);
+            public boolean equals(java.lang.Object);
+            // static final long getMillisOf(java.util.Date);
+            public int compareTo(java.util.Date);
+            public int hashCode();
+            public java.lang.String toString();
+            public java.lang.String toLocaleString();
+            public java.lang.String toGMTString();
+            public int getTimezoneOffset();
+            // public static java.util.Date from(java.time.Instant);
+            // public java.time.Instant toInstant();
+            // public int compareTo(java.lang.Object);
+            //   static {};
         }
     }
 }

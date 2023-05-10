@@ -31,13 +31,20 @@ pub fn find_method<'jvm>(
     class: impl AsRef<java::lang::Class>,
     jni_name: &CStr,
     jni_descriptor: &CStr,
+    is_static: bool,
 ) -> Result<'jvm, MethodPtr> {
     let class = class.as_ref().as_raw();
 
     let env = jvm.env();
     let method = unsafe {
         env.invoke(
-            |env| env.GetMethodID,
+            |env| {
+                if is_static {
+                    env.GetStaticMethodID
+                } else {
+                    env.GetMethodID
+                }
+            },
             |env, f| {
                 f(
                     env,
@@ -67,5 +74,5 @@ pub fn find_constructor<'jvm>(
     jni_descriptor: &CStr,
 ) -> Result<'jvm, MethodPtr> {
     const METHOD_NAME: &CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"<init>\0") };
-    find_method(jvm, class, METHOD_NAME, jni_descriptor)
+    find_method(jvm, class, METHOD_NAME, jni_descriptor, false)
 }

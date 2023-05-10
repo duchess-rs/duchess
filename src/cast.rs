@@ -1,6 +1,8 @@
 use std::marker::PhantomData;
 
-use crate::{jvm::JavaObjectExt, raw::HasEnvPtr, JavaObject, Jvm, JvmOp, Local};
+use crate::{
+    jvm::JavaObjectExt, raw::HasEnvPtr, refs::AsJRef, JavaObject, JvmOp, Local, TryJDeref,
+};
 
 /// A trait to represent safe upcast operations for a [`JavaObject`].
 ///
@@ -9,15 +11,15 @@ use crate::{jvm::JavaObjectExt, raw::HasEnvPtr, JavaObject, Jvm, JvmOp, Local};
 /// Inherits the rules of [`JavaObject`], but also `S` must be a valid superclass or implemented interface of `Self`.
 /// XX: would this actually allow unsafe behavior in a JNI call? or is it already checked/enforced?
 ///
-/// XX: having to impl Upcast<T> for T on each struct is pretty annoying to get AsRef<T> to work without conflicts
+/// XX: having to impl `Upcast<T>` for T on each struct is pretty annoying to get `AsJRef<T>` to work without conflicts
 pub unsafe trait Upcast<S: JavaObject>: JavaObject {}
 
-pub struct TryDowncast<J, From, To> {
+pub struct TryDowncast<J, To> {
     op: J,
-    _marker: PhantomData<(From, To)>,
+    _marker: PhantomData<To>,
 }
 
-impl<J: Clone, From, To> Clone for TryDowncast<J, From, To> {
+impl<J: Clone, To> Clone for TryDowncast<J, To> {
     fn clone(&self) -> Self {
         Self {
             op: self.op.clone(),
@@ -26,12 +28,11 @@ impl<J: Clone, From, To> Clone for TryDowncast<J, From, To> {
     }
 }
 
-impl<J, From, To> TryDowncast<J, From, To>
+impl<J, To> TryDowncast<J, To>
 where
     J: JvmOp,
-    for<'jvm> J::Output<'jvm>: AsRef<From>,
-    From: JavaObject,
-    To: Upcast<From>,
+    for<'jvm> J::Output<'jvm>: TryJDeref,
+    To: for<'jvm> Upcast<<J::Output<'jvm> as TryJDeref>::Java>,
 {
     pub(crate) fn new(op: J) -> Self {
         Self {
@@ -39,35 +40,22 @@ where
             _marker: PhantomData,
         }
     }
-
-    pub fn execute<'jvm>(
-        self,
-        jvm: &mut Jvm<'jvm>,
-    ) -> crate::Result<'jvm, Result<Local<'jvm, To>, J::Output<'jvm>>>
-    where
-        J: JvmOp<Input<'jvm> = ()>,
-    {
-        self.execute_with(jvm, ())
-    }
 }
 
-impl<J, From, To> JvmOp for TryDowncast<J, From, To>
+impl<J, To> JvmOp for TryDowncast<J, To>
 where
     J: JvmOp,
-    for<'jvm> J::Output<'jvm>: AsRef<From>,
-    From: JavaObject,
-    To: Upcast<From>,
+    for<'jvm> J::Output<'jvm>: TryJDeref,
+    To: for<'jvm> Upcast<<J::Output<'jvm> as TryJDeref>::Java>,
 {
-    type Input<'jvm> = J::Input<'jvm>;
     type Output<'jvm> = Result<Local<'jvm, To>, J::Output<'jvm>>;
 
     fn execute_with<'jvm>(
         self,
         jvm: &mut crate::Jvm<'jvm>,
-        input: J::Input<'jvm>,
     ) -> crate::Result<'jvm, Self::Output<'jvm>> {
-        let instance = self.op.execute_with(jvm, input)?;
-        let instance_raw = instance.as_ref().as_raw();
+        let instance = self.op.execute_with(jvm)?;
+        let instance_raw = instance.try_jderef()?.as_raw();
 
         let class = To::class(jvm)?;
         let class_raw = class.as_raw();
@@ -82,7 +70,7 @@ where
 
         if is_inst {
             // SAFETY: just shown that jobject instanceof To::class
-            let casted = unsafe { std::mem::transmute::<&From, &To>(instance.as_ref()) };
+            let casted = unsafe { std::mem::transmute::<&_, &To>(instance.try_jderef()?) };
             Ok(Ok(jvm.local(casted)))
         } else {
             Ok(Err(instance))
@@ -90,12 +78,12 @@ where
     }
 }
 
-pub struct AsUpcast<J, From, To> {
+pub struct AsUpcast<J, To> {
     op: J,
-    _marker: PhantomData<(From, To)>,
+    _marker: PhantomData<To>,
 }
 
-impl<J: Clone, From, To> Clone for AsUpcast<J, From, To> {
+impl<J: Clone, To> Clone for AsUpcast<J, To> {
     fn clone(&self) -> Self {
         Self {
             op: self.op.clone(),
@@ -104,11 +92,10 @@ impl<J: Clone, From, To> Clone for AsUpcast<J, From, To> {
     }
 }
 
-impl<J, From, To> AsUpcast<J, From, To>
+impl<J, To> AsUpcast<J, To>
 where
     J: JvmOp,
-    for<'jvm> J::Output<'jvm>: AsRef<From>,
-    From: Upcast<To>,
+    for<'jvm> J::Output<'jvm>: AsJRef<To>,
     To: JavaObject,
 {
     pub(crate) fn new(op: J) -> Self {
@@ -117,37 +104,27 @@ where
             _marker: PhantomData,
         }
     }
-
-    pub fn execute<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Local<'jvm, To>>
-    where
-        J: JvmOp<Input<'jvm> = ()>,
-    {
-        self.execute_with(jvm, ())
-    }
 }
 
-impl<J, From, To> JvmOp for AsUpcast<J, From, To>
+impl<J, To> JvmOp for AsUpcast<J, To>
 where
     J: JvmOp,
-    for<'jvm> J::Output<'jvm>: AsRef<From>,
-    From: Upcast<To>,
+    for<'jvm> J::Output<'jvm>: AsJRef<To>,
     To: JavaObject,
 {
-    type Input<'jvm> = J::Input<'jvm>;
     type Output<'jvm> = Local<'jvm, To>;
 
     fn execute_with<'jvm>(
         self,
         jvm: &mut crate::Jvm<'jvm>,
-        input: J::Input<'jvm>,
     ) -> crate::Result<'jvm, Self::Output<'jvm>> {
-        let instance = self.op.execute_with(jvm, input)?;
+        let instance = self.op.execute_with(jvm)?;
 
         if cfg!(debug_assertions) {
             let class = To::class(jvm)?;
             let class_raw = class.as_raw();
 
-            let instance_raw = instance.as_ref().as_raw();
+            let instance_raw = instance.as_jref()?.as_raw();
             assert!(unsafe {
                 jvm.env().invoke(
                     |env| env.IsInstanceOf,
@@ -157,7 +134,7 @@ where
         }
 
         // Safety: From: Upcast<To>
-        Ok(jvm.local(unsafe { std::mem::transmute::<&From, &To>(instance.as_ref()) }))
+        Ok(jvm.local(instance.as_jref()?))
     }
 }
 
@@ -174,10 +151,10 @@ where
 ///     duchess::by_type! {
 ///         with jvm match x => {
 ///             java::lang::String as string => {
-///                 println!("Got a string with {} chars", string.length().execute(jvm)?);
+///                 println!("Got a string with {} chars", string.length().execute_with(jvm)?);
 ///             },
 ///             java::lang::Throwable as throwable => {
-///                 throwable.print_stack_trace().execute(jvm)?;
+///                 throwable.print_stack_trace().execute_with(jvm)?;
 ///             },
 ///             else {
 ///                 println!("Got something that wasn't a String or a Throwable");
@@ -215,7 +192,7 @@ macro_rules! by_type {
                 unreachable!()
             }
             $(
-                else if let Ok($var) = obj.try_downcast::<_, $class>().execute($jvm)? {
+                else if let Ok($var) = obj.try_downcast::<$class>().execute_with($jvm)? {
                     $arm
                 }
             )*

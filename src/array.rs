@@ -4,10 +4,11 @@ use crate::{
     cast::Upcast,
     error::check_exception,
     java::{self, lang::Class},
-    ops::IntoJava,
     plumbing::JavaObjectExt,
     raw::{HasEnvPtr, ObjectPtr},
-    Error, IntoRust, IntoScalar, JavaObject, JavaType, Jvm, JvmOp, Local, ScalarMethod,
+    to_java::ToJavaImpl,
+    AsJRef, Error, JDeref, JavaObject, JavaType, Jvm, JvmOp, Local, Nullable, ScalarMethod, ToRust,
+    TryJDeref,
 };
 
 pub struct JavaArray<T: JavaType> {
@@ -22,19 +23,34 @@ unsafe impl<T: JavaType> JavaObject for JavaArray<T> {
 
 // Upcasts
 unsafe impl<T: JavaType> Upcast<JavaArray<T>> for JavaArray<T> {}
+
 // all arrays extend Object
 unsafe impl<T: JavaType> Upcast<java::lang::Object> for JavaArray<T> {}
 
+impl<T: JavaType> JDeref for JavaArray<T> {
+    fn jderef(&self) -> &Self {
+        self
+    }
+}
+
+impl<T: JavaType> TryJDeref for JavaArray<T> {
+    type Java = Self;
+
+    fn try_jderef(&self) -> Nullable<&Self> {
+        Ok(self)
+    }
+}
+
 // array.length isn't a normal field or method, so hand-generating the traits
 pub trait JavaArrayExt<T: JavaType>: JvmOp {
-    type Length: ScalarMethod<Self, jni_sys::jsize>;
+    type Length: ScalarMethod<jni_sys::jsize>;
     fn length(self) -> Self::Length;
 }
 
 impl<This, T> JavaArrayExt<T> for This
 where
     This: JvmOp,
-    for<'jvm> This::Output<'jvm>: AsRef<JavaArray<T>>,
+    for<'jvm> This::Output<'jvm>: AsJRef<JavaArray<T>>,
     T: JavaType,
 {
     type Length = Length<Self, T>;
@@ -55,19 +71,14 @@ pub struct Length<This, T> {
 impl<This, T> JvmOp for Length<This, T>
 where
     This: JvmOp,
-    for<'jvm> This::Output<'jvm>: AsRef<JavaArray<T>>,
+    for<'jvm> This::Output<'jvm>: AsJRef<JavaArray<T>>,
     T: JavaType,
 {
-    type Input<'jvm> = This::Input<'jvm>;
     type Output<'jvm> = jni_sys::jsize;
 
-    fn execute_with<'jvm>(
-        self,
-        jvm: &mut Jvm<'jvm>,
-        input: Self::Input<'jvm>,
-    ) -> crate::Result<'jvm, Self::Output<'jvm>> {
-        let this = self.this.execute_with(jvm, input)?;
-        let this = this.as_ref().as_raw();
+    fn execute_with<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
+        let this = self.this.execute_with(jvm)?;
+        let this = this.as_jref()?.as_raw();
 
         let len = unsafe {
             jvm.env()
@@ -80,10 +91,10 @@ where
 macro_rules! primivite_array {
     ($([$rust:ty]: $java_name:literal $java_ty:ident $new_fn:ident $get_fn:ident $set_fn:ident,)*) => {
         $(
-            impl IntoJava<JavaArray<$rust>> for &[$rust] {
+            impl JvmOp for &[$rust] {
                 type Output<'jvm> = Local<'jvm, JavaArray<$rust>>;
 
-                fn into_java<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
+                fn execute_with<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
                     let Ok(len) = self.len().try_into() else {
                         return Err(Error::SliceTooLong(self.len()))
                     };
@@ -113,22 +124,33 @@ macro_rules! primivite_array {
                 }
             }
 
-            impl<J> IntoRust<Vec<$rust>> for J
-            where
-                for<'jvm> J: JvmOp<Input<'jvm> = ()>,
-                for<'jvm> J::Output<'jvm>: AsRef<JavaArray<$rust>>,
-            {
-                fn into_rust<'jvm>(self, jvm: &mut Jvm<'jvm>) -> $crate::Result<'jvm, Vec<$rust>> {
-                    let array = self.execute_with(jvm, ())?;
-                    let array = jvm.local(array.as_ref());
+            impl ToJavaImpl<java::Array<$rust>> for [$rust] {
+                fn to_java_impl<'jvm>(
+                    rust: &Self,
+                    jvm: &mut Jvm<'jvm>,
+                ) -> crate::Result<'jvm, Option<Local<'jvm, java::Array<$rust>>>> {
+                    Ok(Some(rust.execute_with(jvm)?))
+                }
+            }
 
-                    let len = array.length().execute(jvm)?;
+            impl ToJavaImpl<java::Array<$rust>> for Vec<$rust> {
+                fn to_java_impl<'jvm>(
+                    rust: &Self,
+                    jvm: &mut Jvm<'jvm>,
+                ) -> crate::Result<'jvm, Option<Local<'jvm, java::Array<$rust>>>> {
+                    Ok(Some(rust.execute_with(jvm)?))
+                }
+            }
+
+            impl ToRust<Vec<$rust>> for JavaArray<$rust> {
+                fn to_rust<'jvm>(&self, jvm: &mut Jvm<'jvm>) -> $crate::Result<'jvm, Vec<$rust>> {
+                    let len = self.length().execute_with(jvm)?;
                     let mut vec = Vec::<$rust>::with_capacity(len as usize);
 
                     unsafe {
                         jvm.env().invoke(|env| env.$get_fn, |env, f| f(
                             env,
-                            array.as_raw().as_ptr(),
+                            self.as_raw().as_ptr(),
                             0,
                             len,
                             vec.as_mut_ptr().cast::<jni_sys::$java_ty>(),

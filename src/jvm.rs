@@ -1,12 +1,13 @@
 use crate::{
     cast::{AsUpcast, TryDowncast, Upcast},
-    catch::{CatchNone, Catching},
     find::find_class,
-    inspect::{ArgOp, Inspect},
+    global::{GlobalOp, IntoGlobal},
     java::lang::{Class, ClassExt, Throwable},
     not_null::NotNull,
     raw::{self, EnvPtr, HasEnvPtr, JvmPtr, ObjectPtr},
-    thread, Error, Global, GlobalResult, IntoLocal, Local,
+    to_rust::ToRustOp,
+    try_catch::TryCatch,
+    thread, AsJRef, ToRust, TryJDeref, Error, Global, GlobalResult, Local,
 };
 
 use std::{ffi::CStr, fmt::Display, ptr::NonNull};
@@ -22,28 +23,7 @@ use once_cell::sync::OnceCell;
 /// over into the JVM, so the more you can chain together your jvm-ops,
 /// the better.
 pub trait JvmOp: Sized {
-    type Input<'jvm>;
     type Output<'jvm>;
-
-    /// "Inspect" executes an operation on this value that results in unit
-    /// and then yields up this value again for further use. If the result
-    /// of `self` is the java value `x`, then `self.inspect(|x| x.foo()).bar()`
-    /// is equivalent to the Java code `x.foo(); return x.bar()`.
-    fn inspect<K>(self, op: impl FnOnce(ArgOp<Self>) -> K) -> Inspect<Self, K>
-    where
-        for<'jvm> Self::Output<'jvm>: CloneIn<'jvm>,
-        K: JvmOp,
-        for<'jvm> K: JvmOp<Input<'jvm> = Self::Output<'jvm>, Output<'jvm> = ()>,
-    {
-        Inspect::new(self, op)
-    }
-
-    /// Start a set of catch blocks that can handle exceptions thrown by `self`. Multiple
-    /// blocks can be added via [`Catching::catch`] for different exception classes, as well as
-    /// a finally block.
-    fn catching(self) -> Catching<Self, CatchNone> {
-        Catching::new(self)
-    }
 
     fn assert_not_null<T>(self) -> NotNull<Self>
     where
@@ -63,11 +43,10 @@ pub trait JvmOp: Sized {
     ///    return Err(x);
     /// }
     /// ```
-    fn try_downcast<From, To>(self) -> TryDowncast<Self, From, To>
+    fn try_downcast<To>(self) -> TryDowncast<Self, To>
     where
-        for<'jvm> Self::Output<'jvm>: AsRef<From>,
-        From: JavaObject,
-        To: Upcast<From>,
+        for<'jvm> Self::Output<'jvm>: TryJDeref,
+        To: for<'jvm> Upcast<<Self::Output<'jvm> as TryJDeref>::Java>,
     {
         TryDowncast::new(self)
     }
@@ -76,20 +55,53 @@ pub trait JvmOp: Sized {
     /// methods defined on any of its super classes or interfaces it implements,
     /// but this can be used to "force" the output of the operation to be typed
     /// as an explicit super type `To`.
-    fn upcast<From, To>(self) -> AsUpcast<Self, From, To>
+    fn upcast<To>(self) -> AsUpcast<Self, To>
     where
-        for<'jvm> Self::Output<'jvm>: AsRef<From>,
-        From: Upcast<To>,
+        for<'jvm> Self::Output<'jvm>: AsJRef<To>,
         To: JavaObject,
     {
         AsUpcast::new(self)
     }
 
-    fn execute_with<'jvm>(
-        self,
-        jvm: &mut Jvm<'jvm>,
-        arg: Self::Input<'jvm>,
-    ) -> crate::Result<'jvm, Self::Output<'jvm>>;
+    /// Given a JVM op that creates a local reference, convert the local reference
+    /// into a global one. Global JVM references can be held as long as you like
+    /// within
+    fn global(self) -> GlobalOp<Self>
+    where
+        for<'jvm> <Self as JvmOp>::Output<'jvm>: IntoGlobal<'jvm>,
+    {
+        GlobalOp::new(self)
+    }
+
+    fn catch<J>(self) -> TryCatch<Self, J>
+    where
+        J: Upcast<Throwable>,
+    {
+        TryCatch::new(self)
+    }
+
+    /// Given a JVM op that returns some Java type, convert it to its Rust equivalent
+    /// (e.g., from a Java String to a Rust string).
+    fn to_rust<R>(self) -> ToRustOp<Self, R>
+    where
+        for<'jvm> Self::Output<'jvm>: ToRust<R>,
+    {
+        ToRustOp::new(self)
+    }
+
+    /// Execute the jvm op, starting a JVM instance if necessary.
+    /// To use this method, the result type cannot be tied to the JVM.
+    /// Typically this is achieved by a call to [`to_rust()`][`Self::to_rust`],
+    /// but if you wish to hold on to a reference to a JVM object,
+    /// you can use [`global()`][`Self::global`] to create a global reference.
+    fn execute<R>(self) -> crate::GlobalResult<R>
+    where
+        for<'jvm> Self: JvmOp<Output<'jvm> = R>,
+    {
+        Jvm::with(|jvm| self.execute_with(jvm))
+    }
+
+    fn execute_with<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>>;
 }
 
 /// This trait is only implemented for `()`; it allows the `JvmOp::execute` method to only
@@ -283,6 +295,7 @@ pub trait JavaObjectExt: Sized {
     unsafe fn from_raw<'a>(ptr: ObjectPtr) -> &'a Self;
     fn as_raw(&self) -> ObjectPtr;
 }
+
 impl<T: JavaObject> JavaObjectExt for T {
     unsafe fn from_raw<'a>(ptr: ObjectPtr) -> &'a Self {
         // XX: safety
@@ -303,7 +316,10 @@ pub unsafe trait JavaType: 'static {
 
 unsafe impl<T: JavaObject> JavaType for T {
     fn array_class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Local<'jvm, Class>> {
-        T::class(jvm)?.array_type().assert_not_null().execute(jvm)
+        T::class(jvm)?
+            .array_type()
+            .assert_not_null()
+            .execute_with(jvm)
     }
 }
 
