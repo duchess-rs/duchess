@@ -90,8 +90,8 @@ GenericBounds: Vec<ClassRef> = {
 Header: () = r#"Compiled from "[a-zA-Z0-9_$. ]+""#;
 
 DotId: DotId = {
-    <a:Id> "." <b:ID> => a.dot(b),
-    <i:DotId> "." <s:ID> => i.dot(s),
+    <a:Id> r"[./]" <b:ID> => a.dot(b),
+    <i:DotId> r"[./]" <s:ID> => i.dot(s),
 };
 
 Id: Id = {

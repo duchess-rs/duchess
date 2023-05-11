@@ -1,8 +1,8 @@
 use crate::{
     argument::DuchessDeclaration,
     class_info::{
-        ClassInfo, ClassRef, Constructor, DotId, Generic, Id, Method, NonRepeatingType, RefType,
-        RootMap, ScalarType, SpannedPackageInfo, Type,
+        ClassInfo, ClassRef, Constructor, DotId, Field, Generic, Id, Method, NonRepeatingType,
+        RefType, RootMap, ScalarType, SpannedPackageInfo, Type,
     },
     reflect::Reflector,
     span_error::SpanError,
@@ -55,7 +55,7 @@ impl SpannedPackageInfo {
         reflector: &mut Reflector,
     ) -> Result<TokenStream, SpanError> {
         let package_id = DotId::new(parents, &self.name);
-        let name = Ident::new(&self.name, self.span);
+        let name = self.name.to_ident(self.span);
 
         let subpackage_tokens: TokenStream = self
             .subpackages
@@ -96,6 +96,7 @@ impl ClassInfo {
         let ext_trait_name = self.ext_trait_name();
         let cached_class = self.cached_class();
         let this_ty = self.this_type();
+        let java_class_generics_with_defaults = self.class_generic_names_with_defaults();
         let java_class_generics = self.class_generic_names();
 
         // Convert constructors
@@ -105,7 +106,7 @@ impl ClassInfo {
             .map(|c| self.constructor(c))
             .collect::<Result<_, _>>()?;
 
-        // Convert class methods (not static methods, those are different)
+        // Convert static methods (not instance methods, those are different)
         let static_methods: Vec<_> = self
             .methods
             .iter()
@@ -113,12 +114,20 @@ impl ClassInfo {
             .map(|m| self.static_method(m))
             .collect::<Result<_, _>>()?;
 
-        // Convert class methods (not static methods, those are different)
+        // Convert instance methods (not static methods, those are different)
         let object_methods: Vec<_> = self
             .methods
             .iter()
             .filter(|m| !m.flags.is_static)
             .map(|m| self.object_method(m))
+            .collect::<Result<_, _>>()?;
+
+        // Generate static field getters
+        let static_field_getters: Vec<_> = self
+            .fields
+            .iter()
+            .filter(|f| f.flags.is_static)
+            .map(|f| self.static_field_getter(f))
             .collect::<Result<_, _>>()?;
 
         let method_structs: Vec<_> = object_methods.iter().map(|m| &m.method_struct).collect();
@@ -134,7 +143,7 @@ impl ClassInfo {
             self.span =>
 
             #[allow(non_camel_case_types)]
-            pub struct #struct_name<#(#java_class_generics,)*> {
+            pub struct #struct_name<#(#java_class_generics_with_defaults,)*> {
                 _dummy: std::marker::PhantomData<(#(#java_class_generics,)*)>
             }
 
@@ -206,6 +215,8 @@ impl ClassInfo {
                     #(#constructors)*
 
                     #(#static_methods)*
+
+                    #(#static_field_getters)*
                 }
 
                 #(#method_structs)*
@@ -404,9 +415,8 @@ impl ClassInfo {
     /// Generates code for instance methods.
     ///
     ///
-    /// NB. This function (particularly the JvmOp impl) has significant overlap with `static_method`,
-    /// so if you make changes here, you may well need changes there. The two are just different enough
-    /// however that combining them did not seem profitable.
+    /// NB. This function (particularly the JvmOp impl) has significant overlap with `static_method`
+    /// and `static_field_getter`, so if you make changes here, you may well need changes there.
     fn object_method(&self, method: &Method) -> Result<MethodOutput, SpanError> {
         assert!(!method.flags.is_static);
 
@@ -436,8 +446,8 @@ impl ClassInfo {
 
         let jni_method = jni_c_str(&*method.name, self.span);
 
-        let rust_method_name = Ident::new(&method.name.to_snake_case(), self.span);
-        let rust_method_type_name = Ident::new(&method.name.to_camel_case(), self.span);
+        let rust_method_name = Id::from(method.name.to_snake_case()).to_ident(self.span);
+        let rust_method_type_name = Id::from(method.name.to_camel_case()).to_ident(self.span);
 
         // The generic parameters declared on the Java method.
         let java_class_generics: Vec<_> = self.class_generic_names();
@@ -585,9 +595,8 @@ impl ClassInfo {
     /// Generates a static method declaration that should be part of the inherent methods
     /// for the struct. Unlike instance methods, static methods can be totally self-contained.
     ///
-    /// NB. This function (particularly the JvmOp impl) has significant overlap with `object_method`,
-    /// so if you make changes here, you may well need changes there. The two are just different enough
-    /// however that combining them did not seem profitable.
+    /// NB. This function (particularly the JvmOp impl) has significant overlap with `object_method`
+    /// and `static_field_getter`, so if you make changes here, you may well need changes there.
     fn static_method(&self, method: &Method) -> Result<TokenStream, SpanError> {
         assert!(method.flags.is_static);
 
@@ -615,8 +624,8 @@ impl ClassInfo {
 
         let jni_method = jni_c_str(&*method.name, self.span);
 
-        let rust_method_name = Ident::new(&method.name.to_snake_case(), self.span);
-        let rust_method_type_name = Ident::new(&method.name.to_camel_case(), self.span);
+        let rust_method_name = Id::from(method.name.to_snake_case()).to_ident(self.span);
+        let rust_method_type_name = Id::from(method.name.to_camel_case()).to_ident(self.span);
 
         // The generic parameters declared on the Java method.
         let java_class_generics: Vec<_> = self.class_generic_names();
@@ -720,9 +729,113 @@ impl ClassInfo {
             }
         );
 
+        Ok(inherent_method)
+    }
+
+    /// Generates a static field getter that should be part of the inherent methods
+    /// for the struct.
+    ///
+    /// NB. This function (particularly the JvmOp impl) has significant overlap with `object_method`
+    /// and `static_method`, so if you make changes here, you may well need changes there.
+    fn static_field_getter(&self, field: &Field) -> Result<TokenStream, SpanError> {
+        assert!(field.flags.is_static);
+
+        let mut sig = Signature::new(&field.name, self.span, &self.generics);
+
+        let output_ty = sig.non_void_output_type(&field.ty)?;
+        let output_trait = sig.field_trait(&field.ty)?;
+        let jni_field_fn = sig.jni_static_field_get_fn(&field.ty)?;
+
+        let jni_field = jni_c_str(&*field.name, self.span);
+        let jni_descriptor = jni_c_str(&field.ty.descriptor(), self.span);
+
+        let rust_field_name = Id::from(format!("get_{}", field.name.to_snake_case())).to_ident(self.span);
+        let rust_field_type_name = Id::from(format!("{}Getter", field.name.to_camel_case())).to_ident(self.span);
+
+        // The generic parameters declared on the Java method.
+        let java_class_generics: Vec<_> = self.class_generic_names();
+
+        // The generic parameters we need on the *method struct* (which will implement the `JvmOp`).
+        // These include the class generics plus all the generics from the method.
+        let field_struct_generics: Vec<_> = java_class_generics.clone(); // XX: Unnecessary clone
+
+        // For each field `f` in the Java type, we create a struct (named `<f>Getter`)
+        // that will implement the `JvmOp`.
+        let field_struct = quote_spanned!(self.span =>
+            #[derive(Clone)]
+            #[allow(non_camel_case_types)]
+            pub struct #rust_field_type_name<
+                #(#field_struct_generics,)*
+            > {
+                phantom: std::marker::PhantomData<(
+                    #(#field_struct_generics,)*
+                )>,
+            }
+        );
+
+        let sig_where_clauses = &sig.where_clauses;
+
+        // Implementation of `JvmOp` for `f` -- when executed, call the method
+        // via JNI, after converting its arguments appropriately.
+        let this_ty = self.this_type();
+        let jvmop_impl = quote_spanned!(self.span =>
+            #[allow(non_camel_case_types)]
+            impl<#(#field_struct_generics),*> JvmOp
+            for #rust_field_type_name<#(#field_struct_generics),*>
+            where
+                #(#java_class_generics: duchess::JavaObject,)*
+                #(#sig_where_clauses,)*
+            {
+                type Output<'jvm> = #output_ty;
+
+                fn execute_with<'jvm>(
+                    self,
+                    jvm: &mut Jvm<'jvm>,
+                ) -> duchess::Result<'jvm, Self::Output<'jvm>> {
+
+                    // Cache the field id for this field -- note that we only have one cache
+                    // no matter how many generic monomorphizations there are. This makes sense
+                    // given Java's erased-based generics system.
+                    static FIELD: OnceCell<FieldPtr> = OnceCell::new();
+                    let field = FIELD.get_or_try_init(|| {
+                        let class = <#this_ty>::class(jvm)?;
+                        find_field(jvm, &class, #jni_field, #jni_descriptor, true)
+                    })?;
+
+                    let class = <#this_ty>::class(jvm)?;
+                    let output = unsafe {
+                        jvm.env().invoke(|env| env.#jni_field_fn, |env, f| f(
+                            env,
+                            class.as_raw().as_ptr(),
+                            field.as_ptr(),
+                        ))
+                    };
+                    check_exception(jvm)?;
+
+                    let output: #output_ty = unsafe { FromJniValue::from_jni_value(jvm, output) };
+                    Ok(output)
+                }
+            }
+        );
+
+        let inherent_method = quote_spanned!(self.span =>
+            #[allow(non_camel_case_types)]
+            pub fn #rust_field_name() -> impl #output_trait
+            where
+                #(#sig_where_clauses,)*
+            {
+                #field_struct
+
+                #jvmop_impl
+
+                #rust_field_type_name {
+                    phantom: Default::default(),
+                }
+            }
+        );
+
         // useful for debugging
-        // eprintln!("{trait_method}");
-        // eprintln!("{trait_impl_method}");
+        // eprintln!("{inherent_method}");
 
         Ok(inherent_method)
     }
@@ -741,6 +854,13 @@ impl ClassInfo {
         self.generics
             .iter()
             .map(|g| g.to_ident(self.span))
+            .collect()
+    }
+
+    fn class_generic_names_with_defaults(&self) -> Vec<TokenStream> {
+        self.class_generic_names()
+            .into_iter()
+            .map(|g| quote_spanned!(self.span => #g = java::lang::Object))
             .collect()
     }
 
@@ -777,7 +897,7 @@ impl ClassInfo {
 }
 
 struct Signature {
-    method_name: Id,
+    item_name: Id,
     span: Span,
     in_scope_generics: Vec<Id>,
     rust_generics: Vec<Ident>,
@@ -798,7 +918,7 @@ impl Signature {
     /// along with the where-clauses from `where_clauses`.
     pub fn new(method_name: &Id, span: Span, external_generics: &[Generic]) -> Self {
         Signature {
-            method_name: method_name.clone(),
+            item_name: method_name.clone(),
             span,
             in_scope_generics: external_generics.iter().map(|g| g.id.clone()).collect(),
             rust_generics: vec![],
@@ -852,7 +972,7 @@ impl Signature {
         if !self.capture_generics {
             Err(SpanError {
                 span: self.span,
-                message: format!("unsupported wildcards in `{}`", self.method_name),
+                message: format!("unsupported wildcards in `{}`", self.item_name),
             })
         } else {
             let mut i = self.rust_generics.len();
@@ -894,20 +1014,28 @@ impl Signature {
         }
     }
 
-    /// Returns an appropriate `impl type` for a funtion that
-    /// returns `ty`. Assumes objects are nullable.
+    /// Returns an appropriate `impl type` for a function that
+    /// returns a `ty` or void. Assumes objects are nullable.
     fn output_type(&mut self, ty: &Option<Type>) -> Result<TokenStream, SpanError> {
+        match ty.as_ref() {
+            Some(ty) => self.non_void_output_type(ty),
+            None => Ok(quote_spanned!(self.span => ())),
+        }
+    }
+
+    /// Returns an appropriate `impl type` for a function that
+    /// returns `ty`. Assumes objects are nullable.
+    fn non_void_output_type(&mut self, ty: &Type) -> Result<TokenStream, SpanError> {
         // XX: do we need the non_repeating transform here? Shouldn't be allowed in return position
-        self.forbid_capture(|this| match ty.as_ref().map(|ty| ty.to_non_repeating()) {
-            Some(NonRepeatingType::Ref(ty)) => {
+        self.forbid_capture(|this| match ty.to_non_repeating() {
+            NonRepeatingType::Ref(ty) => {
                 let t = this.java_ref_ty(&ty)?;
                 Ok(quote_spanned!(this.span => Option<Local<'jvm, #t>>))
             }
-            Some(NonRepeatingType::Scalar(ty)) => {
+            NonRepeatingType::Scalar(ty) => {
                 let t = this.java_scalar_ty(&ty);
                 Ok(quote_spanned!(this.span => #t))
             }
-            None => Ok(quote_spanned!(this.span => ())),
         })
     }
 
@@ -918,8 +1046,8 @@ impl Signature {
                 return Err(SpanError {
                     span: self.span,
                     message: format!(
-                        "unsupported repeating method return type in `{}`",
-                        self.method_name
+                        "unsupported repeating return type in method `{}`",
+                        self.item_name
                     ),
                 })
             }
@@ -945,8 +1073,8 @@ impl Signature {
                 return Err(SpanError {
                     span: self.span,
                     message: format!(
-                        "unsupported repeating method return type in `{}`",
-                        self.method_name
+                        "unsupported repeating return type in static method `{}`",
+                        self.item_name
                     ),
                 })
             }
@@ -964,6 +1092,114 @@ impl Signature {
         };
         Ok(Ident::new(f, self.span))
     }
+
+    // Currently unused
+    fn _jni_field_get_fn(&mut self, ty: &Type) -> Result<Ident, SpanError> {
+        let f = match ty {
+            Type::Ref(_) => "GetObjectField",
+            Type::Repeat(_) => {
+                return Err(SpanError {
+                    span: self.span,
+                    message: format!(
+                        "unsupported repeating type in getter of field `{}`",
+                        self.item_name
+                    ),
+                })
+            }
+            Type::Scalar(scalar) => match scalar {
+                ScalarType::Int => "GetIntField",
+                ScalarType::Long => "GetLongField",
+                ScalarType::Short => "GetShortField",
+                ScalarType::Byte => "GetByteField",
+                ScalarType::F64 => "GetDoubleField",
+                ScalarType::F32 => "GetFloatField",
+                ScalarType::Boolean => "GetBooleanField",
+                ScalarType::Char => "GetCharField",
+            },
+        };
+        Ok(Ident::new(f, self.span))
+    }
+
+    // Currently unused
+    fn _jni_field_set_fn(&mut self, ty: &Type) -> Result<Ident, SpanError> {
+        let f = match ty {
+            Type::Ref(_) => "SetObjectField",
+            Type::Repeat(_) => {
+                return Err(SpanError {
+                    span: self.span,
+                    message: format!(
+                        "unsupported repeating type in setter of field `{}`",
+                        self.item_name
+                    ),
+                })
+            }
+            Type::Scalar(scalar) => match scalar {
+                ScalarType::Int => "SetIntField",
+                ScalarType::Long => "SetLongField",
+                ScalarType::Short => "SetShortField",
+                ScalarType::Byte => "SetByteField",
+                ScalarType::F64 => "SetDoubleField",
+                ScalarType::F32 => "SetFloatField",
+                ScalarType::Boolean => "SetBooleanField",
+                ScalarType::Char => "SetCharField",
+            },
+        };
+        Ok(Ident::new(f, self.span))
+    }
+
+    fn jni_static_field_get_fn(&mut self, ty: &Type) -> Result<Ident, SpanError> {
+        let f = match ty {
+            Type::Ref(_) => "GetStaticObjectField",
+            Type::Repeat(_) => {
+                return Err(SpanError {
+                    span: self.span,
+                    message: format!(
+                        "unsupported repeating type in getter of static field `{}`",
+                        self.item_name
+                    ),
+                })
+            }
+            Type::Scalar(scalar) => match scalar {
+                ScalarType::Int => "GetStaticIntField",
+                ScalarType::Long => "GetStaticLongField",
+                ScalarType::Short => "GetStaticShortField",
+                ScalarType::Byte => "GetStaticByteField",
+                ScalarType::F64 => "GetStaticDoubleField",
+                ScalarType::F32 => "GetStaticFloatField",
+                ScalarType::Boolean => "GetStaticBooleanField",
+                ScalarType::Char => "GetStaticCharField",
+            },
+        };
+        Ok(Ident::new(f, self.span))
+    }
+
+    // Currently unused
+    fn _jni_static_field_set_fn(&mut self, ty: &Type) -> Result<Ident, SpanError> {
+        let f = match ty {
+            Type::Ref(_) => "SetStaticObjectField",
+            Type::Repeat(_) => {
+                return Err(SpanError {
+                    span: self.span,
+                    message: format!(
+                        "unsupported repeating type in setter of static field `{}`",
+                        self.item_name
+                    ),
+                })
+            }
+            Type::Scalar(scalar) => match scalar {
+                ScalarType::Int => "SetStaticIntField",
+                ScalarType::Long => "SetStaticLongField",
+                ScalarType::Short => "SetStaticShortField",
+                ScalarType::Byte => "SetStaticByteField",
+                ScalarType::F64 => "SetStaticDoubleField",
+                ScalarType::F32 => "SetStaticFloatField",
+                ScalarType::Boolean => "SetStaticBooleanField",
+                ScalarType::Char => "SetStaticCharField",
+            },
+        };
+        Ok(Ident::new(f, self.span))
+    }
+
     /// Returns an appropriate trait for a method that
     /// returns `ty`. Assumes objects are nullable.
     fn method_trait(&mut self, ty: &Option<Type>) -> Result<TokenStream, SpanError> {
@@ -977,6 +1213,21 @@ impl Signature {
                 Ok(quote_spanned!(this.span => duchess::ScalarMethod<#t>))
             }
             None => Ok(quote_spanned!(this.span => duchess::VoidMethod)),
+        })
+    }
+
+    /// Returns an appropriate trait for a field that
+    /// returns `ty`. Assumes objects are nullable.
+    fn field_trait(&mut self, ty: &Type) -> Result<TokenStream, SpanError> {
+        self.forbid_capture(|this| match ty.to_non_repeating() {
+            NonRepeatingType::Ref(ty) => {
+                let t = this.java_ref_ty(&ty)?;
+                Ok(quote_spanned!(this.span => duchess::JavaField<#t>))
+            }
+            NonRepeatingType::Scalar(ty) => {
+                let t = this.java_scalar_ty(&ty);
+                Ok(quote_spanned!(this.span => duchess::ScalarField<#t>))
+            }
         })
     }
 
@@ -1069,9 +1320,9 @@ impl DotIdExt for DotId {
 
     fn to_module_name(&self, span: Span) -> TokenStream {
         let (package_names, struct_name) = self.split();
-        let struct_ident = Ident::new(struct_name, span);
+        let struct_ident = struct_name.to_ident(span);
         let package_idents: Vec<Ident> =
-            package_names.iter().map(|n| Ident::new(n, span)).collect();
+            package_names.iter().map(|n| n.to_ident(span)).collect();
         quote_spanned!(span => #(#package_idents ::)* #struct_ident)
     }
 }
