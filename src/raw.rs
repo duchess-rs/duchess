@@ -325,7 +325,7 @@ impl FieldPtr {
     }
 }
 
-// The JNI promises method pointers remain valid for as long as the class is loaded and can be shared across threads
+// The JNI promises field pointers remain valid for as long as the class is loaded and can be shared across threads
 unsafe impl Send for FieldPtr {}
 unsafe impl Sync for FieldPtr {}
 
