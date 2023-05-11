@@ -1093,60 +1093,6 @@ impl Signature {
         Ok(Ident::new(f, self.span))
     }
 
-    // Currently unused
-    fn _jni_field_get_fn(&mut self, ty: &Type) -> Result<Ident, SpanError> {
-        let f = match ty {
-            Type::Ref(_) => "GetObjectField",
-            Type::Repeat(_) => {
-                return Err(SpanError {
-                    span: self.span,
-                    message: format!(
-                        "unsupported repeating type in getter of field `{}`",
-                        self.item_name
-                    ),
-                })
-            }
-            Type::Scalar(scalar) => match scalar {
-                ScalarType::Int => "GetIntField",
-                ScalarType::Long => "GetLongField",
-                ScalarType::Short => "GetShortField",
-                ScalarType::Byte => "GetByteField",
-                ScalarType::F64 => "GetDoubleField",
-                ScalarType::F32 => "GetFloatField",
-                ScalarType::Boolean => "GetBooleanField",
-                ScalarType::Char => "GetCharField",
-            },
-        };
-        Ok(Ident::new(f, self.span))
-    }
-
-    // Currently unused
-    fn _jni_field_set_fn(&mut self, ty: &Type) -> Result<Ident, SpanError> {
-        let f = match ty {
-            Type::Ref(_) => "SetObjectField",
-            Type::Repeat(_) => {
-                return Err(SpanError {
-                    span: self.span,
-                    message: format!(
-                        "unsupported repeating type in setter of field `{}`",
-                        self.item_name
-                    ),
-                })
-            }
-            Type::Scalar(scalar) => match scalar {
-                ScalarType::Int => "SetIntField",
-                ScalarType::Long => "SetLongField",
-                ScalarType::Short => "SetShortField",
-                ScalarType::Byte => "SetByteField",
-                ScalarType::F64 => "SetDoubleField",
-                ScalarType::F32 => "SetFloatField",
-                ScalarType::Boolean => "SetBooleanField",
-                ScalarType::Char => "SetCharField",
-            },
-        };
-        Ok(Ident::new(f, self.span))
-    }
-
     fn jni_static_field_get_fn(&mut self, ty: &Type) -> Result<Ident, SpanError> {
         let f = match ty {
             Type::Ref(_) => "GetStaticObjectField",
@@ -1168,33 +1114,6 @@ impl Signature {
                 ScalarType::F32 => "GetStaticFloatField",
                 ScalarType::Boolean => "GetStaticBooleanField",
                 ScalarType::Char => "GetStaticCharField",
-            },
-        };
-        Ok(Ident::new(f, self.span))
-    }
-
-    // Currently unused
-    fn _jni_static_field_set_fn(&mut self, ty: &Type) -> Result<Ident, SpanError> {
-        let f = match ty {
-            Type::Ref(_) => "SetStaticObjectField",
-            Type::Repeat(_) => {
-                return Err(SpanError {
-                    span: self.span,
-                    message: format!(
-                        "unsupported repeating type in setter of static field `{}`",
-                        self.item_name
-                    ),
-                })
-            }
-            Type::Scalar(scalar) => match scalar {
-                ScalarType::Int => "SetStaticIntField",
-                ScalarType::Long => "SetStaticLongField",
-                ScalarType::Short => "SetStaticShortField",
-                ScalarType::Byte => "SetStaticByteField",
-                ScalarType::F64 => "SetStaticDoubleField",
-                ScalarType::F32 => "SetStaticFloatField",
-                ScalarType::Boolean => "SetStaticBooleanField",
-                ScalarType::Char => "SetStaticCharField",
             },
         };
         Ok(Ident::new(f, self.span))

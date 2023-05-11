@@ -19,15 +19,46 @@ duchess::java_package! {
     interface Seq<A> {}
 
     package scala.collection.mutable;
-    class ArrayBuffer<A>
-        implements scala.collection.StrictOptimizedSeqOps<A, scala.collection.mutable.ArrayBuffer, scala.collection.mutable.ArrayBuffer<A>>
-    {
+    class ArrayBuffer<A> implements scala.collection.StrictOptimizedSeqOps<
+        A, scala.collection.mutable.ArrayBuffer, scala.collection.mutable.ArrayBuffer<A>
+    > {
         scala.collection.mutable.ArrayBuffer();
     }
 
     package viper.silver.ast;
     class Bool {}
+    class Domain {}
+    class "NoTrafos$" implements viper.silver.ast.ErrorTrafo {
+        static viper.silver.ast."NoTrafos$" "MODULE$";
+    }
+    class ExtensionMember {}
+    class Field {}
+    class Function {}
     class Int {}
+    class Method {}
+    class "NoPosition$" implements viper.silver.ast.Position {
+        static viper.silver.ast."NoPosition$" "MODULE$";
+    }
+    class "NoInfo$" implements viper.silver.ast.Info {
+        static viper.silver.ast."NoInfo$" "MODULE$";
+    }
+    class Predicate {}
+    class Program {
+        public viper.silver.ast.Program(
+            scala.collection.immutable.Seq<viper.silver.ast.Domain>,
+            scala.collection.immutable.Seq<viper.silver.ast.Field>,
+            scala.collection.immutable.Seq<viper.silver.ast.Function>,
+            scala.collection.immutable.Seq<viper.silver.ast.Predicate>,
+            scala.collection.immutable.Seq<viper.silver.ast.Method>,
+            scala.collection.immutable.Seq<viper.silver.ast.ExtensionMember>,
+            viper.silver.ast.Position,
+            viper.silver.ast.Info,
+            viper.silver.ast.ErrorTrafo
+        );
+    }
+    interface ErrorTrafo {}
+    interface Info {}
+    interface Position {}
 
     package viper.silver.frontend;
     class SilFrontend {}
@@ -45,6 +76,9 @@ duchess::java_package! {
 
     package viper.carbon;
     class CarbonVerifier {
-        viper.carbon.CarbonVerifier(viper.silver.reporter.Reporter, scala.collection.immutable.Seq<scala.Tuple2<java.lang.String, java.lang.Object>>);
+        viper.carbon.CarbonVerifier(
+            viper.silver.reporter.Reporter,
+            scala.collection.immutable.Seq<scala.Tuple2<java.lang.String, java.lang.Object>>
+        );
     }
 }
