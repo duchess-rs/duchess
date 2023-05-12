@@ -896,19 +896,45 @@ impl ClassInfo {
     }
 }
 
+/// "Signature" processes Java argument/return types and
+/// converts them into Rust types. This includes translating Java
+/// generics into Rust generics.
 struct Signature {
+    /// Member being translated.
     item_name: Id,
+
+    /// Span to use for error reporting.
     span: Span,
+
+    /// Generic parameters from class, method.
+    /// Used to check for validity and to avoid generating conflicting names.
     in_scope_generics: Vec<Id>,
+
+    /// Generics to include on the generated Rust method.
+    /// Includes the Java generics but also includes fresh generic
+    /// parameters generated from Java wildcards.
+    ///
+    /// For example:
+    ///
+    /// ```java
+    /// void foo(Class<?> c)
+    /// ```
+    ///
+    /// would generate a Rust method like `fn foo<C>(c: Class<C>)`
     rust_generics: Vec<Ident>,
+
+    /// Where clauses to include on the generated Rust method.
     where_clauses: Vec<TokenStream>,
+
+    /// If true, permit `?` and translate to fresh generics.
+    /// If false, report an error if `?` appears, because it is a context where
+    /// we don't support capture.
     capture_generics: bool,
 }
 
 impl Signature {
     /// Creates a signature attached to an item (e.g., a method) named `method_name`,
-    /// declared at `span`, which inherits
-    /// `external_generics` from its class and which declares `internal_generis` on itself.
+    /// declared at `span`, which inherits `external_generics` from its class.
     ///
     /// You can then invoke helper methods to convert java types into Rust types.
     /// In some cases these conversions may create new entries in `fresh_generics`
@@ -927,6 +953,11 @@ impl Signature {
         }
     }
 
+    /// Declares the generic parameters on the method/constructor being translated.
+    /// "Internal" generics are distinct from "external" generics because they are
+    /// added to `self.rust_generics` and `self.where_clauses`, so that in the end
+    /// the caller has a unified list of all the generics that have to be declared on
+    /// the Rust method.
     pub fn with_internal_generics(self, internal_generics: &[Generic]) -> Result<Self, SpanError> {
         let mut s = self;
 
