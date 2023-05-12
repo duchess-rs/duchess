@@ -125,11 +125,10 @@ impl JvmOp for &HttpRequest {
     type Output<'jvm> = Local<'jvm, java_auth::HttpRequest>;
 
     fn execute_with<'jvm>(self, jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, Self::Output<'jvm>> {
-        let body_hash_signed = self.body_hash.iter().map(|&b| b as i8).collect::<Vec<_>>();
         java_auth::HttpRequest::new(
             self.verb.to_java::<java::lang::String>(),
             self.path.to_java::<java::lang::String>(),
-            body_hash_signed.to_java::<java::Array<i8>>(),
+            self.body_hash.to_java::<java::Array<i8>>(),
             self.params.to_java::<java::util::Map<java::lang::String, java::util::List<java::lang::String>>>(),
             self.headers.to_java::<java::util::Map<java::lang::String, java::util::List<java::lang::String>>>(),
         )

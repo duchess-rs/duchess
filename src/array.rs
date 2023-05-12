@@ -168,7 +168,8 @@ macro_rules! primivite_array {
 
 // Bool is represented as u8 in JNI
 primivite_array! {
-    [i8]: "boolean" jboolean NewBooleanArray GetBooleanArrayRegion SetBooleanArrayRegion,
+    [bool]: "boolean" jboolean NewBooleanArray GetBooleanArrayRegion SetBooleanArrayRegion,
+    [i8]: "byte" jbyte NewByteArray GetByteArrayRegion SetByteArrayRegion,
     [u16]: "char" jchar NewCharArray GetCharArrayRegion SetCharArrayRegion,
     [i16]: "short" jshort NewShortArray GetShortArrayRegion SetShortArrayRegion,
     [i32]: "int" jint NewIntArray GetIntArrayRegion SetIntArrayRegion,
