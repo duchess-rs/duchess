@@ -6,6 +6,7 @@ mod argument;
 mod check;
 mod class_info;
 mod codegen;
+mod derive;
 mod parse;
 mod reflect;
 mod signature;
@@ -36,3 +37,7 @@ pub fn java_package(input: TokenStream) -> TokenStream {
         Err(e) => return e.into_tokens().into(),
     }
 }
+
+synstructure::decl_derive!([ToRust, attributes(java)] => derive::derive_to_rust);
+
+synstructure::decl_derive!([ToJava, attributes(java)] => derive::derive_to_java);

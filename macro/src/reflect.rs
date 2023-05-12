@@ -3,8 +3,11 @@ use std::{collections::BTreeMap, env, process::Command, sync::Arc};
 use proc_macro2::Span;
 
 use crate::{
-    argument::{DuchessDeclaration, Ident, JavaPackage},
-    class_info::{ClassDecl, ClassInfo, DotId, Id, RootMap, SpannedPackageInfo},
+    argument::{DuchessDeclaration, Ident, JavaPackage, MethodSelector},
+    class_info::{
+        ClassDecl, ClassInfo, Constructor, DotId, Generic, Id, Method, RootMap, SpannedPackageInfo,
+        Type,
+    },
     span_error::SpanError,
 };
 
@@ -187,5 +190,84 @@ impl Reflector {
             .classes
             .entry(class_name.clone())
             .or_insert(Arc::new(ci)))
+    }
+
+    ///
+    pub fn reflect_method(
+        &mut self,
+        method_selector: &MethodSelector,
+    ) -> Result<ReflectedMethod<'_>, SpanError> {
+        match method_selector {
+            MethodSelector::ClassName(cn) => {
+                let dot_id = cn.to_dot_id();
+                let class_info = self.reflect(&dot_id, cn.span)?;
+                match class_info.constructors.len() {
+                    1 => Ok(ReflectedMethod::Constructor(class_info, &class_info.constructors[0])),
+                    0 => Err(SpanError { span: cn.span, message: format!("no constructors found") }),
+                    n => Err(SpanError { span: cn.span, message: format!("{n} constructors found, use an explicit class declaration to disambiguate") }),
+                }
+            }
+            MethodSelector::MethodName(cn, mn) => {
+                let dot_id = cn.to_dot_id();
+                let class_info = self.reflect(&dot_id, cn.span)?;
+                let methods: Vec<&Method> = class_info
+                    .methods
+                    .iter()
+                    .filter(|m| &m.name[..] == &mn.text[..])
+                    .collect();
+                match methods.len() {
+                    1 => Ok(ReflectedMethod::Method(class_info, &methods[0])),
+                    0 => Err(SpanError { span: cn.span, message: format!("no methods named `{mn}` found") }),
+                    n => Err(SpanError { span: cn.span, message: format!("{n} methods named `{mn}` found, use an explicit class declaration to disambiguate") }),
+                }
+            }
+            MethodSelector::ClassInfo(_) => todo!(),
+        }
+    }
+}
+
+/// Reflection on something callable.
+#[derive(Copy, Clone, Debug)]
+pub enum ReflectedMethod<'i> {
+    Constructor(&'i ClassInfo, &'i Constructor),
+    Method(&'i ClassInfo, &'i Method),
+}
+
+impl ReflectedMethod<'_> {
+    /// The name of this callable thing in Rust
+    pub fn name(&self) -> Id {
+        match self {
+            ReflectedMethod::Constructor(..) => Id::from("new"),
+            ReflectedMethod::Method(_, m) => m.name.clone(),
+        }
+    }
+
+    pub fn class(&self) -> &ClassInfo {
+        match self {
+            ReflectedMethod::Constructor(c, _) => c,
+            ReflectedMethod::Method(c, _) => c,
+        }
+    }
+
+    /// Is this something that is called on a *type*?
+    pub fn is_static(&self) -> bool {
+        match self {
+            ReflectedMethod::Constructor(..) => true,
+            ReflectedMethod::Method(_, m) => m.flags.is_static,
+        }
+    }
+
+    pub fn generics(&self) -> &Vec<Generic> {
+        match self {
+            ReflectedMethod::Constructor(_, c) => &c.generics,
+            ReflectedMethod::Method(_, m) => &m.generics,
+        }
+    }
+
+    pub fn argument_tys(&self) -> &Vec<Type> {
+        match self {
+            ReflectedMethod::Constructor(_, c) => &c.argument_tys,
+            ReflectedMethod::Method(_, m) => &m.argument_tys,
+        }
     }
 }

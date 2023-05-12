@@ -290,7 +290,7 @@ impl Signature {
         })
     }
 
-    fn java_ty(&mut self, ty: &Type) -> Result<TokenStream, SpanError> {
+    pub fn java_ty(&mut self, ty: &Type) -> Result<TokenStream, SpanError> {
         match &ty.to_non_repeating() {
             NonRepeatingType::Ref(ty) => self.java_ref_ty(ty),
             NonRepeatingType::Scalar(ty) => Ok(self.java_scalar_ty(ty)),

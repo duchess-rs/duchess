@@ -5,8 +5,7 @@ use std::collections::HashMap;
 use thiserror::Error;
 
 use auth::{
-    AuthenticatedExt, AuthenticationExceptionUnauthenticatedExt, AuthorizationExceptionDeniedExt,
-    HttpAuthExt,
+    AuthenticationExceptionUnauthenticatedExt, AuthorizationExceptionDeniedExt, HttpAuthExt,
 };
 
 duchess::java_package! {
@@ -45,15 +44,18 @@ unsafe impl duchess::plumbing::Upcast<java::lang::Throwable>
 
 pub struct HttpAuth(Global<auth::HttpAuth>);
 
-#[derive(Debug)]
+#[derive(Debug, duchess::ToJava)]
+#[java(auth.HttpRequest)]
 pub struct HttpRequest {
     pub verb: String,
     pub path: String,
-    pub body_hash: Vec<u8>,
-    pub params: HashMap<String, Vec<String>>,
+    pub hashed_payload: Vec<u8>,
+    pub parameters: HashMap<String, Vec<String>>,
     pub headers: HashMap<String, Vec<String>>,
 }
 
+#[derive(duchess::ToRust, duchess::ToJava)]
+#[java(auth.Authenticated)]
 pub struct Authenticated {
     pub account_id: String,
     pub user: String,
@@ -112,40 +114,6 @@ impl HttpAuth {
             .to_rust()
             .execute()
             .unwrap()
-    }
-}
-
-// XX: Could we build a #[derive(IntoJava)] macro to remove a lot this boiler plate? Or perhaps for data-only classes
-// the javap macro could build these?
-impl JvmOp for &HttpRequest {
-    type Output<'jvm> = Local<'jvm, auth::HttpRequest>;
-
-    fn execute_with<'jvm>(self, jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, Self::Output<'jvm>> {
-        auth::HttpRequest::new(
-            self.verb.to_java::<java::lang::String>(),
-            self.path.to_java::<java::lang::String>(),
-            self.body_hash.to_java::<java::Array<i8>>(),
-            self.params.to_java::<java::util::Map<java::lang::String, java::util::List<java::lang::String>>>(),
-            self.headers.to_java::<java::util::Map<java::lang::String, java::util::List<java::lang::String>>>(),
-        )
-        .execute_with(jvm)
-    }
-}
-
-impl ToRust<Authenticated> for auth::Authenticated {
-    fn to_rust<'jvm>(&self, jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, Authenticated> {
-        let account_id = self
-            .account_id()
-            .assert_not_null()
-            .to_rust()
-            .execute_with(jvm)?;
-        let user = self.user().assert_not_null().to_rust().execute_with(jvm)?;
-        let this = self.global().execute_with(jvm)?;
-        Ok(Authenticated {
-            account_id,
-            user,
-            this,
-        })
     }
 }
 
@@ -209,14 +177,6 @@ impl ToRust<AuthorizeError> for duchess::java::lang::Throwable {
     }
 }
 
-impl<'a> JvmOp for &'a Authenticated {
-    type Output<'jvm> = &'a Global<auth::Authenticated>;
-
-    fn execute_with<'jvm>(self, _jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, Self::Output<'jvm>> {
-        Ok(&self.this)
-    }
-}
-
 impl JvmOp for &AuthorizeRequest {
     type Output<'jvm> = Local<'jvm, auth::AuthorizeRequest>;
 
@@ -239,8 +199,8 @@ fn main() -> duchess::GlobalResult<()> {
     let request = HttpRequest {
         verb: "POST".into(),
         path: "/".into(),
-        body_hash: vec![1, 2, 3],
-        params: HashMap::new(),
+        hashed_payload: vec![1, 2, 3],
+        parameters: HashMap::new(),
         headers: [("Authentication".into(), vec!["Some signature".into()])].into(),
     };
 
