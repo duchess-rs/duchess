@@ -310,6 +310,25 @@ impl MethodPtr {
 unsafe impl Send for MethodPtr {}
 unsafe impl Sync for MethodPtr {}
 
+#[doc(hidden)]
+#[derive(Clone, Copy)]
+pub struct FieldPtr(NonNull<jni_sys::_jfieldID>);
+
+impl FieldPtr {
+    pub(crate) fn new(ptr: jni_sys::jfieldID) -> Option<Self> {
+        NonNull::new(ptr).map(Self)
+    }
+
+    #[doc(hidden)]
+    pub fn as_ptr(self) -> jni_sys::jfieldID {
+        self.0.as_ptr()
+    }
+}
+
+// The JNI promises field pointers remain valid for as long as the class is loaded and can be shared across threads
+unsafe impl Send for FieldPtr {}
+unsafe impl Sync for FieldPtr {}
+
 /// Trait used by codegen to convert into [`jni-sys`] unions.
 #[doc(hidden)]
 pub trait IntoJniValue {

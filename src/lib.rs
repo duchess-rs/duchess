@@ -43,8 +43,8 @@ pub mod prelude {
     pub use crate::cast::by_type;
     pub use crate::jvm::JvmOp;
     pub use crate::ops::{
-        IntoJava, IntoLocal, IntoOptLocal, IntoScalar, IntoVoid, JavaMethod, ScalarMethod,
-        VoidMethod,
+        IntoJava, IntoLocal, IntoOptLocal, IntoScalar, IntoVoid, JavaField, JavaMethod, ScalarField,
+        ScalarMethod, VoidMethod,
     };
     pub use crate::to_java::ToJava;
 }
@@ -54,9 +54,9 @@ pub mod prelude {
 pub mod plumbing {
     pub use crate::cast::Upcast;
     pub use crate::error::check_exception;
-    pub use crate::find::{find_class, find_constructor, find_method};
+    pub use crate::find::{find_class, find_constructor, find_field, find_method};
     pub use crate::global::GlobalOp;
     pub use crate::jvm::JavaObjectExt;
     pub use crate::refs::NullJRef;
-    pub use crate::raw::{FromJniValue, HasEnvPtr, IntoJniValue, MethodPtr, ObjectPtr};
+    pub use crate::raw::{FieldPtr, FromJniValue, HasEnvPtr, IntoJniValue, MethodPtr, ObjectPtr};
 }

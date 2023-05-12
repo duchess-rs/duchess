@@ -157,3 +157,33 @@ where
 }
 
 impl<J> VoidMethod for J where for<'jvm> Self: JvmOp<Output<'jvm> = ()> {}
+
+/// A java field that returns a `T` object (when executed).
+pub trait JavaField<T>
+where
+    T: JavaObject,
+    for<'jvm> Self: JvmOp<Output<'jvm> = Option<Local<'jvm, T>>>,
+{
+}
+
+impl<J, T> JavaField<T> for J
+where
+    T: JavaObject,
+    for<'jvm> Self: JvmOp<Output<'jvm> = Option<Local<'jvm, T>>>,
+{
+}
+
+/// A java field that returns a scalar value of type `T` when executed.
+pub trait ScalarField<T>
+where
+    T: JavaScalar,
+    for<'jvm> Self: JvmOp<Output<'jvm> = T>,
+{
+}
+
+impl<J, T> ScalarField<T> for J
+where
+    T: JavaScalar,
+    for<'jvm> Self: JvmOp<Output<'jvm> = T>,
+{
+}
