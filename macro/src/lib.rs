@@ -8,6 +8,7 @@ mod class_info;
 mod codegen;
 mod parse;
 mod reflect;
+mod signature;
 mod span_error;
 
 /// The main duchess macro, used like so

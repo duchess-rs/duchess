@@ -1,6 +1,7 @@
 use std::{collections::BTreeMap, sync::Arc};
 
-use proc_macro2::{Delimiter, Ident, Span, TokenTree};
+use proc_macro2::{Delimiter, Ident, Span, TokenStream, TokenTree};
+use quote::quote_spanned;
 
 use crate::{
     parse::{Parse, TextAccum},
@@ -379,7 +380,7 @@ impl NonRepeatingType {
     pub fn descriptor(&self) -> String {
         match self {
             NonRepeatingType::Ref(r) => match r {
-                RefType::Class(c) => format!("L{};", c.name.with_slashes()),
+                RefType::Class(c) => format!("L{};", c.name.to_jni_name()),
                 RefType::Array(r) => format!("[{}", r.descriptor()),
 
                 // FIXME(#42): The descriptor actually depends on how the type
@@ -564,12 +565,22 @@ impl DotId {
         (package, name)
     }
 
-    pub fn with_slashes(&self) -> String {
+    /// Returns a name like `java/lang/Object`
+    pub fn to_jni_name(&self) -> String {
         self.ids
             .iter()
             .map(|id| &id[..])
             .collect::<Vec<_>>()
             .join("/")
+    }
+
+    /// Returns a token stream like `java::lang::Object`
+    pub fn to_module_name(&self, span: Span) -> TokenStream {
+        let (package_names, struct_name) = self.split();
+        let struct_ident = Ident::new(struct_name, span);
+        let package_idents: Vec<Ident> =
+            package_names.iter().map(|n| Ident::new(n, span)).collect();
+        quote_spanned!(span => #(#package_idents ::)* #struct_ident)
     }
 }
 

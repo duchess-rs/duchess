@@ -1,5 +1,5 @@
 use duchess::java::lang::ThrowableExt;
-use duchess::java::util::{ArrayList, ArrayListExt, HashMap as JavaHashMap, MapExt};
+use duchess::java::util::{HashMap as JavaHashMap, MapExt};
 use duchess::{java, prelude::*, Global, Jvm, Local, ToRust};
 use std::collections::HashMap;
 use thiserror::Error;
