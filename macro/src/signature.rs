@@ -305,14 +305,18 @@ impl Signature {
                 Ok(quote_spanned!(self.span => java::Array<#e>))
             }
             RefType::TypeParameter(t) => {
-                assert!(
-                    self.in_scope_generics.contains(t),
-                    "generic type parameter `{:?}` not among in-scope parameters: {:?}",
-                    t,
-                    self.in_scope_generics,
-                );
-                let t = t.to_ident(self.span);
-                Ok(quote_spanned!(self.span => #t))
+                if self.in_scope_generics.contains(t) {
+                    let t = t.to_ident(self.span);
+                    Ok(quote_spanned!(self.span => #t))
+                } else {
+                    Err(SpanError {
+                        span: self.span,
+                        message: format!(
+                            "generic type parameter `{:?}` not among in-scope parameters: {:?}",
+                            t, self.in_scope_generics,
+                        ),
+                    })
+                }
             }
             RefType::Extends(ty) => {
                 let g = self.fresh_generic()?;
