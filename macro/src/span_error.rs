@@ -14,3 +14,9 @@ impl SpanError {
         quote_spanned! { span => compile_error! { #message } }
     }
 }
+
+impl From<SpanError> for syn::Error {
+    fn from(value: SpanError) -> Self {
+        syn::Error::new(value.span, value.message)
+    }
+}

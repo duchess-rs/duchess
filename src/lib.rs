@@ -3,25 +3,25 @@
 mod array;
 mod cast;
 mod error;
-mod global;
 mod find;
+mod global;
 mod jvm;
 mod libjvm;
 mod not_null;
 mod ops;
-mod refs;
 mod raw;
 mod ref_;
+mod refs;
 mod str;
+mod thread;
 mod to_java;
 mod to_rust;
 mod try_catch;
-mod thread;
 
 /// Contains reusable declarations for classes distributed by the JDK under the `java.*` packages.
 pub mod java;
 
-pub use duchess_macro::java_package;
+pub use duchess_macro::{java_package, ToJava, ToRust};
 pub use error::{Error, GlobalResult, Result};
 pub use jvm::JavaObject;
 pub use jvm::JavaType;
@@ -43,8 +43,8 @@ pub mod prelude {
     pub use crate::cast::by_type;
     pub use crate::jvm::JvmOp;
     pub use crate::ops::{
-        IntoJava, IntoLocal, IntoOptLocal, IntoScalar, IntoVoid, JavaField, JavaMethod, ScalarField,
-        ScalarMethod, VoidMethod,
+        IntoJava, IntoLocal, IntoOptLocal, IntoScalar, IntoVoid, JavaField, JavaMethod,
+        ScalarField, ScalarMethod, VoidMethod,
     };
     pub use crate::to_java::ToJava;
 }
@@ -57,6 +57,7 @@ pub mod plumbing {
     pub use crate::find::{find_class, find_constructor, find_field, find_method};
     pub use crate::global::GlobalOp;
     pub use crate::jvm::JavaObjectExt;
-    pub use crate::refs::NullJRef;
     pub use crate::raw::{FieldPtr, FromJniValue, HasEnvPtr, IntoJniValue, MethodPtr, ObjectPtr};
+    pub use crate::refs::NullJRef;
+    pub use crate::to_java::ToJavaImpl;
 }

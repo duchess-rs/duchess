@@ -158,3 +158,13 @@ impl ToJavaImpl<java::lang::String> for str {
         Ok(Some(jstr))
     }
 }
+
+impl ToJavaImpl<java::Array<i8>> for Vec<u8> {
+    fn to_java_impl<'jvm>(
+        rust: &Self,
+        jvm: &mut Jvm<'jvm>,
+    ) -> crate::Result<'jvm, Option<Local<'jvm, java::Array<i8>>>> {
+        let this: &Vec<i8> = unsafe { std::mem::transmute(rust) };
+        ToJavaImpl::to_java_impl(this, jvm)
+    }
+}

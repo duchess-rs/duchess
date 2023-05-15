@@ -1,7 +1,7 @@
 use proc_macro2::Span;
 
 use crate::{
-    class_info::{ClassDecl, Id},
+    class_info::{ClassDecl, ClassInfo, DotId, Id},
     parse::{Parse, Parser},
     span_error::SpanError,
 };
@@ -18,6 +18,95 @@ impl Parse for DuchessDeclaration {
 
     fn description() -> String {
         format!("list of classes whose methods you would like to call (e.g., `java.lang.Object`)")
+    }
+}
+
+/// There are various points where the user must select
+/// a method. In these cases, we permit them to either write
+/// just a class name (in which case we search for (hopefully) at most one
+/// such method), a class + method name, or a little mini class declaration
+/// that includes the full details (which accommodates the case where it is
+/// overloaded).
+pub enum MethodSelector {
+    /// User wrote `foo.bar.Baz`
+    ClassName(JavaPath),
+
+    /// User wrote `foo.bar.Baz::method`
+    MethodName(JavaPath, Ident),
+
+    /// User wrote `class Foo { ... }` with full details.
+    /// This class should have at most one member.
+    ClassInfo(ClassInfo),
+}
+
+impl MethodSelector {
+    /// Span for things that refer to the method
+    pub fn span(&self) -> Span {
+        match self {
+            MethodSelector::ClassName(jp) => jp.span,
+            MethodSelector::MethodName(_, ident) => ident.span,
+            MethodSelector::ClassInfo(ci) => ci.span,
+        }
+    }
+
+    /// Span for things that refer to the class the method is in
+    pub fn class_span(&self) -> Span {
+        match self {
+            MethodSelector::ClassName(jp) => jp.span,
+            MethodSelector::MethodName(jp, _) => jp.span,
+            MethodSelector::ClassInfo(ci) => ci.span,
+        }
+    }
+}
+
+impl Parse for MethodSelector {
+    fn parse(p: &mut crate::parse::Parser) -> Result<Option<Self>, SpanError> {
+        // Check for a `class` declaration
+        if let Some(c) = ClassDecl::parse(p)? {
+            return match c {
+                ClassDecl::Reflected(r) => Err(SpanError {
+                    span: r.span,
+                    message: format!("expected a class with a single member, not `*`"),
+                }),
+                ClassDecl::Specified(c) => {
+                    let members = c.constructors.len() + c.fields.len() + c.methods.len();
+                    if members != 1 {
+                        Err(SpanError {
+                            span: c.span,
+                            message: format!(
+                                "expected a class with exactly one member, but {} members found",
+                                members
+                            ),
+                        })
+                    } else {
+                        Ok(Some(MethodSelector::ClassInfo(c)))
+                    }
+                }
+            };
+        }
+
+        // Otherwise we expect either `foo.bar.Baz` or `foo.bar.Baz::method`
+        let Some(path) = JavaPath::parse(p)? else {
+            return Ok(None);
+        };
+
+        if let Some(_) = p.eat_punct(':') {
+            if let Some(_) = p.eat_punct(':') {
+                if let Some(ident) = Ident::parse(p)? {
+                    return Ok(Some(MethodSelector::MethodName(path, ident)));
+                }
+            }
+            Err(SpanError {
+                span: p.peek_span().unwrap_or(Span::call_site()),
+                message: format!("expected method name after `::`"),
+            })
+        } else {
+            Ok(Some(MethodSelector::ClassName(path)))
+        }
+    }
+
+    fn description() -> String {
+        format!("method selector, e.g. `java.package.Class`, `java.package.Class::method`, or full details")
     }
 }
 
@@ -56,6 +145,12 @@ impl Parse for JavaPackage {
 pub struct JavaPath {
     pub ids: Vec<Ident>,
     pub span: Span,
+}
+
+impl JavaPath {
+    pub fn to_dot_id(&self) -> DotId {
+        self.ids.iter().map(|ident| ident.to_id()).collect()
+    }
 }
 
 impl Parse for JavaPath {
