@@ -2,7 +2,6 @@ use std::collections::VecDeque;
 
 use proc_macro2::Span;
 use quote::quote_spanned;
-use rust_format::Formatter;
 use syn::{spanned::Spanned, Attribute};
 use synstructure::VariantInfo;
 
@@ -15,19 +14,7 @@ pub fn derive_to_rust(s: synstructure::Structure) -> proc_macro2::TokenStream {
     };
     match driver.try_derive_to_rust() {
         Ok(t) => {
-            if let Ok(debug_env) = std::env::var("DUCHESS_DEBUG") {
-                if debug_env == "*" || debug_env == "1" || s.ast().ident.to_string() == debug_env {
-                    match rust_format::RustFmt::default().format_tokens(t.clone()) {
-                        Ok(v) => {
-                            eprintln!("{v}");
-                        }
-                        Err(_) => {
-                            eprintln!("{t}");
-                        }
-                    }
-                }
-            }
-
+            crate::debug_tokens(&s.ast().ident, &t);
             t
         }
         Err(e) => e.into_compile_error(),
@@ -41,19 +28,7 @@ pub fn derive_to_java(s: synstructure::Structure) -> proc_macro2::TokenStream {
     };
     match driver.try_derive_to_java() {
         Ok(t) => {
-            if let Ok(debug_env) = std::env::var("DUCHESS_DEBUG") {
-                if debug_env == "*" || debug_env == "1" || s.ast().ident.to_string() == debug_env {
-                    match rust_format::RustFmt::default().format_tokens(t.clone()) {
-                        Ok(v) => {
-                            eprintln!("{v}");
-                        }
-                        Err(_) => {
-                            eprintln!("{t}");
-                        }
-                    }
-                }
-            }
-
+            crate::debug_tokens(&s.ast().ident, &t);
             t
         }
         Err(e) => e.into_compile_error(),

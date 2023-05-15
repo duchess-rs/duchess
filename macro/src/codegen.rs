@@ -1,7 +1,8 @@
 use crate::{
     argument::DuchessDeclaration,
     class_info::{
-        ClassInfo, ClassRef, Constructor, DotId, Field, Id, Method, NonRepeatingType, RootMap, SpannedPackageInfo, Type,
+        ClassInfo, ClassRef, Constructor, DotId, Field, Id, Method, NonRepeatingType, RootMap,
+        SpannedPackageInfo, Type,
     },
     reflect::Reflector,
     signature::Signature,
@@ -11,7 +12,6 @@ use inflector::Inflector;
 use once_cell::sync::OnceCell;
 use proc_macro2::{Ident, Literal, Span, TokenStream};
 use quote::quote_spanned;
-use rust_format::Formatter;
 
 impl DuchessDeclaration {
     pub fn to_tokens(&self) -> Result<TokenStream, SpanError> {
@@ -235,18 +235,7 @@ impl ClassInfo {
             };
         };
 
-        if let Ok(f) = std::env::var("DUCHESS_DEBUG") {
-            if f == "*" || f == "1" || self.name.to_string().starts_with(&f) {
-                match rust_format::RustFmt::default().format_tokens(output.clone()) {
-                    Ok(v) => {
-                        eprintln!("{v}");
-                    }
-                    Err(_) => {
-                        eprintln!("{output:?}");
-                    }
-                }
-            }
-        }
+        crate::debug_tokens(&self.name, &output);
 
         Ok(output)
     }
@@ -749,8 +738,10 @@ impl ClassInfo {
         let jni_field = jni_c_str(&*field.name, self.span);
         let jni_descriptor = jni_c_str(&field.ty.descriptor(), self.span);
 
-        let rust_field_name = Id::from(format!("get_{}", field.name.to_snake_case())).to_ident(self.span);
-        let rust_field_type_name = Id::from(format!("{}Getter", field.name.to_camel_case())).to_ident(self.span);
+        let rust_field_name =
+            Id::from(format!("get_{}", field.name.to_snake_case())).to_ident(self.span);
+        let rust_field_type_name =
+            Id::from(format!("{}Getter", field.name.to_camel_case())).to_ident(self.span);
 
         // The generic parameters declared on the Java method.
         let java_class_generics: Vec<_> = self.class_generic_names();

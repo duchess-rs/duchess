@@ -1,6 +1,7 @@
 use argument::DuchessDeclaration;
 use parse::Parser;
 use proc_macro::TokenStream;
+use rust_format::Formatter;
 
 mod argument;
 mod check;
@@ -41,3 +42,17 @@ pub fn java_package(input: TokenStream) -> TokenStream {
 synstructure::decl_derive!([ToRust, attributes(java)] => derive::derive_to_rust);
 
 synstructure::decl_derive!([ToJava, attributes(java)] => derive::derive_to_java);
+
+fn debug_tokens(name: impl std::fmt::Display, token_stream: &proc_macro2::TokenStream) {
+    let Ok(f) = std::env::var("DUCHESS_DEBUG") else { return };
+    if f == "*" || f == "1" || name.to_string().starts_with(&f) {
+        match rust_format::RustFmt::default().format_tokens(token_stream.clone()) {
+            Ok(v) => {
+                eprintln!("{v}");
+            }
+            Err(_) => {
+                eprintln!("{token_stream:?}");
+            }
+        }
+    }
+}
