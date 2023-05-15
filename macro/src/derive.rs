@@ -224,7 +224,7 @@ impl Driver<'_> {
         Ok(construct)
     }
 
-    /// Generates the code to create this variant as part of a `ToRust` impl.
+    /// Generates the code to create this variant as part of a `ToJava` impl.
     /// Assumes `self` is the java type and `jvm` is in scope.
     fn variant_to_java(
         &mut self,
