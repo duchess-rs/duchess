@@ -1,8 +1,7 @@
-duchess::java_package! { //~ ERROR: proc macro panicked
-    //~^ HELP: generic type parameter `Id { data: "bool" }` not among in-scope parameters: []
+duchess::java_package! {
     package java.lang;
 
-    public class java.lang.Object {
+    public class java.lang.Object { //~ ERROR: generic type parameter `Id { data: "bool" }` not among in-scope parameters: []
         public java.lang.Object();
         public native bool hashCode();
     }

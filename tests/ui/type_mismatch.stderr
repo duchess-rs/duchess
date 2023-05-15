@@ -1,16 +1,8 @@
-error: proc macro panicked
- --> $DIR/type_mismatch.rs:1:1
+error: generic type parameter `Id { data: "bool" }` not among in-scope parameters: []
+ --> $DIR/type_mismatch.rs:4:5
   |
-1 | / duchess::java_package! {
-2 | |
-3 | |     package java.lang;
-4 | |
-... |
-8 | |     }
-9 | | }
-  | |_^
-  |
-  = help: message: generic type parameter `Id { data: "bool" }` not among in-scope parameters: []
+4 |     public class java.lang.Object {
+  |     ^^^^^^
 
 error: aborting due to previous error
 
