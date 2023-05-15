@@ -8,6 +8,8 @@ You need the `javap` tool on your path.
 On Ubuntu, I installed `java-20-amazon-corretto-jdk/stable`, 
 but `openjdk-17-jre/stable-security` might also work. --nikomatsakis
 
+oli: `openjdk-17-jdk-headless` works on unbuntu.
+
 ## How to use
 
 *This is a README from the future, in that it describes the intended plan for the crate.*
