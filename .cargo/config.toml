@@ -1,2 +1,2 @@
 [env]
-CLASSPATH = { value = "java", relative = true }
+CLASSPATH = { value = "java", relative = true, force = true }
