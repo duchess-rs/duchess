@@ -24,24 +24,6 @@ duchess::java_package! {
     class AuthorizationExceptionDenied { * }
 }
 
-// XX: can be removed when we automatically look through extends/implements
-unsafe impl duchess::plumbing::Upcast<java::lang::Throwable>
-    for auth::AuthenticationExceptionUnauthenticated
-{
-}
-unsafe impl duchess::plumbing::Upcast<java::lang::Throwable>
-    for auth::AuthenticationExceptionInvalidSecurityToken
-{
-}
-unsafe impl duchess::plumbing::Upcast<java::lang::Throwable>
-    for auth::AuthenticationExceptionInvalidSignature
-{
-}
-unsafe impl duchess::plumbing::Upcast<java::lang::Throwable>
-    for auth::AuthorizationExceptionDenied
-{
-}
-
 pub struct HttpAuth(Global<auth::HttpAuth>);
 
 #[derive(Debug, duchess::ToJava)]

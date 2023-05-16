@@ -6,6 +6,7 @@ use quote::quote_spanned;
 use crate::{
     parse::{Parse, TextAccum},
     span_error::SpanError,
+    upcasts::Upcasts,
 };
 
 /// Stores all the data about the classes/packages to be translated
@@ -14,6 +15,7 @@ use crate::{
 pub struct RootMap {
     pub subpackages: BTreeMap<Id, SpannedPackageInfo>,
     pub classes: BTreeMap<DotId, Arc<ClassInfo>>,
+    pub upcasts: Upcasts,
 }
 
 impl RootMap {
@@ -144,6 +146,17 @@ pub struct ClassInfo {
 impl ClassInfo {
     pub fn parse(text: &str, span: Span) -> Result<ClassInfo, SpanError> {
         javap::parse_class_info(span, &text)
+    }
+
+    pub fn this_ref(&self) -> ClassRef {
+        ClassRef {
+            name: self.name.clone(),
+            generics: self
+                .generics
+                .iter()
+                .map(|g| RefType::TypeParameter(g.id.clone()))
+                .collect(),
+        }
     }
 }
 
@@ -537,6 +550,22 @@ impl DotId {
                 .cloned()
                 .collect(),
         }
+    }
+
+    pub fn object() -> Self {
+        Self::parse("java.lang.Object")
+    }
+
+    pub fn exception() -> Self {
+        Self::parse("java.lang.Exception")
+    }
+
+    pub fn runtime_exception() -> Self {
+        Self::parse("java.lang.RuntimeException")
+    }
+
+    pub fn throwable() -> Self {
+        Self::parse("java.lang.Throwable")
     }
 
     pub fn parse(s: impl AsRef<str>) -> DotId {
