@@ -9,6 +9,7 @@ use crate::{
         Type,
     },
     span_error::SpanError,
+    upcasts::Upcasts,
 };
 
 impl DuchessDeclaration {
@@ -23,9 +24,13 @@ impl DuchessDeclaration {
                 &mut classes,
             )?;
         }
+
+        let upcasts: Upcasts = Upcasts::from_iter(classes.values().map(|v| &**v));
+
         Ok(RootMap {
             subpackages,
             classes,
+            upcasts,
         })
     }
 }

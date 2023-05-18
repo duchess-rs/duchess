@@ -10,4 +10,5 @@
     - [The `Jvm` type](./jvm.md)
     - [Local vs global object references](./local_vs_global.md)
 - [Internals](./internals.md)
+    - [Upcasts](./upcasts.md)
 - [Logo](./logo.md)

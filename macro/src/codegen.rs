@@ -1,15 +1,15 @@
 use crate::{
     argument::DuchessDeclaration,
     class_info::{
-        ClassInfo, ClassRef, Constructor, DotId, Field, Id, Method, NonRepeatingType, RootMap,
+        ClassInfo, Constructor, DotId, Field, Id, Method, NonRepeatingType, RootMap,
         SpannedPackageInfo, Type,
     },
     reflect::Reflector,
     signature::Signature,
     span_error::SpanError,
+    upcasts::Upcasts,
 };
 use inflector::Inflector;
-use once_cell::sync::OnceCell;
 use proc_macro2::{Ident, Literal, Span, TokenStream};
 use quote::quote_spanned;
 
@@ -66,7 +66,7 @@ impl SpannedPackageInfo {
         let class_tokens: TokenStream = self
             .classes
             .iter()
-            .map(|class_id| root_map.classes[class_id].to_tokens())
+            .map(|class_id| root_map.classes[class_id].to_tokens(&root_map.upcasts))
             .collect::<Result<_, _>>()?;
 
         let supers: Vec<TokenStream> = package_id
@@ -91,7 +91,7 @@ impl SpannedPackageInfo {
 }
 
 impl ClassInfo {
-    pub fn to_tokens(&self) -> Result<TokenStream, SpanError> {
+    pub fn to_tokens(&self, upcasts: &Upcasts) -> Result<TokenStream, SpanError> {
         let struct_name = self.struct_name();
         let ext_trait_name = self.ext_trait_name();
         let cached_class = self.cached_class();
@@ -137,7 +137,7 @@ impl ClassInfo {
             .map(|m| &m.trait_impl_method)
             .collect();
         let jvm_op_impls: Vec<_> = object_methods.iter().map(|m| &m.jvm_op_impl).collect();
-        let upcast_impls = self.upcast_impls()?;
+        let upcast_impls = self.upcast_impls(upcasts)?;
 
         let output = quote_spanned! {
             self.span =>
@@ -171,11 +171,6 @@ impl ClassInfo {
                 {
                     #cached_class
                 }
-
-                unsafe impl<#(#java_class_generics,)*> plumbing::Upcast<#struct_name<#(#java_class_generics,)*>> for #struct_name<#(#java_class_generics,)*>
-                where
-                    #(#java_class_generics: duchess::JavaObject,)*
-                {}
 
                 impl<#(#java_class_generics,)*> AsRef<#struct_name<#(#java_class_generics,)*>> for #struct_name<#(#java_class_generics,)*>
                 where
@@ -240,14 +235,17 @@ impl ClassInfo {
         Ok(output)
     }
 
-    fn upcast_impls(&self) -> Result<TokenStream, SpanError> {
+    fn upcast_impls(&self, upcasts: &Upcasts) -> Result<TokenStream, SpanError> {
+        let class_refs = upcasts.upcasts_for_generated_class(&self.name);
+
         let struct_name = self.struct_name();
         let java_class_generics = self.class_generic_names();
-        self
-            .resolve_upcasts()
+        class_refs
+            .iter()
             .map(|r| {
-                let mut sig = Signature::new(&Id::from("supertrait"), self.span, &[])
-                .with_internal_generics(&self.generics)?;
+                let mut sig = 
+                    Signature::new(&Id::from("supertrait"), self.span, &[])
+                    .with_internal_generics(&self.generics)?;
                 let tokens = sig.forbid_capture(|sig| sig.class_ref_ty(r)).unwrap();
                 Ok(quote_spanned!(self.span =>
                     unsafe impl<#(#java_class_generics,)*> plumbing::Upcast<#tokens> for #struct_name<#(#java_class_generics,)*>
@@ -257,21 +255,6 @@ impl ClassInfo {
                 ))
             })
             .collect()
-    }
-
-    // XX: Clearly, we'll need more sophisticated resolution of what types we descend from, but for now we can at least
-    // inject the "everything is an Object" root.
-    fn resolve_upcasts(&self) -> impl Iterator<Item = &'_ ClassRef> {
-        static OBJECT: OnceCell<ClassRef> = OnceCell::new();
-        let object = OBJECT.get_or_init(|| ClassRef {
-            name: DotId::parse("java.lang.Object"),
-            generics: vec![],
-        });
-
-        self.extends
-            .iter()
-            .chain(&self.implements)
-            .chain(Some(object).filter(|obj| obj.name != self.name).into_iter())
     }
 
     fn cached_class(&self) -> TokenStream {
