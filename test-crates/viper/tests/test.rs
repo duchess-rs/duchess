@@ -14,13 +14,7 @@ use viper::viper::silver::reporter::NoopReporter__;
 
 /// Builds an empty Scala Seq of the specified type
 fn empty_scala_seq<T: duchess::JavaObject>() -> impl IntoJava<Seq<T>> {
-    ArrayBuffer::new()
-        .upcast::<StrictOptimizedSeqOps<T, ArrayBuffer, ArrayBuffer<T>>>()
-        .upcast::<SeqOps<T, ArrayBuffer, ArrayBuffer<T>>>()
-        .upcast::<IterableOps<T, ArrayBuffer, ArrayBuffer<T>>>()
-        .upcast::<IterableOnceOps<T, ArrayBuffer, ArrayBuffer<T>>>()
-        .to_seq()
-        .assert_not_null()
+    ArrayBuffer::new().to_seq().assert_not_null()
 }
 
 #[test]
