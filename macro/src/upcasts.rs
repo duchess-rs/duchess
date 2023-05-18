@@ -83,6 +83,13 @@ impl Upcasts {
                 });
         };
 
+        // N.B. we don't insert the reflexive `C extends C` relations here, which means we don't
+        // necessarily have 100% parity between these hardcoded types and types created by
+        // `insert_direct_upcasts`. This is a micro-optimization that I can't resist.
+        // The idea is that reflexive impls aren't necessary because they only matter when
+        // we are generating `Upcast` impls, and we only generate `Upcast` impls for those
+        // classes that appear in our package declarations.
+
         insert(DotId::runtime_exception(), DotId::exception());
         insert(DotId::exception(), DotId::throwable());
         insert(DotId::throwable(), DotId::object());
