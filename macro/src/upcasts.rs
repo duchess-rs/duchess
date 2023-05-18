@@ -5,7 +5,7 @@ use crate::{
     substitution::{Substitute, Substitution},
 };
 
-/// A map storing the transitive upcasts for each class that we are generated (and potentially additional classes).
+/// A map storing the transitive upcasts for each class that we are generating (and potentially additional classes).
 ///
 /// There is one caveat: we only compute the transitive superclasses based on the classes that are input to
 /// the proc macro. The problem is that we can only inspect the tokens presented to us. While we could reflect
