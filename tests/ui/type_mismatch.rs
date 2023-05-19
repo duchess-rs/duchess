@@ -6,3 +6,5 @@ duchess::java_package! {
         public native bool hashCode();
     }
 }
+
+fn main() {}

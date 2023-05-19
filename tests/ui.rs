@@ -7,11 +7,6 @@ fn main() -> color_eyre::eyre::Result<()> {
     let mut config = Config::default();
     config.root_dir = "tests/ui".into();
 
-    // Don't require `fn main()`. If this becomes desirable, we need to either split
-    // the test suite into two folders, or require `fn main()` in all tests.
-    config.program.args.push("--crate-type".into());
-    config.program.args.push("lib".into());
-
     if bless {
         config.output_conflict_handling = OutputConflictHandling::Bless;
     }
