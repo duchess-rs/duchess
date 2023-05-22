@@ -1,6 +1,8 @@
 # duchess
 Experiments with Java-Rust interop
 
+[Chat on Zulip](https://duchess.zulipchat.com/)
+
 ## Instructions
 
 You need the `javap` tool on your path.
