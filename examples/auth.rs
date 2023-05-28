@@ -1,10 +1,10 @@
 use duchess::java::lang::ThrowableExt;
 use duchess::java::util::{HashMap as JavaHashMap, MapExt};
-use duchess::{java, prelude::*, Global, Jvm, Local, ToRust};
+use duchess::{java, prelude::*, Global, Jvm, Local};
 use std::collections::HashMap;
 use thiserror::Error;
 
-use auth::{AuthorizationExceptionDeniedExt, HttpAuthExt};
+use auth::HttpAuthExt;
 
 duchess::java_package! {
     package auth;
@@ -73,10 +73,20 @@ pub struct AuthorizeRequest {
     pub context: HashMap<String, String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Error, duchess::ToRust)]
+#[java(java.lang.Throwable)]
 pub enum AuthorizeError {
-    Denied(String),
-    InternalError(String),
+    #[error("Denied({user_message})")]
+    #[java(auth.AuthorizationExceptionDenied)]
+    Denied { user_message: String },
+
+    #[error("Generic({get_message})")]
+    #[java(auth.AuthorizationException)]
+    Generic { get_message: String },
+
+    #[error("InternalError({get_message})")]
+    #[java(java.lang.Throwable)]
+    InternalError { get_message: String },
 }
 
 impl HttpAuth {
@@ -95,42 +105,19 @@ impl HttpAuth {
             .unwrap()
     }
 
-    // pub fn authorize(
-    //     &self,
-    //     authn: &Authenticated,
-    //     authz: &AuthorizeRequest,
-    // ) -> Result<(), AuthorizeError> {
-    //     self.0
-    //         .authorize(authn, authz)
-    //         .catch::<duchess::java::lang::Throwable>()
-    //         .to_rust()
-    //         .execute()
-    //         .unwrap()
-    // }
+    pub fn authorize(
+        &self,
+        authn: &Authenticated,
+        authz: &AuthorizeRequest,
+    ) -> Result<(), AuthorizeError> {
+        self.0
+            .authorize(authn, authz)
+            .catch::<duchess::java::lang::Throwable>()
+            .to_rust()
+            .execute()
+            .unwrap()
+    }
 }
-
-// impl ToRust<AuthorizeError> for duchess::java::lang::Throwable {
-//     fn to_rust<'jvm>(&self, jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, AuthorizeError> {
-//         if let Ok(x) = self
-//             .try_downcast::<auth::AuthorizationExceptionDenied>()
-//             .execute_with(jvm)?
-//         {
-//             let message = x
-//                 .user_message()
-//                 .assert_not_null()
-//                 .to_rust()
-//                 .execute_with(jvm)?;
-//             Ok(AuthorizeError::Denied(message))
-//         } else {
-//             let message = self
-//                 .get_message()
-//                 .assert_not_null()
-//                 .to_rust()
-//                 .execute_with(jvm)?;
-//             Ok(AuthorizeError::InternalError(message))
-//         }
-//     }
-// }
 
 impl JvmOp for &AuthorizeRequest {
     type Output<'jvm> = Local<'jvm, auth::AuthorizeRequest>;
@@ -178,10 +165,10 @@ fn main() -> duchess::GlobalResult<()> {
         context: HashMap::new(),
     };
 
-    // if let Err(e) = auth.authorize(&authenticated, &request) {
-    //     println!("User `{}` access denied: {:?}", authenticated.user, e);
-    //     return Ok(());
-    // }
+    if let Err(e) = auth.authorize(&authenticated, &request) {
+        println!("User `{}` access denied: {:?}", authenticated.user, e);
+        return Ok(());
+    }
     println!("User allowed to delete my-resource");
 
     Ok(())

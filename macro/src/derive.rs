@@ -95,7 +95,7 @@ impl Driver<'_> {
 
         let self_ty = &self.input.ast().ident;
         Ok(quote_spanned!(self.span() =>
-        #[allow(unused_imports)]
+        #[allow(unused_imports, unused_variables)]
         impl duchess::ToRust<#self_ty> for #class_name {
             fn to_rust<'jvm>(&self, jvm: &mut duchess::Jvm<'jvm>) -> duchess::Result<'jvm, #self_ty> {
                 use #ext_trait_name;
@@ -147,7 +147,7 @@ impl Driver<'_> {
         let self_ty = &self.input.ast().ident;
 
         Ok(quote_spanned!(self.span() =>
-        #[allow(unused_imports)]
+        #[allow(unused_imports, unused_variables)]
         impl duchess::ToRust<#self_ty> for #root_class_name {
             fn to_rust<'jvm>(&self, jvm: &mut duchess::Jvm<'jvm>) -> duchess::Result<'jvm, #self_ty> {
                 use duchess::prelude::*;
