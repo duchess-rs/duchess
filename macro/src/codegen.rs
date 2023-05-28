@@ -243,7 +243,7 @@ impl ClassInfo {
         class_refs
             .iter()
             .map(|r| {
-                let mut sig = 
+                let mut sig =
                     Signature::new(&Id::from("supertrait"), self.span, &[])
                     .with_internal_generics(&self.generics)?;
                 let tokens = sig.forbid_capture(|sig| sig.class_ref_ty(r)).unwrap();

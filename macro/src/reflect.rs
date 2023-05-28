@@ -1,12 +1,11 @@
-use std::{collections::BTreeMap, env, process::Command, sync::Arc};
+use std::{cell::RefCell, collections::BTreeMap, env, process::Command, sync::Arc};
 
 use proc_macro2::Span;
 
 use crate::{
     argument::{DuchessDeclaration, Ident, JavaPackage, MethodSelector},
     class_info::{
-        ClassDecl, ClassInfo, Constructor, DotId, Generic, Id, Method, RootMap, SpannedPackageInfo,
-        Type,
+        ClassDecl, ClassInfo, DotId, Generic, Id, Method, RootMap, SpannedPackageInfo, Type,
     },
     span_error::SpanError,
     upcasts::Upcasts,
@@ -126,19 +125,15 @@ impl JavaPackage {
 /// look up info about their interfaces.
 #[derive(Default)]
 pub struct Reflector {
-    classes: BTreeMap<DotId, Arc<ClassInfo>>,
+    classes: RefCell<BTreeMap<DotId, Arc<ClassInfo>>>,
 }
 
 impl Reflector {
     /// Returns the (potentially cached) info about `class_name`;
-    pub fn reflect(
-        &mut self,
-        class_name: &DotId,
-        span: Span,
-    ) -> Result<&Arc<ClassInfo>, SpanError> {
+    pub fn reflect(&self, class_name: &DotId, span: Span) -> Result<Arc<ClassInfo>, SpanError> {
         // yields an error if we cannot reflect on that class.
-        if self.classes.contains_key(class_name) {
-            return Ok(&self.classes[class_name]);
+        if let Some(class) = self.classes.borrow().get(class_name).map(Arc::clone) {
+            return Ok(class);
         }
 
         let mut command = Command::new("javap");
@@ -193,21 +188,23 @@ impl Reflector {
         ci.span = Span::call_site();
         Ok(self
             .classes
+            .borrow_mut()
             .entry(class_name.clone())
-            .or_insert(Arc::new(ci)))
+            .or_insert(Arc::new(ci))
+            .clone())
     }
 
     ///
     pub fn reflect_method(
-        &mut self,
+        &self,
         method_selector: &MethodSelector,
-    ) -> Result<ReflectedMethod<'_>, SpanError> {
+    ) -> Result<ReflectedMethod, SpanError> {
         match method_selector {
             MethodSelector::ClassName(cn) => {
                 let dot_id = cn.to_dot_id();
                 let class_info = self.reflect(&dot_id, cn.span)?;
                 match class_info.constructors.len() {
-                    1 => Ok(ReflectedMethod::Constructor(class_info, &class_info.constructors[0])),
+                    1 => Ok(ReflectedMethod::Constructor(class_info, 0)),
                     0 => Err(SpanError { span: cn.span, message: format!("no constructors found") }),
                     n => Err(SpanError { span: cn.span, message: format!("{n} constructors found, use an explicit class declaration to disambiguate") }),
                 }
@@ -215,13 +212,17 @@ impl Reflector {
             MethodSelector::MethodName(cn, mn) => {
                 let dot_id = cn.to_dot_id();
                 let class_info = self.reflect(&dot_id, cn.span)?;
-                let methods: Vec<&Method> = class_info
+                let methods: Vec<(MethodIndex, &Method)> = class_info
                     .methods
                     .iter()
-                    .filter(|m| &m.name[..] == &mn.text[..])
+                    .enumerate()
+                    .filter(|(_i, m)| &m.name[..] == &mn.text[..])
                     .collect();
                 match methods.len() {
-                    1 => Ok(ReflectedMethod::Method(class_info, &methods[0])),
+                    1 => {
+                        let (id, _method) = methods[0];
+                        Ok(ReflectedMethod::Method(class_info, id))
+                    },
                     0 => Err(SpanError { span: cn.span, message: format!("no methods named `{mn}` found") }),
                     n => Err(SpanError { span: cn.span, message: format!("{n} methods named `{mn}` found, use an explicit class declaration to disambiguate") }),
                 }
@@ -231,19 +232,22 @@ impl Reflector {
     }
 }
 
+type ConstructorIndex = usize;
+type MethodIndex = usize;
+
 /// Reflection on something callable.
-#[derive(Copy, Clone, Debug)]
-pub enum ReflectedMethod<'i> {
-    Constructor(&'i ClassInfo, &'i Constructor),
-    Method(&'i ClassInfo, &'i Method),
+#[derive(Clone, Debug)]
+pub enum ReflectedMethod {
+    Constructor(Arc<ClassInfo>, ConstructorIndex),
+    Method(Arc<ClassInfo>, MethodIndex),
 }
 
-impl ReflectedMethod<'_> {
+impl ReflectedMethod {
     /// The name of this callable thing in Rust
     pub fn name(&self) -> Id {
         match self {
             ReflectedMethod::Constructor(..) => Id::from("new"),
-            ReflectedMethod::Method(_, m) => m.name.clone(),
+            ReflectedMethod::Method(c, m) => c.methods[*m].name.clone(),
         }
     }
 
@@ -258,21 +262,21 @@ impl ReflectedMethod<'_> {
     pub fn is_static(&self) -> bool {
         match self {
             ReflectedMethod::Constructor(..) => true,
-            ReflectedMethod::Method(_, m) => m.flags.is_static,
+            ReflectedMethod::Method(c, m) => c.methods[*m].flags.is_static,
         }
     }
 
     pub fn generics(&self) -> &Vec<Generic> {
         match self {
-            ReflectedMethod::Constructor(_, c) => &c.generics,
-            ReflectedMethod::Method(_, m) => &m.generics,
+            ReflectedMethod::Constructor(c, t) => &c.constructors[*t].generics,
+            ReflectedMethod::Method(c, m) => &c.methods[*m].generics,
         }
     }
 
     pub fn argument_tys(&self) -> &Vec<Type> {
         match self {
-            ReflectedMethod::Constructor(_, c) => &c.argument_tys,
-            ReflectedMethod::Method(_, m) => &m.argument_tys,
+            ReflectedMethod::Constructor(c, t) => &c.constructors[*t].argument_tys,
+            ReflectedMethod::Method(c, m) => &c.methods[*m].argument_tys,
         }
     }
 }

@@ -40,7 +40,6 @@ pub mod codegen_deps {
 
 /// Contains traits with methods expected to be invoked by end-users.
 pub mod prelude {
-    pub use crate::cast::by_type;
     pub use crate::jvm::JvmOp;
     pub use crate::ops::{
         IntoJava, IntoLocal, IntoOptLocal, IntoScalar, IntoVoid, JavaField, JavaMethod,

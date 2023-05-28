@@ -44,16 +44,24 @@ pub struct Authenticated {
     this: Global<auth::Authenticated>,
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, duchess::ToRust)]
+#[java(auth.AuthenticationException)]
 pub enum AuthenticateError {
-    #[error("Unathenticated({0})")]
-    Unathenticated(String),
+    #[error("Unathenticated()")]
+    #[java(auth.AuthenticationExceptionUnauthenticated)]
+    Unathenticated(),
+
     #[error("InvalidSecurityToken")]
+    #[java(auth.AuthenticationExceptionInvalidSecurityToken)]
     InvalidSecurityToken,
+
     #[error("InvalidSignature")]
+    #[java(auth.AuthenticationExceptionInvalidSignature)]
     InvalidSignature,
-    #[error("InternalError({0})")]
-    InternalError(String),
+
+    #[error("InternalError()")]
+    #[java(auth.AuthenticationException)]
+    InternalError(),
 }
 
 #[derive(Debug)]

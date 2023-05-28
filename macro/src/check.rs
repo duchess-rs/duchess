@@ -109,7 +109,7 @@ impl ClassInfo {
             if !info
                 .constructors
                 .iter()
-                .any(|info_c| info_c.to_method_sig(info) == c_method_sig)
+                .any(|info_c| info_c.to_method_sig(&info) == c_method_sig)
             {
                 push_error_message(format!(
                     "constructor {} does not match any constructors in the reflected class",
