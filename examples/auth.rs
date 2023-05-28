@@ -4,9 +4,7 @@ use duchess::{java, prelude::*, Global, Jvm, Local, ToRust};
 use std::collections::HashMap;
 use thiserror::Error;
 
-use auth::{
-    AuthenticationExceptionUnauthenticatedExt, AuthorizationExceptionDeniedExt, HttpAuthExt,
-};
+use auth::{AuthorizationExceptionDeniedExt, HttpAuthExt};
 
 duchess::java_package! {
     package auth;
@@ -45,11 +43,11 @@ pub struct Authenticated {
 }
 
 #[derive(Debug, Error, duchess::ToRust)]
-#[java(auth.AuthenticationException)]
+#[java(java.lang.Throwable)]
 pub enum AuthenticateError {
-    #[error("Unathenticated()")]
+    #[error("Unathenticated({user_message})")]
     #[java(auth.AuthenticationExceptionUnauthenticated)]
-    Unathenticated(),
+    Unathenticated { user_message: String },
 
     #[error("InvalidSecurityToken")]
     #[java(auth.AuthenticationExceptionInvalidSecurityToken)]
@@ -59,9 +57,13 @@ pub enum AuthenticateError {
     #[java(auth.AuthenticationExceptionInvalidSignature)]
     InvalidSignature,
 
-    #[error("InternalError()")]
+    #[error("Generic({get_message})")]
     #[java(auth.AuthenticationException)]
-    InternalError(),
+    Generic { get_message: String },
+
+    #[error("InternalError({get_message})")]
+    #[java(java.lang.Throwable)]
+    InternalError { get_message: String },
 }
 
 #[derive(Debug)]
@@ -93,79 +95,42 @@ impl HttpAuth {
             .unwrap()
     }
 
-    pub fn authorize(
-        &self,
-        authn: &Authenticated,
-        authz: &AuthorizeRequest,
-    ) -> Result<(), AuthorizeError> {
-        self.0
-            .authorize(authn, authz)
-            .catch::<duchess::java::lang::Throwable>()
-            .to_rust()
-            .execute()
-            .unwrap()
-    }
+    // pub fn authorize(
+    //     &self,
+    //     authn: &Authenticated,
+    //     authz: &AuthorizeRequest,
+    // ) -> Result<(), AuthorizeError> {
+    //     self.0
+    //         .authorize(authn, authz)
+    //         .catch::<duchess::java::lang::Throwable>()
+    //         .to_rust()
+    //         .execute()
+    //         .unwrap()
+    // }
 }
 
-impl ToRust<AuthenticateError> for duchess::java::lang::Throwable {
-    fn to_rust<'jvm>(&self, jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, AuthenticateError> {
-        // XX: why can't we infer the <Throwable, ?
-        if let Ok(x) = self
-            .try_downcast::<auth::AuthenticationExceptionUnauthenticated>()
-            .execute_with(jvm)?
-        {
-            let message = x
-                .user_message()
-                .assert_not_null()
-                .to_rust()
-                .execute_with(jvm)?;
-            Ok(AuthenticateError::InternalError(message))
-        // XX: should we add a .is_instance() alias for try_downcast().is_ok()?
-        } else if self
-            .try_downcast::<auth::AuthenticationExceptionInvalidSecurityToken>()
-            .execute_with(jvm)?
-            .is_ok()
-        {
-            Ok(AuthenticateError::InvalidSecurityToken)
-        } else if self
-            .try_downcast::<auth::AuthenticationExceptionInvalidSignature>()
-            .execute_with(jvm)?
-            .is_ok()
-        {
-            Ok(AuthenticateError::InvalidSignature)
-        } else {
-            let message = self
-                .get_message()
-                .assert_not_null()
-                .to_rust()
-                .execute_with(jvm)?;
-            Ok(AuthenticateError::InternalError(message))
-        }
-    }
-}
-
-impl ToRust<AuthorizeError> for duchess::java::lang::Throwable {
-    fn to_rust<'jvm>(&self, jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, AuthorizeError> {
-        if let Ok(x) = self
-            .try_downcast::<auth::AuthorizationExceptionDenied>()
-            .execute_with(jvm)?
-        {
-            let message = x
-                .user_message()
-                .assert_not_null()
-                .to_rust()
-                .execute_with(jvm)?;
-            Ok(AuthorizeError::Denied(message))
-        } else {
-            let message = self
-                .get_message()
-                .assert_not_null()
-                .to_rust()
-                .execute_with(jvm)?;
-            Ok(AuthorizeError::InternalError(message))
-        }
-    }
-}
+// impl ToRust<AuthorizeError> for duchess::java::lang::Throwable {
+//     fn to_rust<'jvm>(&self, jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, AuthorizeError> {
+//         if let Ok(x) = self
+//             .try_downcast::<auth::AuthorizationExceptionDenied>()
+//             .execute_with(jvm)?
+//         {
+//             let message = x
+//                 .user_message()
+//                 .assert_not_null()
+//                 .to_rust()
+//                 .execute_with(jvm)?;
+//             Ok(AuthorizeError::Denied(message))
+//         } else {
+//             let message = self
+//                 .get_message()
+//                 .assert_not_null()
+//                 .to_rust()
+//                 .execute_with(jvm)?;
+//             Ok(AuthorizeError::InternalError(message))
+//         }
+//     }
+// }
 
 impl JvmOp for &AuthorizeRequest {
     type Output<'jvm> = Local<'jvm, auth::AuthorizeRequest>;
@@ -213,10 +178,10 @@ fn main() -> duchess::GlobalResult<()> {
         context: HashMap::new(),
     };
 
-    if let Err(e) = auth.authorize(&authenticated, &request) {
-        println!("User `{}` access denied: {:?}", authenticated.user, e);
-        return Ok(());
-    }
+    // if let Err(e) = auth.authorize(&authenticated, &request) {
+    //     println!("User `{}` access denied: {:?}", authenticated.user, e);
+    //     return Ok(());
+    // }
     println!("User allowed to delete my-resource");
 
     Ok(())

@@ -1,6 +1,6 @@
 use std::{
-    cmp::Ordering,
-    collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque},
+    collections::{BTreeMap, BTreeSet, VecDeque},
+    sync::Arc,
 };
 
 use proc_macro2::{Span, TokenStream};
@@ -10,9 +10,9 @@ use synstructure::VariantInfo;
 
 use crate::{
     argument::{JavaPath, MethodSelector},
-    class_info::{ClassInfo, ClassRef, DotId},
+    class_info::{ClassInfo, ClassRef},
     parse::{Parse, Parser},
-    reflect::{ReflectedMethod, Reflector},
+    reflect::Reflector,
     signature::Signature,
     upcasts::Upcasts,
 };
@@ -87,19 +87,15 @@ impl Driver<'_> {
         let to_rust_body = self.variant_to_rust(quote_spanned!(self.span() => self), variant)?;
 
         let method_selector = self.find_method_selector(variant_span, variant.ast().attrs)?;
-        let reflected_method = self.reflector.reflect_method(&method_selector)?;
-        let class_name = reflected_method
-            .class()
-            .name
-            .to_module_name(method_selector.class_span());
-
-        let ext_trait_name = reflected_method
-            .class()
-            .name
-            .to_ext_trait_name(method_selector.class_span());
+        let class = self
+            .reflector
+            .reflect(&method_selector.class_name(), method_selector.class_span())?;
+        let class_name = class.name.to_module_name(method_selector.class_span());
+        let ext_trait_name = class.name.to_ext_trait_name(method_selector.class_span());
 
         let self_ty = &self.input.ast().ident;
         Ok(quote_spanned!(self.span() =>
+        #[allow(unused_imports)]
         impl duchess::ToRust<#self_ty> for #class_name {
             fn to_rust<'jvm>(&self, jvm: &mut duchess::Jvm<'jvm>) -> duchess::Result<'jvm, #self_ty> {
                 use #ext_trait_name;
@@ -113,8 +109,8 @@ impl Driver<'_> {
         self.check_generics()?;
 
         let root_path: JavaPath = self.find_java_attr(self.span(), &self.input.ast().attrs)?;
-        let variants = self.reflect_enum_variants()?;
-        let upcasts: Upcasts = variants.iter().map(|v| v.reflected.class()).collect();
+        let variants = self.to_rust_enum_variants()?;
+        let upcasts: Upcasts = variants.iter().map(|v| &*v.class).collect();
 
         let variant_classes = unique_variant_classes(&variants)?;
         let variants = order_by_specificity(&variant_classes, &upcasts);
@@ -123,16 +119,8 @@ impl Driver<'_> {
         };
         self.check_all_extend_root(&root_path, root, children, &upcasts)?;
 
-        let root_class_name = root
-            .reflected
-            .class()
-            .name
-            .to_module_name(root.selector.span());
-        let root_ext_trait_name = root
-            .reflected
-            .class()
-            .name
-            .to_ext_trait_name(root.selector.span());
+        let root_class_name = root.class.name.to_module_name(root.selector.span());
+        let root_ext_trait_name = root.class.name.to_ext_trait_name(root.selector.span());
         let root_to_rust = self.variant_to_rust(
             quote_spanned!(root.variant.ast().ident.span() => self),
             root.variant,
@@ -140,16 +128,11 @@ impl Driver<'_> {
 
         let child_class_names = children
             .iter()
-            .map(|c| c.reflected.class().name.to_module_name(c.selector.span()))
+            .map(|c| c.class.name.to_module_name(c.selector.span()))
             .collect::<Vec<_>>();
         let child_ext_trait_names = children
             .iter()
-            .map(|c| {
-                c.reflected
-                    .class()
-                    .name
-                    .to_ext_trait_name(c.selector.span())
-            })
+            .map(|c| c.class.name.to_ext_trait_name(c.selector.span()))
             .collect::<Vec<_>>();
         let child_to_rust = children
             .iter()
@@ -162,7 +145,9 @@ impl Driver<'_> {
             .collect::<Result<Vec<_>, _>>()?;
 
         let self_ty = &self.input.ast().ident;
+
         Ok(quote_spanned!(self.span() =>
+        #[allow(unused_imports)]
         impl duchess::ToRust<#self_ty> for #root_class_name {
             fn to_rust<'jvm>(&self, jvm: &mut duchess::Jvm<'jvm>) -> duchess::Result<'jvm, #self_ty> {
                 use duchess::prelude::*;
@@ -181,18 +166,20 @@ impl Driver<'_> {
         ))
     }
 
-    fn reflect_enum_variants(&self) -> Result<Vec<ReflectedEnumVariant>, syn::Error> {
+    fn to_rust_enum_variants(&self) -> Result<Vec<ToRustEnumVariant>, syn::Error> {
         self.input
             .variants()
             .iter()
             .map(|variant| {
                 let selector =
                     self.find_method_selector(variant.ast().ident.span(), variant.ast().attrs)?;
-                let reflected = self.reflector.reflect_method(&selector)?;
-                Ok::<_, syn::Error>(ReflectedEnumVariant {
+                let class = self
+                    .reflector
+                    .reflect(&selector.class_name(), selector.class_span())?;
+                Ok::<_, syn::Error>(ToRustEnumVariant {
                     variant,
                     selector,
-                    reflected,
+                    class,
                 })
             })
             .collect::<Result<Vec<_>, _>>()
@@ -439,28 +426,29 @@ impl Driver<'_> {
     fn check_all_extend_root(
         &self,
         root_path: &JavaPath,
-        root: &ReflectedEnumVariant,
-        children: &[&ReflectedEnumVariant<'_>],
+        root: &ToRustEnumVariant,
+        children: &[&ToRustEnumVariant<'_>],
         upcasts: &Upcasts,
     ) -> Result<(), syn::Error> {
-        if root.reflected.class().name != root_path.to_dot_id() {
+        if root.class.name != root_path.to_dot_id() {
             return Err(syn::Error::new(
                 root_path.span,
                 format!("must have one enum variant for root Java class `{root_path}`"),
             ));
         }
 
-        let root_ref = root.reflected.class().this_ref();
+        let root_ref = root.class.this_ref();
         if let Some(child) = children.iter().find(|c| {
             !upcasts
-                .upcasts_for_generated_class(&c.reflected.class().name)
+                .upcasts_for_generated_class(&c.class.name)
                 .contains(&root_ref)
         }) {
             Err(syn::Error::new(
                 child.selector.span(),
                 format!(
-                    "enum variant must extend the root `{}`",
-                    root.reflected.class().name
+                    "enum variant must extend the root `{}`: {:?}",
+                    root.class.name,
+                    upcasts.upcasts_for_generated_class(&child.class.name),
                 ),
             ))
         } else {
@@ -471,9 +459,9 @@ impl Driver<'_> {
 
 // XX topo sort, assumes no cycles
 fn order_by_specificity<'a, 'i>(
-    variant_classes: &'a BTreeMap<ClassRef, &'a ReflectedEnumVariant<'i>>,
+    variant_classes: &'a BTreeMap<ClassRef, &'a ToRustEnumVariant<'i>>,
     upcasts: &'a Upcasts,
-) -> Vec<&'a ReflectedEnumVariant<'i>> {
+) -> Vec<&'a ToRustEnumVariant<'i>> {
     let class_set = variant_classes.keys().cloned().collect::<BTreeSet<_>>();
     let included_upcasts = variant_classes
         .keys()
@@ -511,19 +499,16 @@ fn order_by_specificity<'a, 'i>(
 }
 
 fn unique_variant_classes<'a, 'i>(
-    variants: &'a [ReflectedEnumVariant<'i>],
-) -> Result<BTreeMap<ClassRef, &'a ReflectedEnumVariant<'i>>, syn::Error> {
+    variants: &'a [ToRustEnumVariant<'i>],
+) -> Result<BTreeMap<ClassRef, &'a ToRustEnumVariant<'i>>, syn::Error> {
     let mut classes = BTreeMap::new();
     for variant in variants.iter() {
-        if classes
-            .insert(variant.reflected.class().this_ref(), variant)
-            .is_some()
-        {
+        if classes.insert(variant.class.this_ref(), variant).is_some() {
             return Err(syn::Error::new(
                 variant.selector.span(),
                 format!(
                     "multiple enum variants for same java class `{}",
-                    variant.reflected.class().name
+                    variant.class.name
                 ),
             ));
         }
@@ -531,8 +516,8 @@ fn unique_variant_classes<'a, 'i>(
     Ok(classes)
 }
 
-struct ReflectedEnumVariant<'i> {
+struct ToRustEnumVariant<'i> {
     variant: &'i VariantInfo<'i>,
     selector: MethodSelector,
-    reflected: ReflectedMethod,
+    class: Arc<ClassInfo>,
 }

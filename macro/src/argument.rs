@@ -57,6 +57,14 @@ impl MethodSelector {
             MethodSelector::ClassInfo(ci) => ci.span,
         }
     }
+
+    pub fn class_name(&self) -> DotId {
+        match self {
+            MethodSelector::ClassName(c) => c.to_dot_id(),
+            MethodSelector::MethodName(c, _) => c.to_dot_id(),
+            MethodSelector::ClassInfo(_) => todo!(),
+        }
+    }
 }
 
 impl Parse for MethodSelector {
