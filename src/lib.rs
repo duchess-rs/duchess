@@ -45,7 +45,9 @@ pub mod prelude {
         IntoJava, IntoLocal, IntoOptLocal, IntoScalar, IntoVoid, JavaField, JavaMethod,
         ScalarField, ScalarMethod, VoidMethod,
     };
+    pub use crate::refs::{AsJRef, JDeref, TryJDeref};
     pub use crate::to_java::ToJava;
+    pub use crate::to_rust::ToRust;
 }
 
 /// Internal module containing non-semver protected

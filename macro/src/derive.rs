@@ -52,6 +52,8 @@ struct Driver<'a> {
 
 impl Driver<'_> {
     fn try_derive_to_rust(&mut self) -> Result<proc_macro2::TokenStream, syn::Error> {
+        self.check_generics()?;
+
         match self.input.ast().data {
             syn::Data::Struct(_) => self.try_derive_to_rust_struct(),
             syn::Data::Enum(_) => self.try_derive_to_rust_enum(),
@@ -62,11 +64,11 @@ impl Driver<'_> {
     }
 
     fn try_derive_to_java(&mut self) -> Result<proc_macro2::TokenStream, syn::Error> {
+        self.check_generics()?;
+
         match self.input.ast().data {
             syn::Data::Struct(_) => self.try_derive_to_java_struct(),
-            syn::Data::Enum(_) => {
-                return Err(syn::Error::new(self.span(), "enums not (yet) supported"));
-            }
+            syn::Data::Enum(_) => self.try_derive_to_java_enum(),
             syn::Data::Union(_) => {
                 return Err(syn::Error::new(self.span(), "unions not supported"));
             }
@@ -78,47 +80,42 @@ impl Driver<'_> {
     }
 
     fn try_derive_to_rust_struct(&mut self) -> Result<proc_macro2::TokenStream, syn::Error> {
-        self.check_generics()?;
-
-        let variants = self.input.variants();
-        let variant = &variants[0];
-        let variant_span = variant.ast().ident.span();
-
-        let to_rust_body = self.variant_to_rust(quote_spanned!(self.span() => self), variant)?;
-
-        let method_selector = self.find_method_selector(variant_span, variant.ast().attrs)?;
-        let class = self
-            .reflector
-            .reflect(&method_selector.class_name(), method_selector.class_span())?;
-        let class_name = class.name.to_module_name(method_selector.class_span());
-        let ext_trait_name = class.name.to_ext_trait_name(method_selector.class_span());
-
-        let self_ty = &self.input.ast().ident;
-        Ok(quote_spanned!(self.span() =>
-        #[allow(unused_imports, unused_variables)]
-        impl duchess::ToRust<#self_ty> for #class_name {
-            fn to_rust<'jvm>(&self, jvm: &mut duchess::Jvm<'jvm>) -> duchess::Result<'jvm, #self_ty> {
-                use #ext_trait_name;
-                Ok(#to_rust_body)
-            }
-        }
-        ))
+        let variants = self.to_rust_variants()?;
+        assert_eq!(variants.len(), 1);
+        self.try_derive_to_rust_variants(&variants[0], &[/* children */])
     }
 
     fn try_derive_to_rust_enum(&mut self) -> Result<proc_macro2::TokenStream, syn::Error> {
-        self.check_generics()?;
-
         let root_path: JavaPath = self.find_java_attr(self.span(), &self.input.ast().attrs)?;
-        let variants = self.to_rust_enum_variants()?;
+        let variants = self.to_rust_variants()?;
         let upcasts: Upcasts = variants.iter().map(|v| &*v.class).collect();
 
         let variant_classes = unique_variant_classes(&variants)?;
         let variants = order_by_specificity(&variant_classes, &upcasts);
+        // Root must be upcast of all children, so must come last when ordered by specificity!
         let Some((&root, children)) = variants.split_last() else {
             return Err(syn::Error::new(self.span(), "enum must have at least one variant"));
         };
-        self.check_all_extend_root(&root_path, root, children, &upcasts)?;
+        if root.class.name != root_path.to_dot_id() {
+            return Err(syn::Error::new(
+                root_path.span,
+                format!("must have one enum variant for root Java class `{root_path}`"),
+            ));
+        }
+        // XX: If one of the classes in a variant's real upcast chain isn't included in the enum
+        // then the upcast chain will be missing chunks from our perspective!
+        check_all_extend_root(&root.class, children.iter().map(|c| &c.selector), &upcasts)?;
 
+        self.try_derive_to_rust_variants(root, children)
+    }
+
+    // Emits an `impl ToRust` as a chain of `if try_downcast()` for child variants (if any) followed by an `else` for
+    // the root variant.
+    fn try_derive_to_rust_variants(
+        &self,
+        root: &ToRustVariant<'_>,
+        children: &[&ToRustVariant<'_>],
+    ) -> Result<proc_macro2::TokenStream, syn::Error> {
         let root_class_name = root.class.name.to_module_name(root.selector.span());
         let root_ext_trait_name = root.class.name.to_ext_trait_name(root.selector.span());
         let root_to_rust = self.variant_to_rust(
@@ -166,59 +163,90 @@ impl Driver<'_> {
         ))
     }
 
-    fn to_rust_enum_variants(&self) -> Result<Vec<ToRustEnumVariant>, syn::Error> {
+    fn try_derive_to_java_struct(&mut self) -> Result<proc_macro2::TokenStream, syn::Error> {
+        let variant = &self.input.variants()[0];
+        let method = self.find_method_selector(variant.ast().ident.span(), variant.ast().attrs)?;
+        let class = self
+            .reflector
+            .reflect(&method.class_name(), method.class_span())?;
+        self.try_derive_to_java_variants(&class, [variant])
+    }
+
+    fn try_derive_to_java_enum(&mut self) -> Result<proc_macro2::TokenStream, syn::Error> {
+        let root_path: JavaPath = self.find_java_attr(self.span(), &self.input.ast().attrs)?;
+        let root_class = self
+            .reflector
+            .reflect(&root_path.to_dot_id(), root_path.span)?;
+
+        let selectors = self
+            .input
+            .variants()
+            .iter()
+            .map(|v| self.find_method_selector(v.ast().ident.span(), v.ast().attrs))
+            .collect::<Result<Vec<_>, _>>()?;
+        let classes = selectors
+            .iter()
+            .map(|s| self.reflector.reflect(&s.class_name(), s.class_span()))
+            .collect::<Result<Vec<_>, _>>()?;
+        let upcasts = classes.iter().map(|c| &**c).collect::<Upcasts>();
+        check_all_extend_root(&root_class, selectors.iter(), &upcasts)?;
+
+        self.try_derive_to_java_variants(&root_class, self.input.variants())
+    }
+
+    fn try_derive_to_java_variants<'a>(
+        &self,
+        root_class: &ClassInfo,
+        variants: impl IntoIterator<Item = &'a VariantInfo<'a>>,
+    ) -> Result<proc_macro2::TokenStream, syn::Error> {
+        let root_class_name = root_class.name.to_module_name(root_class.span);
+
+        let to_java_bodies = variants
+            .into_iter()
+            .map(|v| self.variant_to_java(v))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let self_ty = &self.input.ast().ident;
+        Ok(quote_spanned!(self.span() =>
+            impl duchess::JvmOp for & #self_ty {
+                type Output<'jvm> = Local<'jvm, #root_class_name>;
+
+                fn execute_with<'jvm>(self, jvm: &mut duchess::Jvm<'jvm>) -> duchess::Result<'jvm, Self::Output<'jvm>> {
+                    use duchess::prelude::*;
+                    match self {
+                        #(#to_java_bodies),*
+                    }
+                }
+            }
+
+            impl duchess::plumbing::ToJavaImpl<#root_class_name> for #self_ty {
+                fn to_java_impl<'jvm>(rust: &Self, jvm: &mut duchess::Jvm<'jvm>) -> duchess::Result<'jvm, Option<Local<'jvm, #root_class_name>>> {
+                    Ok(Some(duchess::JvmOp::execute_with(rust, jvm)?))
+                }
+            }
+        ))
+    }
+
+    fn to_rust_variants(&self) -> Result<Vec<ToRustVariant>, syn::Error> {
         self.input
             .variants()
             .iter()
             .map(|variant| {
                 let selector =
                     self.find_method_selector(variant.ast().ident.span(), variant.ast().attrs)?;
+                // We're not constructing Java objects in ToRust, so we just need the class name
+                // and shouldn't error if the class has multiple constructors that need
+                // disambiguation!
                 let class = self
                     .reflector
                     .reflect(&selector.class_name(), selector.class_span())?;
-                Ok::<_, syn::Error>(ToRustEnumVariant {
+                Ok::<_, syn::Error>(ToRustVariant {
                     variant,
                     selector,
                     class,
                 })
             })
             .collect::<Result<Vec<_>, _>>()
-    }
-
-    fn try_derive_to_java_struct(&mut self) -> Result<proc_macro2::TokenStream, syn::Error> {
-        self.check_generics()?;
-
-        let variants = self.input.variants();
-        let variant = &variants[0];
-        let variant_span = variant.ast().ident.span();
-
-        let to_java_body = self.variant_to_java(variant)?;
-
-        let method_selector = self.find_method_selector(variant_span, variant.ast().attrs)?;
-        let reflected_method = self.reflector.reflect_method(&method_selector)?;
-        let class_name = reflected_method
-            .class()
-            .name
-            .to_module_name(method_selector.class_span());
-
-        let self_ty = &self.input.ast().ident;
-        Ok(quote_spanned!(self.span() =>
-            impl duchess::JvmOp for & #self_ty {
-                type Output<'jvm> = Local<'jvm, #class_name>;
-
-                fn execute_with<'jvm>(self, jvm: &mut duchess::Jvm<'jvm>) -> duchess::Result<'jvm, Self::Output<'jvm>> {
-                    match self {
-                        #to_java_body
-                    }
-                }
-            }
-
-            impl duchess::plumbing::ToJavaImpl<#class_name> for #self_ty {
-                fn to_java_impl<'jvm>(rust: &Self, jvm: &mut duchess::Jvm<'jvm>) -> duchess::Result<'jvm, Option<Local<'jvm, #class_name>>> {
-                    Ok(Some(duchess::JvmOp::execute_with(rust, jvm)?))
-                }
-            }
-        ))
     }
 
     fn check_generics(&self) -> Result<(), syn::Error> {
@@ -287,7 +315,7 @@ impl Driver<'_> {
     /// Generates the code to create this variant as part of a `ToJava` impl.
     /// Assumes `self` is the java type and `jvm` is in scope.
     fn variant_to_java(
-        &mut self,
+        &self,
         variant: &VariantInfo,
     ) -> Result<proc_macro2::TokenStream, syn::Error> {
         let variant_span = variant.ast().ident.span();
@@ -301,7 +329,7 @@ impl Driver<'_> {
             let pattern = variant.pat();
             return Ok(quote_spanned!(self.span() =>
                 #pattern => {
-                    Ok(jvm.local(#binding))
+                    #binding .jderef().upcast().execute_with(jvm)
                 }
             ));
         }
@@ -383,7 +411,7 @@ impl Driver<'_> {
         let pattern = variant.pat();
         Ok(quote_spanned!(self.span() =>
             #pattern => {
-                #class_name :: #method_name ( #(#args),* ) . execute_with(jvm)
+                #class_name :: #method_name ( #(#args),* ) .upcast().execute_with(jvm)
             }
         ))
     }
@@ -396,6 +424,8 @@ impl Driver<'_> {
         self.find_java_attr(span, attrs)
     }
 
+    /// For enum cases, the root `#[java()]` can't be a method selector, only a class name, so we remain flexible here
+    /// in how we try to parse the attr.
     fn find_java_attr<T: Parse>(&self, span: Span, attrs: &[Attribute]) -> Result<T, syn::Error> {
         for attr in attrs {
             let path = attr.meta.path();
@@ -422,46 +452,33 @@ impl Driver<'_> {
             _ => false,
         }
     }
+}
 
-    fn check_all_extend_root(
-        &self,
-        root_path: &JavaPath,
-        root: &ToRustEnumVariant,
-        children: &[&ToRustEnumVariant<'_>],
-        upcasts: &Upcasts,
-    ) -> Result<(), syn::Error> {
-        if root.class.name != root_path.to_dot_id() {
-            return Err(syn::Error::new(
-                root_path.span,
-                format!("must have one enum variant for root Java class `{root_path}`"),
-            ));
-        }
-
-        let root_ref = root.class.this_ref();
-        if let Some(child) = children.iter().find(|c| {
-            !upcasts
-                .upcasts_for_generated_class(&c.class.name)
-                .contains(&root_ref)
-        }) {
-            Err(syn::Error::new(
-                child.selector.span(),
-                format!(
-                    "enum variant must extend the root `{}`: {:?}",
-                    root.class.name,
-                    upcasts.upcasts_for_generated_class(&child.class.name),
-                ),
-            ))
-        } else {
-            Ok(())
-        }
+fn check_all_extend_root<'a>(
+    root: &ClassInfo,
+    variants: impl IntoIterator<Item = &'a MethodSelector>,
+    upcasts: &Upcasts,
+) -> Result<(), syn::Error> {
+    if let Some(child) = variants.into_iter().find(|c| {
+        !upcasts
+            .upcasts_for_generated_class(&c.class_name())
+            .contains(&root.this_ref())
+    }) {
+        Err(syn::Error::new(
+            child.class_span(),
+            format!("enum variant must extend the root `{}`", root.name),
+        ))
+    } else {
+        Ok(())
     }
 }
 
-// XX topo sort, assumes no cycles
+/// Return the variants sorted topologically by their class heirarchy. Roughly, this means leaf classes must come before
+/// any class they extend or implement ("most specific first").
 fn order_by_specificity<'a, 'i>(
-    variant_classes: &'a BTreeMap<ClassRef, &'a ToRustEnumVariant<'i>>,
+    variant_classes: &'a BTreeMap<ClassRef, &'a ToRustVariant<'i>>,
     upcasts: &'a Upcasts,
-) -> Vec<&'a ToRustEnumVariant<'i>> {
+) -> Vec<&'a ToRustVariant<'i>> {
     let class_set = variant_classes.keys().cloned().collect::<BTreeSet<_>>();
     let included_upcasts = variant_classes
         .keys()
@@ -477,7 +494,9 @@ fn order_by_specificity<'a, 'i>(
         })
         .collect::<BTreeMap<_, BTreeSet<_>>>();
 
-    // XX: O(N^2) until we build a upcasts.direct()
+    // XX: This is an O(N^2) impl that will slow down large enum derives. If we expose an upcasts.direct() fn we can
+    // impl a more efficient sort. For now, we loop over the remaining classes, removing any that are upcasts of any
+    // others. What're left are the leaf classes. Rinse 'n repeat.
     let mut ordered = Vec::with_capacity(variant_classes.len());
     let mut remaining = class_set.clone();
     while !remaining.is_empty() {
@@ -499,8 +518,8 @@ fn order_by_specificity<'a, 'i>(
 }
 
 fn unique_variant_classes<'a, 'i>(
-    variants: &'a [ToRustEnumVariant<'i>],
-) -> Result<BTreeMap<ClassRef, &'a ToRustEnumVariant<'i>>, syn::Error> {
+    variants: &'a [ToRustVariant<'i>],
+) -> Result<BTreeMap<ClassRef, &'a ToRustVariant<'i>>, syn::Error> {
     let mut classes = BTreeMap::new();
     for variant in variants.iter() {
         if classes.insert(variant.class.this_ref(), variant).is_some() {
@@ -516,7 +535,7 @@ fn unique_variant_classes<'a, 'i>(
     Ok(classes)
 }
 
-struct ToRustEnumVariant<'i> {
+struct ToRustVariant<'i> {
     variant: &'i VariantInfo<'i>,
     selector: MethodSelector,
     class: Arc<ClassInfo>,
