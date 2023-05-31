@@ -75,6 +75,7 @@ mod auto {
             public boolean isSynthetic();
             public java.lang.String getName();
             public native java.lang.Class getSuperclass();
+            // public native boolean isAssignableFrom(java.lang.Class<?>);
             public java.lang.String getPackageName();
             public java.lang.Class[] getInterfaces();
             public java.lang.Class getComponentType();

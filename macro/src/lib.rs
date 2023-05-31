@@ -12,8 +12,8 @@ mod parse;
 mod reflect;
 mod signature;
 mod span_error;
-mod upcasts;
 mod substitution;
+mod upcasts;
 
 /// The main duchess macro, used like so
 ///

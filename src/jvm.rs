@@ -5,9 +5,10 @@ use crate::{
     java::lang::{Class, ClassExt, Throwable},
     not_null::NotNull,
     raw::{self, EnvPtr, HasEnvPtr, JvmPtr, ObjectPtr},
+    thread,
     to_rust::ToRustOp,
     try_catch::TryCatch,
-    thread, AsJRef, ToRust, TryJDeref, Error, Global, GlobalResult, Local,
+    AsJRef, Error, Global, GlobalResult, Local, ToRust, TryJDeref,
 };
 
 use std::{ffi::CStr, fmt::Display, ptr::NonNull};
