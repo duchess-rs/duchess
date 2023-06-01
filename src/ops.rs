@@ -57,7 +57,7 @@ identity_jvm_op! {
 /// let b = [1, 2, 3].as_slice();
 /// my_java_call(a, b).execute(&jvm)?;
 /// ```
-pub trait IntoJava<T: JavaObject> {
+pub trait IntoJava<T: JavaObject>: Copy {
     type Output<'jvm>: AsJRef<T>;
 
     fn into_java<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>>;
@@ -79,28 +79,18 @@ where
 /// A [`JvmOp`] that produces a [`Local`] reference to a `T` object.
 /// Local references are values that are only valid in this JNI call.
 /// They can be converted to [`Global`] references.
-pub trait IntoLocal<T: JavaObject>: for<'jvm> JvmOp<Output<'jvm> = Local<'jvm, T>> {}
+pub trait JavaConstructor<T: JavaObject>
+where
+    Self: for<'jvm> JvmOp<Output<'jvm> = Local<'jvm, T>>,
+    Self: std::ops::Deref<Target = T::OfOp<Self>>,
+{
+}
 
-impl<J, T> IntoLocal<T> for J
+impl<J, T> JavaConstructor<T> for J
 where
     T: JavaObject,
     J: for<'jvm> JvmOp<Output<'jvm> = Local<'jvm, T>>,
-{
-}
-
-/// A [`JvmOp`] that produces an optional [`Local`] reference to a `T`;
-/// None will be used if the result is `null`.
-/// Local references are values that are only valid in this JNI call.
-/// They can be converted to [`Global`] references.
-pub trait IntoOptLocal<T: JavaObject>:
-    for<'jvm> JvmOp<Output<'jvm> = Option<Local<'jvm, T>>>
-{
-}
-
-impl<J, T> IntoOptLocal<T> for J
-where
-    T: JavaObject,
-    J: for<'jvm> JvmOp<Output<'jvm> = Option<Local<'jvm, T>>>,
+    J: std::ops::Deref<Target = T::OfOp<Self>>,
 {
 }
 
@@ -123,7 +113,8 @@ impl<J> IntoVoid for J where J: for<'jvm> JvmOp<Output<'jvm> = ()> {}
 pub trait JavaMethod<T>
 where
     T: JavaObject,
-    for<'jvm> Self: JvmOp<Output<'jvm> = Option<Local<'jvm, T>>>,
+    Self: for<'jvm> JvmOp<Output<'jvm> = Option<Local<'jvm, T>>>,
+    Self: std::ops::Deref<Target = T::OfOp<Self>>,
 {
 }
 
@@ -131,6 +122,7 @@ impl<J, T> JavaMethod<T> for J
 where
     T: JavaObject,
     for<'jvm> Self: JvmOp<Output<'jvm> = Option<Local<'jvm, T>>>,
+    J: std::ops::Deref<Target = T::OfOp<J>>,
 {
 }
 

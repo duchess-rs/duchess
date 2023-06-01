@@ -1,7 +1,7 @@
 error: generic type parameter `Id { data: "bool" }` not among in-scope parameters: []
- --> $DIR/type_mismatch.rs:4:5
+ --> $DIR/type_mismatch.rs:6:5
   |
-4 |     public class java.lang.Object {
+6 |     public class java.lang.Object {
   |     ^^^^^^
 
 error: aborting due to previous error

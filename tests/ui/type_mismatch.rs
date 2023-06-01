@@ -1,3 +1,5 @@
+//@compile-flags: --crate-type lib
+
 duchess::java_package! {
     package java.lang;
 

@@ -7,7 +7,7 @@ use thiserror::Error;
 
 use crate::AsJRef;
 use crate::{
-    java::lang::{Throwable, ThrowableExt},
+    java::lang::Throwable,
     raw::{HasEnvPtr, ObjectPtr},
     Global, Jvm, JvmOp, Local,
 };

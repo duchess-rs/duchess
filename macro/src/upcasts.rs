@@ -42,6 +42,7 @@ impl<'a> FromIterator<&'a ClassInfo> for Upcasts {
 impl Upcasts {
     /// Returns the transitive superclasses / interfaces of `name`.
     /// These will reference generic parameters from in the class declaration of `name`.
+    /// This does NOT include the "reflexive" upcast from `T` to `T`.
     pub fn upcasts_for_generated_class(&self, name: &DotId) -> &BTreeSet<ClassRef> {
         &self.map[name].extends
     }
@@ -53,16 +54,19 @@ impl Upcasts {
             extends: BTreeSet::default(),
         };
 
-        upcasts.extends.insert(class.this_ref());
-
+        // Include direct upcasts declared by the user.
         for c in class.extends.iter().chain(&class.implements) {
             upcasts.extends.insert(c.clone());
         }
 
-        upcasts.extends.insert(ClassRef {
-            name: DotId::object(),
-            generics: vec![],
-        });
+        // Everything can be upcast to object.
+        let object = DotId::object();
+        if class.name != object {
+            upcasts.extends.insert(ClassRef {
+                name: object,
+                generics: vec![],
+            });
+        }
 
         let old_value = self.map.insert(class.name.clone(), upcasts);
         assert!(old_value.is_none());
@@ -82,13 +86,6 @@ impl Upcasts {
                     generics: vec![],
                 });
         };
-
-        // N.B. we don't insert the reflexive `C extends C` relations here, which means we don't
-        // necessarily have 100% parity between these hardcoded types and types created by
-        // `insert_direct_upcasts`. This is a micro-optimization that I can't resist.
-        // The idea is that reflexive impls aren't necessary because they only matter when
-        // we are generating `Upcast` impls, and we only generate `Upcast` impls for those
-        // classes that appear in our package declarations.
 
         insert(DotId::runtime_exception(), DotId::exception());
         insert(DotId::exception(), DotId::throwable());

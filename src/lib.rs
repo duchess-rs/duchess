@@ -4,6 +4,7 @@ mod array;
 mod cast;
 mod error;
 mod find;
+mod from_ref;
 mod global;
 mod jvm;
 mod libjvm;
@@ -42,8 +43,8 @@ pub mod codegen_deps {
 pub mod prelude {
     pub use crate::jvm::JvmOp;
     pub use crate::ops::{
-        IntoJava, IntoLocal, IntoOptLocal, IntoScalar, IntoVoid, JavaField, JavaMethod,
-        ScalarField, ScalarMethod, VoidMethod,
+        IntoJava, IntoScalar, IntoVoid, JavaConstructor, JavaField, JavaMethod, ScalarField,
+        ScalarMethod, VoidMethod,
     };
     pub use crate::refs::{AsJRef, JDeref, TryJDeref};
     pub use crate::to_java::ToJava;
@@ -56,8 +57,10 @@ pub mod plumbing {
     pub use crate::cast::Upcast;
     pub use crate::error::check_exception;
     pub use crate::find::{find_class, find_constructor, find_field, find_method};
+    pub use crate::from_ref::FromRef;
     pub use crate::global::GlobalOp;
     pub use crate::jvm::JavaObjectExt;
+    pub use crate::jvm::JavaView;
     pub use crate::raw::{FieldPtr, FromJniValue, HasEnvPtr, IntoJniValue, MethodPtr, ObjectPtr};
     pub use crate::refs::NullJRef;
     pub use crate::to_java::ToJavaImpl;

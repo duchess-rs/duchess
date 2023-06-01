@@ -27,11 +27,6 @@ duchess::java_package! {
     class BuildStep { * }
 }
 
-use crate::log::BuildStepExt;
-use crate::log::LoggerExt;
-use crate::log::NameStepExt;
-use crate::log::TimeStepExt;
-
 #[test]
 fn one_big_call() -> duchess::GlobalResult<()> {
     // FIXME: conflict between interface trait (LoggerExt) and class trait (BuilderExt)

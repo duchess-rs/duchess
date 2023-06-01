@@ -30,23 +30,6 @@ impl RootMap {
     }
 }
 
-/// The various pieces that we use to reflect a Java method into Rust.
-struct MethodOutput {
-    /// Declaration of the struct for the method, e.g., `struct toString<...> { ... }`.
-    method_struct: TokenStream,
-
-    /// Declaration of the items for the method in the `FooExt` trait, e.g.
-    /// `type toString: IntoOptionLocal<String>; fn toString(&self) -> Self::toString;`
-    trait_method: TokenStream,
-
-    /// Declaration of the `type` and `fn` to be used in the blanket impl we are going to create,
-    /// which will map the associated type to the `method_struct`.
-    trait_impl_method: TokenStream,
-
-    /// Implementation of `jvmop` for the method struct.
-    jvm_op_impl: TokenStream,
-}
-
 impl SpannedPackageInfo {
     fn to_tokens(
         &self,
@@ -93,7 +76,6 @@ impl SpannedPackageInfo {
 impl ClassInfo {
     pub fn to_tokens(&self, upcasts: &Upcasts) -> Result<TokenStream, SpanError> {
         let struct_name = self.struct_name();
-        let ext_trait_name = self.ext_trait_name();
         let cached_class = self.cached_class();
         let this_ty = self.this_type();
         let java_class_generics_with_defaults = self.class_generic_names_with_defaults();
@@ -115,11 +97,29 @@ impl ClassInfo {
             .collect::<Result<_, _>>()?;
 
         // Convert instance methods (not static methods, those are different)
-        let object_methods: Vec<_> = self
+        let op_methods: Vec<_> = self
             .methods
             .iter()
             .filter(|m| !m.flags.is_static)
-            .map(|m| self.object_method(m))
+            .map(|m| self.op_struct_method(m))
+            .collect::<Result<_, _>>()?;
+
+        // Convert instance methods (not static methods, those are different)
+        let obj_methods: Vec<_> = self
+            .methods
+            .iter()
+            .filter(|m| !m.flags.is_static)
+            .map(|m| self.obj_struct_method(m))
+            .collect::<Result<_, _>>()?;
+
+        let assoc_struct_declarations = self.assoc_structs(upcasts, op_methods, obj_methods)?;
+
+        // Convert instance methods of the form `Foo::method`
+        let inherent_object_methods: Vec<_> = self
+            .methods
+            .iter()
+            .filter(|m| !m.flags.is_static)
+            .map(|m| self.inherent_object_method(m))
             .collect::<Result<_, _>>()?;
 
         // Generate static field getters
@@ -130,13 +130,6 @@ impl ClassInfo {
             .map(|f| self.static_field_getter(f))
             .collect::<Result<_, _>>()?;
 
-        let method_structs: Vec<_> = object_methods.iter().map(|m| &m.method_struct).collect();
-        let trait_methods: Vec<_> = object_methods.iter().map(|m| &m.trait_method).collect();
-        let trait_impl_methods: Vec<_> = object_methods
-            .iter()
-            .map(|m| &m.trait_impl_method)
-            .collect();
-        let jvm_op_impls: Vec<_> = object_methods.iter().map(|m| &m.jvm_op_impl).collect();
         let upcast_impls = self.upcast_impls(upcasts)?;
 
         let output = quote_spanned! {
@@ -147,16 +140,9 @@ impl ClassInfo {
                 _dummy: std::marker::PhantomData<(#(#java_class_generics,)*)>
             }
 
-            #[allow(non_camel_case_types)]
-            pub trait #ext_trait_name<#(#java_class_generics,)*> : duchess::JvmOp
-            where
-                #(#java_class_generics : duchess::JavaObject,)*
-            {
-                #(#trait_methods)*
-            }
-
             // Hide other generated items
             #[allow(unused_imports)]
+            #[allow(nonstandard_style)]
             const _: () = {
                 use duchess::{
                     *,
@@ -164,6 +150,8 @@ impl ClassInfo {
                     plumbing::*,
                     prelude::*,
                 };
+
+                #assoc_struct_declarations
 
                 unsafe impl<#(#java_class_generics,)*> duchess::JavaObject for #struct_name<#(#java_class_generics,)*>
                 where
@@ -178,6 +166,17 @@ impl ClassInfo {
                 {
                     fn as_ref(&self) -> &#struct_name<#(#java_class_generics,)*> {
                         self
+                    }
+                }
+
+                impl<#(#java_class_generics,)*> std::ops::Deref for #struct_name<#(#java_class_generics,)*>
+                where
+                    #(#java_class_generics: duchess::JavaObject,)*
+                {
+                    type Target = <Self as JavaView>::OfObj<Self>;
+
+                    fn deref(&self) -> &Self::Target {
+                        FromRef::from_ref(self)
                     }
                 }
 
@@ -201,6 +200,13 @@ impl ClassInfo {
                     }
                 }
 
+                // Reflexive upcast impl
+                unsafe impl<#(#java_class_generics,)*> plumbing::Upcast<#struct_name<#(#java_class_generics,)*>> for #struct_name<#(#java_class_generics,)*>
+                where
+                    #(#java_class_generics: duchess::JavaObject,)*
+                {}
+
+                // Other upcast impls
                 #upcast_impls
 
                 impl< #(#java_class_generics,)* > #this_ty
@@ -212,20 +218,8 @@ impl ClassInfo {
                     #(#static_methods)*
 
                     #(#static_field_getters)*
-                }
 
-                #(#method_structs)*
-
-                #(#jvm_op_impls)*
-
-                #[allow(non_camel_case_types)]
-                impl<This, #(#java_class_generics,)*> #ext_trait_name<#(#java_class_generics,)*> for This
-                where
-                    This: JvmOp,
-                    for<'jvm> This::Output<'jvm>: duchess::AsJRef<#this_ty>,
-                    #(#java_class_generics: duchess::JavaObject,)*
-                {
-                    #(#trait_impl_methods)*
+                    #(#inherent_object_methods)*
                 }
             };
         };
@@ -235,26 +229,182 @@ impl ClassInfo {
         Ok(output)
     }
 
-    fn upcast_impls(&self, upcasts: &Upcasts) -> Result<TokenStream, SpanError> {
-        let class_refs = upcasts.upcasts_for_generated_class(&self.name);
-
-        let struct_name = self.struct_name();
+    /// Construct the various declarations related to the op struct,
+    /// with the exception of any methods that must be invoked.
+    fn assoc_structs(
+        &self,
+        upcasts: &Upcasts,
+        op_struct_methods: Vec<TokenStream>,
+        obj_struct_methods: Vec<TokenStream>,
+    ) -> Result<TokenStream, SpanError> {
+        let name = self.struct_name();
         let java_class_generics = self.class_generic_names();
+
+        // Names for the `J` and `N` parameters.
+        // There is no particular reason to create `Ident` for these
+        // except that I decided to pretend we had hygienic procedural
+        // macros in this particular piece of code for some reason.
+        let j = Ident::new("J", self.span);
+        let n = Ident::new("N", self.span);
+
+        // Subtle: the struct itself does not require
+        // that `J: IntoJava<Self>` or `N: FromRef<J>`.
+        // Those requirements are placed only on the `Deref` impls.
+
+        let struct_definition = |struct_name: &Ident| {
+            quote_spanned!(self.span =>
+                #[repr(transparent)]
+                pub struct #struct_name<#(#java_class_generics,)* #j, #n> {
+                    this: #j,
+                    phantom: std::marker::PhantomData<(#name<#(#java_class_generics),*>, #n)>,
+                }
+            )
+        };
+
+        let deref_impl = |struct_name: &Ident| {
+            quote_spanned!(self.span =>
+                impl<#(#java_class_generics,)* #j, #n> std::ops::Deref
+                for #struct_name<#(#java_class_generics,)* #j, #n>
+                where
+                    #n: FromRef<#j>,
+                {
+                    type Target = #n;
+
+                    fn deref(&self) -> &#n {
+                        FromRef::from_ref(&self.this)
+                    }
+                }
+            )
+        };
+
+        let from_ref_impl = |struct_name: &Ident| {
+            quote_spanned!(self.span =>
+                impl<#(#java_class_generics,)* #j, #n> FromRef<#j> for #struct_name<#(#java_class_generics,)* #j, #n> {
+                    fn from_ref(j: &J) -> &Self {
+                        // This is safe because of the `#[repr(transparent)]`
+                        // on the struct declaration.
+                        unsafe {
+                            std::mem::transmute::<&J, &Self>(j)
+                        }
+                    }
+                }
+            )
+        };
+
+        // Construct the default value for the "next" (#n) parameter.
+        let mro = self.mro(upcasts)?;
+
+        let op_name = Id::from(format!("ViewAs{}Op", self.name.class_name())).to_ident(self.span);
+        let op_mro_tokens = self.mro_tokens(&j, "OfOpWith", &mro);
+
+        let obj_name = Id::from(format!("ViewAs{}Obj", self.name.class_name())).to_ident(self.span);
+        let obj_mro_tokens = self.mro_tokens(&j, "OfObjWith", &mro);
+
+        let all_names = &[&op_name, &obj_name];
+
+        let this_ty = self.this_type();
+
+        let other_impls = quote_spanned!(self.span =>
+            impl<#(#java_class_generics,)*> JavaView for #name<#(#java_class_generics,)*>
+            {
+                type OfOp<#j> = #op_name<#(#java_class_generics,)* #j, #op_mro_tokens>;
+
+                type OfOpWith<#j, #n> = #op_name<#(#java_class_generics,)* #j, #n>
+                where
+                    N: FromRef<J>;
+
+                type OfObj<#j> = #obj_name<#(#java_class_generics,)* #j, #obj_mro_tokens>;
+
+                type OfObjWith<#j, #n> = #obj_name<#(#java_class_generics,)* #j, #n>
+                where
+                    N: FromRef<J>;
+            }
+
+            impl<#(#java_class_generics,)* #j, #n> #op_name<#(#java_class_generics,)* #j, #n>
+            where
+                #(#java_class_generics: duchess::JavaObject,)*
+                #j: IntoJava<#name<#(#java_class_generics,)*>>,
+                #n: FromRef<#j>,
+            {
+                #(#op_struct_methods)*
+            }
+
+            impl<#(#java_class_generics,)* #j, #n> #obj_name<#(#java_class_generics,)* #j, #n>
+            where
+                #(#java_class_generics: duchess::JavaObject,)*
+                for<'jvm> &'jvm #j: IntoJava<#this_ty>,
+            {
+                #(#obj_struct_methods)*
+            }
+        );
+
+        let declarations: TokenStream = all_names
+            .iter()
+            .copied()
+            .flat_map(|n| vec![struct_definition(n), deref_impl(n), from_ref_impl(n)])
+            .chain(Some(other_impls))
+            .collect();
+
+        Ok(declarations)
+    }
+
+    /// Constructs the default "next" type for our [op struct].
+    /// This is based on the method resolution order (mro) for the
+    /// current type. For example, if `Foo` extends `Bar`, then the
+    /// result for `Foo` would be
+    /// `Bar::OfOpWith<J, java::lang::Object::OfOpWith<J, ()>>`.
+    ///
+    /// [op struct]: https://duchess-rs.github.io/duchess/methods.html#op-structs
+    fn mro_tokens(&self, j: &Ident, assoc_name: &str, mro: &[TokenStream]) -> TokenStream {
+        let Some((head, tail)) = mro.split_first() else {
+            return quote_spanned!(self.span => ());
+        };
+
+        let tail_tokens = self.mro_tokens(j, assoc_name, tail);
+
+        let assoc_ident = Ident::new(assoc_name, self.span);
+        quote_spanned!(self.span =>
+            <#head as JavaView>::#assoc_ident<#j, #tail_tokens>
+        )
+    }
+
+    /// Returns the ["method resolution order"][mro] for self. This is a series of
+    /// supertypes (classes or interfaces) ordered such that the more specific types
+    /// appear first. The returned list only includes "proper" supertypes, it does not
+    /// include the current class.
+    ///
+    /// FIXME: The returned list contains the right items, but is in an arbitary order,
+    /// and is not following the documented order. The result is that calls may wind up
+    /// calling methods from supertypes instead of subtypes. This only matters if subtypes
+    /// refine the return type.
+    ///
+    /// [mro]: https://duchess-rs.github.io/duchess/methods.html#method-resolution-order
+    fn mro(&self, upcasts: &Upcasts) -> Result<Vec<TokenStream>, SpanError> {
+        let class_refs = upcasts.upcasts_for_generated_class(&self.name);
         class_refs
             .iter()
             .map(|r| {
-                let mut sig =
-                    Signature::new(&Id::from("supertrait"), self.span, &[])
+                let mut sig = Signature::new(&Id::from("supertrait"), self.span, &[])
                     .with_internal_generics(&self.generics)?;
-                let tokens = sig.forbid_capture(|sig| sig.class_ref_ty(r)).unwrap();
-                Ok(quote_spanned!(self.span =>
+                Ok(sig.forbid_capture(|sig| sig.class_ref_ty(r)).unwrap())
+            })
+            .collect()
+    }
+
+    fn upcast_impls(&self, upcasts: &Upcasts) -> Result<TokenStream, SpanError> {
+        let struct_name = self.struct_name();
+        let java_class_generics = self.class_generic_names();
+        Ok(self.mro(upcasts)?
+            .into_iter()
+            .map(|tokens| {
+                quote_spanned!(self.span =>
                     unsafe impl<#(#java_class_generics,)*> plumbing::Upcast<#tokens> for #struct_name<#(#java_class_generics,)*>
                     where
                         #(#java_class_generics: duchess::JavaObject,)*
                     {}
-                ))
+                )
             })
-            .collect()
+            .collect())
     }
 
     fn cached_class(&self) -> TokenStream {
@@ -287,7 +437,7 @@ impl ClassInfo {
             .collect();
 
         let ty = self.this_type();
-        let output_trait = quote_spanned!(self.span => IntoLocal<#ty>);
+        let output_trait = quote_spanned!(self.span => JavaConstructor<#ty>);
 
         let java_class_generics = self.class_generic_names();
 
@@ -304,7 +454,6 @@ impl ClassInfo {
             pub fn new(
                 #(#input_names : impl #input_traits,)*
             ) -> impl #output_trait {
-                #[allow(non_camel_case_types)]
                 struct Impl<
                     #(#java_class_generics,)*
                     #(#input_names),*
@@ -315,7 +464,35 @@ impl ClassInfo {
                     )>,
                 }
 
-                #[allow(non_camel_case_types)]
+                impl<
+                    #(#java_class_generics,)*
+                    #(#input_names,)*
+                > Copy for Impl<
+                    #(#java_class_generics,)*
+                    #(#input_names,)*
+                >
+                where
+                    #(#java_class_generics: duchess::JavaObject,)*
+                    #(#input_names : #input_traits,)*
+                {
+                }
+
+                impl<
+                    #(#java_class_generics,)*
+                    #(#input_names,)*
+                > Clone for Impl<
+                    #(#java_class_generics,)*
+                    #(#input_names,)*
+                >
+                where
+                    #(#java_class_generics: duchess::JavaObject,)*
+                    #(#input_names : #input_traits,)*
+                {
+                    fn clone(&self) -> Self {
+                        *self
+                    }
+                }
+
                 impl<
                     #(#java_class_generics,)*
                     #(#input_names,)*
@@ -335,41 +512,55 @@ impl ClassInfo {
                     ) -> duchess::Result<'jvm, Self::Output<'jvm>> {
                         #(#prepare_inputs)*
 
-                            let class = <#ty>::class(jvm)?;
+                        let class = <#ty>::class(jvm)?;
 
-                            // Cache the method id for the constructor -- note that we only have one cache
-                            // no matter how many generic monomorphizations there are. This makes sense
-                            // given Java's erased-based generics system.
-                            static CONSTRUCTOR: OnceCell<MethodPtr> = OnceCell::new();
-                            let constructor = CONSTRUCTOR.get_or_try_init(|| {
-                                find_constructor(jvm, &class, #jni_descriptor)
-                            })?;
+                        // Cache the method id for the constructor -- note that we only have one cache
+                        // no matter how many generic monomorphizations there are. This makes sense
+                        // given Java's erased-based generics system.
+                        static CONSTRUCTOR: OnceCell<MethodPtr> = OnceCell::new();
+                        let constructor = CONSTRUCTOR.get_or_try_init(|| {
+                            find_constructor(jvm, &class, #jni_descriptor)
+                        })?;
 
-                            let env = jvm.env();
-                            let obj = unsafe {
-                                env.invoke(|env| env.NewObjectA, |env, f| f(
-                                    env,
-                                    class.as_raw().as_ptr(),
-                                    constructor.as_ptr(),
-                                    [
-                                        #(#input_names.into_jni_value(),)*
-                                    ].as_ptr(),
-                                ))
-                            };
+                        let env = jvm.env();
+                        let obj = unsafe {
+                            env.invoke(|env| env.NewObjectA, |env, f| f(
+                                env,
+                                class.as_raw().as_ptr(),
+                                constructor.as_ptr(),
+                                [
+                                    #(#input_names.into_jni_value(),)*
+                                ].as_ptr(),
+                            ))
+                        };
 
-                            if let Some(obj) = ObjectPtr::new(obj) {
-                                Ok(unsafe { Local::from_raw(env, obj) })
-                            } else {
-                                check_exception(jvm)?;
-                                // NewObjectA should only return a null pointer when an exception occurred in the
-                                // constructor, so reaching here is a strange JVM state
-                                Err(duchess::Error::JvmInternal(format!(
-                                    "failed to create new `{}` via constructor `{}`",
-                                    #name, #descriptor,
-                                )))
-                            }
+                        if let Some(obj) = ObjectPtr::new(obj) {
+                            Ok(unsafe { Local::from_raw(env, obj) })
+                        } else {
+                            check_exception(jvm)?;
+                            // NewObjectA should only return a null pointer when an exception occurred in the
+                            // constructor, so reaching here is a strange JVM state
+                            Err(duchess::Error::JvmInternal(format!(
+                                "failed to create new `{}` via constructor `{}`",
+                                #name, #descriptor,
+                            )))
                         }
                     }
+                }
+
+                impl<
+                    #(#java_class_generics,)*
+                    #(#input_names,)*
+                > std::ops::Deref for Impl<
+                    #(#java_class_generics,)*
+                    #(#input_names,)*
+                > {
+                    type Target = <#ty as JavaView>::OfOp<Self>;
+
+                    fn deref(&self) -> &Self::Target {
+                        <Self::Target as FromRef<_>>::from_ref(self)
+                    }
+                }
 
                 Impl {
                     #(#input_names: #input_names,)*
@@ -384,18 +575,14 @@ impl ClassInfo {
         Ok(output)
     }
 
-    /// Generates code for instance methods.
+    /// Generates code for the methods that goes on the `ops` object.
     ///
     ///
     /// NB. This function (particularly the JvmOp impl) has significant overlap with `static_method`
     /// and `static_field_getter`, so if you make changes here, you may well need changes there.
-    fn object_method(&self, method: &Method) -> Result<MethodOutput, SpanError> {
-        assert!(!method.flags.is_static);
-
+    fn op_struct_method(&self, method: &Method) -> Result<TokenStream, SpanError> {
         let mut sig = Signature::new(&method.name, self.span, &self.generics)
             .with_internal_generics(&method.generics)?;
-
-        let this_ty = self.this_type();
 
         let input_traits: Vec<_> = method
             .argument_tys
@@ -407,9 +594,136 @@ impl ClassInfo {
             .map(|i| Ident::new(&format!("a{i}"), self.span))
             .collect();
 
-        let output_ty = sig.output_type(&method.return_ty)?;
+        // The "output trait" is the trait bounds we declare for the user,
+        // e.g., for a method like `Foo method()`, we will declare a
+        // Rust method `-> impl JavaMethod<Foo>`, and this variable
+        // would be `JavaMethod<Foo>`.
         let output_trait = sig.method_trait(&method.return_ty)?;
+
+        let rust_method_name = Id::from(method.name.to_snake_case()).to_ident(self.span);
+
+        // The generic parameters we need on the Rust method, these include:
+        //
+        // * a type parameter for each java generic
+        // * any fresh generics we created to capture wildcards
+        let rust_method_generics = &sig.rust_generics;
+
+        // The final where clauses we need on the method.
+        // This includes the bounds declared in Java but also
+        // other bounds we added as we converted input types
+        // to account for captures.
+        let sig_where_clauses = &sig.where_clauses;
+
+        let this_ty = self.this_type();
+
+        let inherent_method = quote_spanned!(self.span =>
+            pub fn #rust_method_name<#(#rust_method_generics),*>(
+                &self,
+                #(#input_names: impl #input_traits),*
+            ) -> impl #output_trait
+            where
+                #(#sig_where_clauses,)*
+            {
+                <#this_ty>::#rust_method_name(
+                    self.this,
+                    #(#input_names,)*
+                )
+            }
+        );
+
+        Ok(inherent_method)
+    }
+
+    fn obj_struct_method(&self, method: &Method) -> Result<TokenStream, SpanError> {
+        let mut sig = Signature::new(&method.name, self.span, &self.generics)
+            .with_internal_generics(&method.generics)?;
+
+        let input_traits: Vec<_> = method
+            .argument_tys
+            .iter()
+            .map(|ty| sig.input_trait(ty))
+            .collect::<Result<_, _>>()?;
+
+        let input_names: Vec<_> = (0..input_traits.len())
+            .map(|i| Ident::new(&format!("a{i}"), self.span))
+            .collect();
+
+        // The "output trait" is the trait bounds we declare for the user,
+        // e.g., for a method like `Foo method()`, we will declare a
+        // Rust method `-> impl JavaMethod<Foo>`, and this variable
+        // would be `JavaMethod<Foo>`.
+        let output_trait = sig.method_trait(&method.return_ty)?;
+
+        let rust_method_name = Id::from(method.name.to_snake_case()).to_ident(self.span);
+
+        // The generic parameters we need on the Rust method, these include:
+        //
+        // * a type parameter for each java generic
+        // * any fresh generics we created to capture wildcards
+        let rust_method_generics = &sig.rust_generics;
+
+        // The final where clauses we need on the method.
+        // This includes the bounds declared in Java but also
+        // other bounds we added as we converted input types
+        // to account for captures.
+        let sig_where_clauses = &sig.where_clauses;
+
+        let this_ty = self.this_type();
+
+        let inherent_method = quote_spanned!(self.span =>
+            pub fn #rust_method_name<'a, #(#rust_method_generics),*>(
+                &'a self,
+                #(#input_names: impl #input_traits + 'a),*
+            ) -> impl #output_trait + 'a
+            where
+                #(#sig_where_clauses,)*
+            {
+                <#this_ty>::#rust_method_name(
+                    &self.this,
+                    #(#input_names,)*
+                )
+            }
+        );
+
+        Ok(inherent_method)
+    }
+
+    fn inherent_object_method(&self, method: &Method) -> Result<TokenStream, SpanError> {
+        let mut sig = Signature::new(&method.name, self.span, &self.generics)
+            .with_internal_generics(&method.generics)?;
+
+        let input_traits: Vec<_> = method
+            .argument_tys
+            .iter()
+            .map(|ty| sig.input_trait(ty))
+            .collect::<Result<_, _>>()?;
+
+        let input_names: Vec<_> = (0..input_traits.len())
+            .map(|i| Ident::new(&format!("a{i}"), self.span))
+            .collect();
+
+        // The "output type" is the actual type returned by this method,
+        // e.g., `Option<Local<Foo>>`.
+        let output_ty = sig.output_type(&method.return_ty)?;
+
+        // The "output trait" is the trait bounds we declare for the user,
+        // e.g., for a method like `Foo method()`, we will declare a
+        // Rust method `-> impl JavaMethod<Foo>`, and this variable
+        // would be `JavaMethod<Foo>`.
+        let output_trait = sig.method_trait(&method.return_ty)?;
+
+        // The appropriate JNI function to call this method.
         let jni_call_fn = sig.jni_call_fn(&method.return_ty)?;
+
+        // If this method returns a java object, then this is the
+        // Rust type representing the java class/interface that is returned
+        // (e.g., `Some(java::lang::Object)`).
+        let java_ref_output_ty = match &method.return_ty {
+            Some(java_return_type) => {
+                sig.forbid_capture(|sig| sig.java_ty_if_ref(java_return_type))?
+            }
+            None => None,
+        };
 
         let jni_descriptor = jni_c_str(&method.descriptor(), self.span);
 
@@ -426,28 +740,28 @@ impl ClassInfo {
 
         // The generic parameters we need on the Rust method, these include:
         //
-        // * a type parameter `a0` for each input
         // * a type parameter for each java generic
         // * any fresh generics we created to capture wildcards
-        let rust_method_generics: Vec<_> = input_names.iter().chain(&sig.rust_generics).collect();
+        let rust_method_generics = &sig.rust_generics;
 
         // The generic parameters we need on the *method struct* (which will implement the `JvmOp`).
-        // These include the class generics plus all the generics from the method.
+        // These include the class generics plus all the generics from the method,
+        // plus a type parameter `a0` for each input
+        let this = Ident::new("this", self.span);
         let method_struct_generics: Vec<_> = java_class_generics
             .iter()
-            .chain(rust_method_generics.iter().copied())
+            .chain(rust_method_generics)
+            .chain(Some(&this))
+            .chain(&input_names)
             .collect();
 
         // For each method `m` in the Java type, we create a struct (named `m`)
         // that will implement the `JvmOp`.
         let method_struct = quote_spanned!(self.span =>
-            #[derive(Clone)]
-            #[allow(non_camel_case_types)]
             pub struct #rust_method_type_name<
-                This,
                 #(#method_struct_generics,)*
             > {
-                this: This,
+                #this: #this,
                 #(#input_names : #input_names,)*
                 phantom: std::marker::PhantomData<(
                     #(#method_struct_generics,)*
@@ -455,60 +769,44 @@ impl ClassInfo {
             }
         );
 
+        // The final where clauses we need on the method.
+        // This includes the bounds declared in Java but also
+        // other bounds we added as we converted input types
+        // to account for captures.
         let sig_where_clauses = &sig.where_clauses;
 
-        // The method signature for the extension trait.
-        let trait_method = quote_spanned!(self.span =>
-            type #rust_method_type_name<#(#rust_method_generics),*>: #output_trait
-            where
-                #(#input_names: #input_traits,)*
-                #(#sig_where_clauses,)*
-                ;
-
-            fn #rust_method_name<#(#rust_method_generics),*>(
-                self,
-                #(#input_names: #input_names),*
-            ) -> Self::#rust_method_type_name<#(#rust_method_generics),*>
-            where
-                #(#input_names: #input_traits,)*
-                #(#sig_where_clauses,)*
-                ;
-        );
-
-        // The method signature for the extension trait.
-        let trait_impl_method = quote_spanned!(self.span =>
-            type #rust_method_type_name<#(#rust_method_generics),*> =
-                #rust_method_type_name<Self, #(#method_struct_generics),*>
-            where
-                #(#input_names: #input_traits,)*
-                #(#sig_where_clauses,)*
-                ;
-
-            fn #rust_method_name<#(#rust_method_generics),*>(
-                self,
-                #(#input_names: #input_names),*
-            ) -> Self::#rust_method_type_name<#(#rust_method_generics),*>
-            where
-                #(#input_names: #input_traits,)*
-                #(#sig_where_clauses,)*
-            {
-                #rust_method_type_name {
-                    this: self,
-                    #(#input_names: #input_names,)*
-                    phantom: Default::default(),
-                }
-            }
-        );
+        // The Rust type of the class defining this method.
+        let this_ty = self.this_type();
 
         // Implementation of `JvmOp` for `m` -- when executed, call the method
         // via JNI, after converting its arguments appropriately.
-        let impl_output = quote_spanned!(self.span =>
-            #[allow(non_camel_case_types)]
-            impl<This, #(#method_struct_generics),*> JvmOp
-            for #rust_method_type_name<This, #(#method_struct_generics),*>
+        let jvmop_impl = quote_spanned!(self.span =>
+            impl<#(#method_struct_generics),*> Copy
+            for #rust_method_type_name<#(#method_struct_generics),*>
             where
-                This: JvmOp,
-                for<'jvm> This::Output<'jvm>: duchess::AsJRef<#this_ty>,
+                #this: IntoJava<#this_ty>,
+                #(#input_names: #input_traits,)*
+                #(#java_class_generics: duchess::JavaObject,)*
+                #(#sig_where_clauses,)*
+            {}
+
+            impl<#(#method_struct_generics),*> Clone
+            for #rust_method_type_name<#(#method_struct_generics),*>
+            where
+                #this: IntoJava<#this_ty>,
+                #(#input_names: #input_traits,)*
+                #(#java_class_generics: duchess::JavaObject,)*
+                #(#sig_where_clauses,)*
+            {
+                fn clone(&self) -> Self {
+                    *self
+                }
+            }
+
+            impl<#(#method_struct_generics),*> JvmOp
+            for #rust_method_type_name<#(#method_struct_generics),*>
+            where
+                #this: IntoJava<#this_ty>,
                 #(#input_names: #input_traits,)*
                 #(#java_class_generics: duchess::JavaObject,)*
                 #(#sig_where_clauses,)*
@@ -519,7 +817,7 @@ impl ClassInfo {
                     self,
                     jvm: &mut Jvm<'jvm>,
                 ) -> duchess::Result<'jvm, Self::Output<'jvm>> {
-                    let this = self.this.execute_with(jvm)?;
+                    let this = self.#this.into_java(jvm)?;
                     let this: & #this_ty = this.as_jref()?;
                     let this = this.as_raw();
 
@@ -552,16 +850,49 @@ impl ClassInfo {
             }
         );
 
-        // useful for debugging
-        // eprintln!("{trait_method}");
-        // eprintln!("{trait_impl_method}");
+        // If we return a Java object, then deref to its op struct.
+        // See [method docs] for more details.
+        // [method docs]:https://duchess-rs.github.io/duchess/methods.html
+        let deref_impl = java_ref_output_ty.map(|java_ref_output_ty| {
+            quote_spanned!(self.span =>
+                impl<#(#method_struct_generics),*> std::ops::Deref
+                for #rust_method_type_name<#(#method_struct_generics),*>
+                where
+                    #(#java_class_generics: duchess::JavaObject,)*
+                    #(#sig_where_clauses,)*
+                {
+                    type Target = <#java_ref_output_ty as JavaView>::OfOp<Self>;
 
-        Ok(MethodOutput {
-            method_struct,
-            trait_method,
-            trait_impl_method,
-            jvm_op_impl: impl_output,
-        })
+                    fn deref(&self) -> &Self::Target {
+                        <Self::Target as FromRef<_>>::from_ref(self)
+                    }
+                }
+            )
+        });
+
+        let inherent_method = quote_spanned!(self.span =>
+            pub fn #rust_method_name<#(#rust_method_generics),*>(
+                #this: impl IntoJava<#this_ty>,
+                #(#input_names: impl #input_traits),*
+            ) -> impl #output_trait
+            where
+                #(#sig_where_clauses,)*
+            {
+                #method_struct
+
+                #jvmop_impl
+
+                #deref_impl
+
+                #rust_method_type_name {
+                    #this: #this,
+                    #(#input_names: #input_names,)*
+                    phantom: Default::default(),
+                }
+            }
+        );
+
+        Ok(inherent_method)
     }
 
     /// Generates a static method declaration that should be part of the inherent methods
@@ -589,6 +920,16 @@ impl ClassInfo {
         let output_trait = sig.method_trait(&method.return_ty)?;
         let jni_call_fn = sig.jni_static_call_fn(&method.return_ty)?;
 
+        // If this method returns a java object, then this is the
+        // Rust type representing the java class/interface that is returned
+        // (e.g., `Some(java::lang::Object)`).
+        let java_ref_output_ty = match &method.return_ty {
+            Some(java_return_type) => {
+                sig.forbid_capture(|sig| sig.java_ty_if_ref(java_return_type))?
+            }
+            None => None,
+        };
+
         let jni_descriptor = jni_c_str(&method.descriptor(), self.span);
 
         // Code to convert each input appropriately
@@ -604,23 +945,22 @@ impl ClassInfo {
 
         // The generic parameters we need on the Rust method, these include:
         //
-        // * a type parameter `a0` for each input
         // * a type parameter for each java generic
         // * any fresh generics we created to capture wildcards
-        let rust_method_generics: Vec<_> = input_names.iter().chain(&sig.rust_generics).collect();
+        let rust_method_generics = &sig.rust_generics;
 
         // The generic parameters we need on the *method struct* (which will implement the `JvmOp`).
-        // These include the class generics plus all the generics from the method.
+        // These include the class generics plus all the generics from the method,
+        // plus a type parameter `a0` for each input.
         let method_struct_generics: Vec<_> = java_class_generics
             .iter()
-            .chain(rust_method_generics.iter().copied())
+            .chain(rust_method_generics)
+            .chain(&input_names)
             .collect();
 
         // For each method `m` in the Java type, we create a struct (named `m`)
         // that will implement the `JvmOp`.
         let method_struct = quote_spanned!(self.span =>
-            #[derive(Clone)]
-            #[allow(non_camel_case_types)]
             pub struct #rust_method_type_name<
                 #(#method_struct_generics,)*
             > {
@@ -637,7 +977,27 @@ impl ClassInfo {
         // via JNI, after converting its arguments appropriately.
         let this_ty = self.this_type();
         let jvmop_impl = quote_spanned!(self.span =>
-            #[allow(non_camel_case_types)]
+            impl<#(#method_struct_generics),*> Copy
+            for #rust_method_type_name<#(#method_struct_generics),*>
+            where
+                #(#input_names: #input_traits,)*
+                #(#java_class_generics: duchess::JavaObject,)*
+                #(#sig_where_clauses,)*
+            {
+            }
+
+            impl<#(#method_struct_generics),*> Clone
+            for #rust_method_type_name<#(#method_struct_generics),*>
+            where
+                #(#input_names: #input_traits,)*
+                #(#java_class_generics: duchess::JavaObject,)*
+                #(#sig_where_clauses,)*
+            {
+                fn clone(&self) -> Self {
+                    *self
+                }
+            }
+
             impl<#(#method_struct_generics),*> JvmOp
             for #rust_method_type_name<#(#method_struct_generics),*>
             where
@@ -681,18 +1041,38 @@ impl ClassInfo {
             }
         );
 
+        // If we return a Java object, then deref to its op struct.
+        // See [method docs] for more details.
+        // [method docs]:https://duchess-rs.github.io/duchess/methods.html
+        let deref_impl = java_ref_output_ty.map(|java_ref_output_ty| {
+            quote_spanned!(self.span =>
+                impl<#(#method_struct_generics),*> std::ops::Deref
+                for #rust_method_type_name<#(#method_struct_generics),*>
+                where
+                    #(#java_class_generics: duchess::JavaObject,)*
+                    #(#sig_where_clauses,)*
+                {
+                    type Target = <#java_ref_output_ty as JavaView>::OfOp<Self>;
+
+                    fn deref(&self) -> &Self::Target {
+                        <Self::Target as FromRef<_>>::from_ref(self)
+                    }
+                }
+            )
+        });
+
         let inherent_method = quote_spanned!(self.span =>
-            #[allow(non_camel_case_types)]
             pub fn #rust_method_name<#(#rust_method_generics),*>(
-                #(#input_names: #input_names),*
+                #(#input_names: impl #input_traits),*
             ) -> impl #output_trait
             where
-                #(#input_names: #input_traits,)*
                 #(#sig_where_clauses,)*
             {
                 #method_struct
 
                 #jvmop_impl
+
+                #deref_impl
 
                 #rust_method_type_name {
                     #(#input_names: #input_names,)*
@@ -736,8 +1116,6 @@ impl ClassInfo {
         // For each field `f` in the Java type, we create a struct (named `<f>Getter`)
         // that will implement the `JvmOp`.
         let field_struct = quote_spanned!(self.span =>
-            #[derive(Clone)]
-            #[allow(non_camel_case_types)]
             pub struct #rust_field_type_name<
                 #(#field_struct_generics,)*
             > {
@@ -753,7 +1131,6 @@ impl ClassInfo {
         // via JNI, after converting its arguments appropriately.
         let this_ty = self.this_type();
         let jvmop_impl = quote_spanned!(self.span =>
-            #[allow(non_camel_case_types)]
             impl<#(#field_struct_generics),*> JvmOp
             for #rust_field_type_name<#(#field_struct_generics),*>
             where
@@ -790,10 +1167,26 @@ impl ClassInfo {
                     Ok(output)
                 }
             }
+
+            impl<#(#field_struct_generics),*> Copy for #rust_field_type_name<#(#field_struct_generics),*>
+            where
+                #(#java_class_generics: duchess::JavaObject,)*
+                #(#sig_where_clauses,)*
+            {
+            }
+
+            impl<#(#field_struct_generics),*> Clone for #rust_field_type_name<#(#field_struct_generics),*>
+            where
+                #(#java_class_generics: duchess::JavaObject,)*
+                #(#sig_where_clauses,)*
+            {
+                fn clone(&self) -> Self {
+                    *self
+                }
+            }
         );
 
         let inherent_method = quote_spanned!(self.span =>
-            #[allow(non_camel_case_types)]
             pub fn #rust_field_name() -> impl #output_trait
             where
                 #(#sig_where_clauses,)*
@@ -816,12 +1209,6 @@ impl ClassInfo {
 
     fn struct_name(&self) -> Ident {
         self.name.class_name().to_ident(self.span)
-    }
-
-    fn ext_trait_name(&self) -> Ident {
-        let mut id = self.name.class_name().clone();
-        id.data.push_str("Ext");
-        id.to_ident(self.span)
     }
 
     fn class_generic_names(&self) -> Vec<Ident> {
