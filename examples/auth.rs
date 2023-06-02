@@ -1,10 +1,7 @@
-use duchess::java::lang::ThrowableExt;
-use duchess::java::util::{HashMap as JavaHashMap, MapExt};
+use duchess::java::util::HashMap as JavaHashMap;
 use duchess::{java, prelude::*, Global, Jvm, Local};
 use std::collections::HashMap;
 use thiserror::Error;
-
-use auth::HttpAuthExt;
 
 duchess::java_package! {
     package auth;
@@ -123,7 +120,8 @@ impl JvmOp for &AuthorizeRequest {
     type Output<'jvm> = Local<'jvm, auth::AuthorizeRequest>;
 
     fn execute_with<'jvm>(self, jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, Self::Output<'jvm>> {
-        let java_context = JavaHashMap::new().execute_with(jvm)?;
+        let java_context: Local<'_, JavaHashMap<java::lang::String, java::lang::String>> =
+            JavaHashMap::new().execute_with(jvm)?;
         for (key, value) in &self.context {
             java_context
                 .put(key.as_str(), value.as_str())

@@ -610,14 +610,6 @@ impl DotId {
         let package_idents: Vec<Ident> = package_names.iter().map(|n| n.to_ident(span)).collect();
         quote_spanned!(span => #(#package_idents ::)* #struct_ident)
     }
-
-    /// Returns a token stream like `java::lang::ObjectExt` -- name of the trait to import
-    pub fn to_ext_trait_name(&self, span: Span) -> TokenStream {
-        let (package_names, struct_name) = self.split();
-        let struct_ident = Id::from(format!("{}Ext", &struct_name[..])).to_ident(span);
-        let package_idents: Vec<Ident> = package_names.iter().map(|n| n.to_ident(span)).collect();
-        quote_spanned!(span => #(#package_idents ::)* #struct_ident)
-    }
 }
 
 impl std::ops::Deref for DotId {

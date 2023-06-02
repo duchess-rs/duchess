@@ -290,10 +290,21 @@ impl Signature {
         })
     }
 
+    /// Returns the Rust type that represents this Java type -- e.g., for `Object`,
+    /// returns `java::lang::Object`. Note that this is not the type of a *reference* to this
+    /// java type (which would be e.g. `Global<java::lang::Object>`).
     pub fn java_ty(&mut self, ty: &Type) -> Result<TokenStream, SpanError> {
         match &ty.to_non_repeating() {
             NonRepeatingType::Ref(ty) => self.java_ref_ty(ty),
             NonRepeatingType::Scalar(ty) => Ok(self.java_scalar_ty(ty)),
+        }
+    }
+
+    /// Like `java_ty`, but only for reference types (returns `None` for scalars).
+    pub fn java_ty_if_ref(&mut self, ty: &Type) -> Result<Option<TokenStream>, SpanError> {
+        match &ty.to_non_repeating() {
+            NonRepeatingType::Ref(ty) => Ok(Some(self.java_ref_ty(ty)?)),
+            NonRepeatingType::Scalar(_) => Ok(None),
         }
     }
 

@@ -10,5 +10,7 @@
     - [The `Jvm` type](./jvm.md)
     - [Local vs global object references](./local_vs_global.md)
 - [Internals](./internals.md)
+    - [The `JavaObject` trait](./java_object.md)
     - [Upcasts](./upcasts.md)
+    - [Methods](./methods.md)
 - [Logo](./logo.md)

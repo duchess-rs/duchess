@@ -29,7 +29,7 @@ impl JvmOp for &str {
     }
 }
 
-impl JvmOp for String {
+impl JvmOp for &String {
     type Output<'jvm> = Local<'jvm, JavaString>;
 
     fn execute_with<'jvm>(

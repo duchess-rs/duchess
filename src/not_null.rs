@@ -1,6 +1,6 @@
 use crate::{Error, JavaObject, JvmOp, Local};
 
-#[derive(Clone)]
+#[derive_where::derive_where(Copy, Clone)]
 pub struct NotNull<J: JvmOp> {
     j: J,
 }

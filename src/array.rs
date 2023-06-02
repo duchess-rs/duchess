@@ -4,21 +4,62 @@ use crate::{
     cast::Upcast,
     error::check_exception,
     java::{self, lang::Class},
-    plumbing::JavaObjectExt,
+    jvm::JavaView,
+    plumbing::{FromRef, JavaObjectExt},
     raw::{HasEnvPtr, ObjectPtr},
     to_java::ToJavaImpl,
     AsJRef, Error, JDeref, JavaObject, JavaType, Jvm, JvmOp, Local, Nullable, ScalarMethod, ToRust,
     TryJDeref,
 };
 
-pub struct JavaArray<T: JavaType> {
+pub struct JavaArray<T> {
     _element: PhantomData<T>,
+}
+
+#[repr(transparent)]
+pub struct JavaArrayOp<T, J, N> {
+    _this: J,
+    phantom: PhantomData<(JavaArray<T>, N)>,
+}
+
+impl<T, J, N> FromRef<J> for JavaArrayOp<T, J, N> {
+    fn from_ref(j: &J) -> &Self {
+        // Safe because of the `repr(transparent)` declaration
+        unsafe { std::mem::transmute::<&J, &Self>(j) }
+    }
+}
+
+#[repr(transparent)]
+pub struct JavaArrayObj<T, J, N> {
+    _this: J,
+    phantom: PhantomData<(JavaArray<T>, N)>,
+}
+
+impl<T, J, N> FromRef<J> for JavaArrayObj<T, J, N> {
+    fn from_ref(j: &J) -> &Self {
+        // Safe because of the `repr(transparent)` declaration
+        unsafe { std::mem::transmute::<&J, &Self>(j) }
+    }
 }
 
 unsafe impl<T: JavaType> JavaObject for JavaArray<T> {
     fn class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Local<'jvm, Class>> {
         T::array_class(jvm)
     }
+}
+
+impl<T> JavaView for JavaArray<T> {
+    type OfOp<J> = JavaArrayOp<T, J, <java::lang::Object as JavaView>::OfOpWith<J, ()>>;
+
+    type OfOpWith<J, N> = JavaArrayOp<T, J, N>
+    where
+        N: FromRef<J>;
+
+    type OfObj<J> = JavaArrayObj<T, J, <java::lang::Object as JavaView>::OfObjWith<J, ()>>;
+
+    type OfObjWith<J, N> = JavaArrayObj<T, J, N>
+    where
+        N: FromRef<J>;
 }
 
 // Upcasts
@@ -62,8 +103,8 @@ where
     }
 }
 
-#[derive(Clone)]
-pub struct Length<This, T> {
+#[derive_where::derive_where(Copy, Clone)]
+pub struct Length<This: JvmOp, T> {
     this: This,
     element: PhantomData<T>,
 }

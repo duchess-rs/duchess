@@ -15,18 +15,10 @@ use crate::{
 /// XX: having to impl `Upcast<T>` for T on each struct is pretty annoying to get `AsJRef<T>` to work without conflicts
 pub unsafe trait Upcast<S: JavaObject>: JavaObject {}
 
-pub struct TryDowncast<J, To> {
+#[derive_where::derive_where(Copy, Clone)]
+pub struct TryDowncast<J: JvmOp, To> {
     op: J,
     _marker: PhantomData<To>,
-}
-
-impl<J: Clone, To> Clone for TryDowncast<J, To> {
-    fn clone(&self) -> Self {
-        Self {
-            op: self.op.clone(),
-            _marker: PhantomData,
-        }
-    }
 }
 
 impl<J, To> TryDowncast<J, To>
@@ -76,18 +68,10 @@ where
     }
 }
 
-pub struct AsUpcast<J, To> {
+#[derive_where::derive_where(Copy, Clone)]
+pub struct AsUpcast<J: JvmOp, To> {
     op: J,
     _marker: PhantomData<To>,
-}
-
-impl<J: Clone, To> Clone for AsUpcast<J, To> {
-    fn clone(&self) -> Self {
-        Self {
-            op: self.op.clone(),
-            _marker: PhantomData,
-        }
-    }
 }
 
 impl<J, To> AsUpcast<J, To>

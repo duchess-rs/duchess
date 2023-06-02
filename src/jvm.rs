@@ -2,8 +2,9 @@ use crate::{
     cast::{AsUpcast, TryDowncast, Upcast},
     find::find_class,
     global::{GlobalOp, IntoGlobal},
-    java::lang::{Class, ClassExt, Throwable},
+    java::lang::{Class, Throwable},
     not_null::NotNull,
+    plumbing::FromRef,
     raw::{self, EnvPtr, HasEnvPtr, JvmPtr, ObjectPtr},
     thread,
     to_rust::ToRustOp,
@@ -23,7 +24,7 @@ use once_cell::sync::OnceCell;
 /// *Eventual goal:* Each call to `execute` represents a single crossing
 /// over into the JVM, so the more you can chain together your jvm-ops,
 /// the better.
-pub trait JvmOp: Sized {
+pub trait JvmOp: Copy {
     type Output<'jvm>;
 
     fn assert_not_null<T>(self) -> NotNull<Self>
@@ -281,11 +282,37 @@ impl JvmBuilder {
 /// }
 /// unsafe impl JavaObject for BigDecimal {}
 /// ```
-pub unsafe trait JavaObject: 'static + Sized + JavaType {
+pub unsafe trait JavaObject: 'static + Sized + JavaType + JavaView {
     // XX: can't be put on extension trait nor define a default because we want to cache the resolved
     // class in a static OnceCell.
     /// Returns Java Class object for this type.
     fn class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Local<'jvm, Class>>;
+}
+
+pub trait JavaView {
+    /// The [op struct] for this java object.
+    /// This is an internal plumbing detail.
+    /// [op struct]: https://duchess-rs.github.io/duchess/methods.html#op-structs
+    type OfOp<J>: FromRef<J>;
+
+    /// The [op struct] for this java object with the given Method Resolution Order (`N`).
+    /// This is an internal plumbing detail.
+    /// [op struct]: https://duchess-rs.github.io/duchess/methods.html#op-structs
+    type OfOpWith<J, N>: FromRef<J>
+    where
+        N: FromRef<J>;
+
+    /// The [object struct] for this java object.
+    /// This is an internal plumbing detail.
+    /// [object struct]: https://duchess-rs.github.io/duchess/methods.html#obj-structs
+    type OfObj<J>: FromRef<J>;
+
+    /// The [object struct] for this java object with the given Method Resolution Order (`N`).
+    /// This is an internal plumbing detail.
+    /// [object struct]: https://duchess-rs.github.io/duchess/methods.html#obj-structs
+    type OfObjWith<J, N>: FromRef<J>
+    where
+        N: FromRef<J>;
 }
 
 /// Extension trait for [JavaObject].

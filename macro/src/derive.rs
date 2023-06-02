@@ -117,7 +117,6 @@ impl Driver<'_> {
         children: &[&ToRustVariant<'_>],
     ) -> Result<proc_macro2::TokenStream, syn::Error> {
         let root_class_name = root.class.name.to_module_name(root.selector.span());
-        let root_ext_trait_name = root.class.name.to_ext_trait_name(root.selector.span());
         let root_to_rust = self.variant_to_rust(
             quote_spanned!(root.variant.ast().ident.span() => self),
             root.variant,
@@ -126,10 +125,6 @@ impl Driver<'_> {
         let child_class_names = children
             .iter()
             .map(|c| c.class.name.to_module_name(c.selector.span()))
-            .collect::<Vec<_>>();
-        let child_ext_trait_names = children
-            .iter()
-            .map(|c| c.class.name.to_ext_trait_name(c.selector.span()))
             .collect::<Vec<_>>();
         let child_to_rust = children
             .iter()
@@ -150,12 +145,10 @@ impl Driver<'_> {
                 use duchess::prelude::*;
                 #(
                     if let Ok(variant) = self.try_downcast::<#child_class_names>().execute_with(jvm)? {
-                        use #child_ext_trait_names;
                         Ok(#child_to_rust)
                     } else
                 )*
                 {
-                    use #root_ext_trait_name;
                     Ok(#root_to_rust)
                 }
             }

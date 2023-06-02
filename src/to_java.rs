@@ -44,6 +44,7 @@ impl<R> ToJava for R {
     }
 }
 
+#[derive_where::derive_where(Copy, Clone)]
 pub struct ToJavaOp<'a, R, J> {
     rust: &'a R,
     phantom: PhantomData<J>,
@@ -72,8 +73,6 @@ where
         rust: &Self,
         jvm: &mut Jvm<'jvm>,
     ) -> crate::Result<'jvm, Option<Local<'jvm, java::util::HashMap<JK, JV>>>> {
-        use java::util::MapExt;
-
         let jmap: Local<'jvm, java::util::HashMap<JK, JV>> =
             java::util::HashMap::new().execute_with(jvm)?;
         for (key, value) in rust {
@@ -112,7 +111,6 @@ where
         rust: &Self,
         jvm: &mut Jvm<'jvm>,
     ) -> crate::Result<'jvm, Option<Local<'jvm, java::util::ArrayList<JE>>>> {
-        use java::util::ListExt;
         let jvec: Local<'jvm, java::util::ArrayList<JE>> =
             java::util::ArrayList::new().execute_with(jvm)?;
         for element in rust {
