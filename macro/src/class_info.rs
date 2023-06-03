@@ -468,7 +468,7 @@ impl std::fmt::Display for ScalarType {
 }
 
 /// A single identifier
-#[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
+#[derive(Eq, Hash, Ord, PartialEq, PartialOrd, Clone, Debug)]
 pub struct Id {
     pub data: String,
 }
@@ -513,7 +513,7 @@ impl std::fmt::Display for Id {
 }
 
 /// A dotted identifier
-#[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
+#[derive(Eq, Hash, Ord, PartialEq, PartialOrd, Clone, Debug)]
 pub struct DotId {
     /// Dotted components. Invariant: len >= 1.
     ids: Vec<Id>,
