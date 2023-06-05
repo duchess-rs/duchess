@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::{
     class_info::{ClassInfo, ClassRef, Constructor, Method, RefType, RootMap, Type},
     reflect::Reflector,
@@ -77,6 +79,9 @@ impl ClassInfo {
             });
         }
 
+        // Check whether any extends declarations are duplicates
+        error_on_duplicates(self.extends.as_slice(), "extends", &mut push_error_message);
+
         for cref in &self.implements {
             if !info.implements.iter().any(|c| c == cref) {
                 let implements_list: String = info
@@ -95,6 +100,13 @@ impl ClassInfo {
                 push_error_message(format!("{m}, but is implemented by `{}`", self.name));
             });
         }
+
+        // Check whether any implements declarations are duplicates
+        error_on_duplicates(
+            self.implements.as_slice(),
+            "implements",
+            &mut push_error_message,
+        );
 
         for c in &self.constructors {
             let c_method_sig = c.to_method_sig(self);
@@ -208,6 +220,24 @@ impl RefType {
             RefType::Extends(ty) => ty.check(root_map, push_error),
             RefType::Super(ty) => ty.check(root_map, push_error),
             RefType::Wildcard => (),
+        }
+    }
+}
+
+fn error_on_duplicates(
+    references: &[ClassRef],
+    ref_type: &str,
+    mut push_error: impl FnMut(String),
+) {
+    let mut seen = HashSet::with_capacity(references.len());
+    for class_ref in references.iter() {
+        if seen.contains(&(class_ref.name)) {
+            push_error(format!(
+                "duplicate reference in '{}' to '{}'",
+                ref_type, class_ref.name
+            ));
+        } else {
+            seen.insert(class_ref.name.clone());
         }
     }
 }
