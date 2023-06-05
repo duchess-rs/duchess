@@ -1,5 +1,4 @@
-use duchess::java::util::HashMap as JavaHashMap;
-use duchess::{java, prelude::*, Global, Jvm, Local};
+use duchess::{java, prelude::*, Global, Local};
 use std::collections::HashMap;
 use thiserror::Error;
 
@@ -63,7 +62,8 @@ pub enum AuthenticateError {
     InternalError { get_message: String },
 }
 
-#[derive(Debug)]
+#[derive(Debug, duchess::ToJava)]
+#[java(auth.AuthorizeRequest)]
 pub struct AuthorizeRequest {
     pub resource: String,
     pub action: String,
@@ -113,23 +113,6 @@ impl HttpAuth {
             .to_rust()
             .execute()
             .unwrap()
-    }
-}
-
-impl JvmOp for &AuthorizeRequest {
-    type Output<'jvm> = Local<'jvm, auth::AuthorizeRequest>;
-
-    fn execute_with<'jvm>(self, jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, Self::Output<'jvm>> {
-        let java_context: Local<'_, JavaHashMap<java::lang::String, java::lang::String>> =
-            JavaHashMap::new().execute_with(jvm)?;
-        for (key, value) in &self.context {
-            java_context
-                .put(key.as_str(), value.as_str())
-                .execute_with(jvm)?;
-        }
-
-        auth::AuthorizeRequest::new(self.resource.as_str(), self.action.as_str(), &java_context)
-            .execute_with(jvm)
     }
 }
 
