@@ -201,6 +201,7 @@ impl Driver<'_> {
 
         let self_ty = &self.input.ast().ident;
         Ok(quote_spanned!(self.span() =>
+            #[allow(unused_imports, unused_variables)]
             impl duchess::JvmOp for & #self_ty {
                 type Output<'jvm> = Local<'jvm, #root_class_name>;
 
