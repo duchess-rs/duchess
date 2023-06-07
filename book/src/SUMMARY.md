@@ -1,6 +1,8 @@
 # Summary
 
 - [Intro](./intro.md)
+- [Tutorials](./tutorials.md)
+    - [Setup](./setup.md)
     - [Calling Java from Rust](./call_java_from_rust.md)
     - [Implementing native methods](./implementing_native_methods.md)
 - [Reference](./reference.md)

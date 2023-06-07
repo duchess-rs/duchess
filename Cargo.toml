@@ -1,7 +1,7 @@
 [workspace]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.1.1"
 license = "Apache-2.0 OR MIT"
 repository = "https://github.com/nikomatsakis/duchess"
 
@@ -12,6 +12,8 @@ edition = "2021"
 license.workspace = true
 repository.workspace = true
 description = "Experiments with Java-Rust interop"
+readme = "README.md"
+homepage = "https://duchess-rs.github.io/duchess/"
 
 [dependencies]
 derive_more = "0.99.17"

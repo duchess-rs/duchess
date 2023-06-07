@@ -1,37 +1,50 @@
 # Duchess: silky smooth Java integration
 
-Duchess is a crate that makes it easy to use Java code.
+[<img src="https://img.shields.io/badge/chat-on%20Zulip-green"></img>][Zulip]
 
-<img src="duchess.svg"></img>
+Duchess is a Rust crate that makes it easy, ergonomic, and efficient to interoperate with Java code.
+
+<img src="duchess.svg" width="300"></img>
+
 
 ## TL;DR
 
-```rust
-// Step 1: Reflect your java code into Rust
-duchess::java_package! {
-    package com.myjava;
-    class MyClass { * }
-}
+Duchess permits you to reflect Java classes into Rust and easily invoke methods on Java objects. For example the following Java code...
 
-// Step 2: Start the JVM
-duchess::with_jvm(|jvm| {
-    // Step 3: Create objects and call methods.
-    // Constructors and methods can be chained;
-    // use `execute` to run the whole chain on the JVM.
-    use com::myjava::{MyClass, MyClassExt};
-    MyClass::new()
-        .some_builder_method(44)
-        .some_other_method("Hello, world")
-        .execute_with(jvm);
-})
+```rust
+Logger logger = new log.Logger();
+logger.addEvent(
+    Event.builder()
+        .withTime(new Date())
+        .withName("foo")
+        .build()
+);
 ```
 
-## Tutorials
+...could be executed in Rust as follows:
 
-To learn more, check out one of our tutorials
+```rust
+let logger = log::Logger::new().global().execute()?;
+logger
+    .add_event(
+        log::Event::builder()
+            .with_time(java::util::Date::new())
+            .with_name("foo")
+            .build(),
+    )
+    .execute()?;
+```
 
-* [Calling Java from Rust](./call_java_from_rust.md)
-* [Implementing native methods](./implementing_native_methods.md)
+## Curious to learn more?
 
-or check out the [reference](./reference.md).
+Check out the...
 
+* The [examples](https://github.com/duchess-rs/duchess/tree/main/examples)
+* The [tutorials](https://duchess-rs.github.io/duchess/tutorials.html) chapter
+
+## Curious to get involved?
+
+Look for [issues tagged with good first issue][] and join the [Zulip][].
+
+[issues tagged with good first issue]: https://github.com/duchess-rs/duchess/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22
+[Zulip]: https://duchess.zulipchat.com/
