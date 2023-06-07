@@ -4,6 +4,8 @@ version.workspace = true
 edition = "2021"
 license.workspace = true
 repository.workspace = true
+readme = "README.md"
+description = "Interal component of duchess crate"
 
 [lib]
 proc-macro = true

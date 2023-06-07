@@ -4,6 +4,7 @@
 version = "0.1.1"
 license = "Apache-2.0 OR MIT"
 repository = "https://github.com/nikomatsakis/duchess"
+homepage = "https://duchess-rs.github.io/duchess/"
 
 [package]
 name = "duchess"
@@ -11,13 +12,12 @@ version.workspace = true
 edition = "2021"
 license.workspace = true
 repository.workspace = true
-description = "Experiments with Java-Rust interop"
+description = "Silky smooth Java-Rust interop"
 readme = "README.md"
-homepage = "https://duchess-rs.github.io/duchess/"
 
 [dependencies]
 derive_more = "0.99.17"
-duchess-macro = { path = "macro" }
+duchess-macro = { path = "macro", version = "0.1.1" }
 jni-sys = "0.3.0"
 cesu8 = "1.1.0"
 once_cell = "1.17.1"

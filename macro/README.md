@@ -1,0 +1,1 @@
+Internal helper crate for [duchess](https://crates.io/crates/duchess). Do not rely on this API.
