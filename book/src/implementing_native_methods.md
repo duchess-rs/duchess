@@ -1,6 +1,15 @@
 # Tutorial: implementing native methods
 
+**WARNING:** This support is not yet implemented.
+
 Duchess also supports implementing Java native methods, making it easy to call Rust code from Java.
+
+## Setup
+
+Be sure to follow the [setup instructions](./setup.md).
+
+## Example
+
 Given a Java class
 
 ```java

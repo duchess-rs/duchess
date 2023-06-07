@@ -1,7 +1,16 @@
 # duchess
-Experiments with Java-Rust interop
 
-[Chat on Zulip](https://duchess.zulipchat.com/)
+**Easy, ergonomic, and efficient Java-Rust interop (still a WIP)**
+
+## TL;DR
+
+
+
+## Get in touch
+
+[Zulip chat](https://duchess.zulipchat.com/)
+
+Or open an issue!
 
 ## Instructions
 

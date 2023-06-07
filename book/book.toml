@@ -4,3 +4,10 @@ language = "en"
 multilingual = false
 src = "src"
 title = "Duchess"
+
+[rust]
+edition = "2021"
+
+[output.html]
+git-repository-url = "https://github.com/duchess-rs/duchess"
+edit-url-template = "https://github.com/duchess-rs/duchess/edit/master/book/{path}"

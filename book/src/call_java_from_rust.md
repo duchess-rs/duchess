@@ -1,5 +1,9 @@
 # Tutorial: Call Java from Rust
 
+## Setup
+
+Be sure to follow the [setup instructions](./setup.md).
+
 ## The Java class we would like to use from Rust
 
 Imagine we have a Java class `Factory` that we would like to use from Rust, defined like so:
