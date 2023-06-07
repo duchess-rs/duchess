@@ -4,7 +4,7 @@
 
 Duchess is a Rust crate that makes it easy, ergonomic, and efficient to interoperate with Java code.
 
-<img src="duchess.svg" width="300"></img>
+<img src="book/src/duchess.svg" width="300"></img>
 
 
 ## TL;DR
