@@ -23,8 +23,6 @@ jobs:
     - name: Build
       run: cargo build --verbose
     - name: Test crates
-      run: cargo test --all --verbose
-    - name: Test examples
-      run: cargo test --examples --verbose
+      run: cargo test --all-targets --verbose
     - name: Test client crates
-      run: cargo test --all --verbose --manifest-path=test-crates/Cargo.toml
+      run: cargo test --all-targets --verbose --manifest-path=test-crates/Cargo.toml
