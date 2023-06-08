@@ -92,6 +92,7 @@ impl ClassInfo {
         let static_methods: Vec<_> = self
             .methods
             .iter()
+            .filter(|m| self.should_mirror_in_rust(m.flags.privacy))
             .filter(|m| m.flags.is_static)
             .map(|m| self.static_method(m))
             .collect::<Result<_, _>>()?;
@@ -100,6 +101,7 @@ impl ClassInfo {
         let op_methods: Vec<_> = self
             .methods
             .iter()
+            .filter(|m| self.should_mirror_in_rust(m.flags.privacy))
             .filter(|m| !m.flags.is_static)
             .map(|m| self.op_struct_method(m))
             .collect::<Result<_, _>>()?;
@@ -108,6 +110,7 @@ impl ClassInfo {
         let obj_methods: Vec<_> = self
             .methods
             .iter()
+            .filter(|m| self.should_mirror_in_rust(m.flags.privacy))
             .filter(|m| !m.flags.is_static)
             .map(|m| self.obj_struct_method(m))
             .collect::<Result<_, _>>()?;
@@ -118,6 +121,7 @@ impl ClassInfo {
         let inherent_object_methods: Vec<_> = self
             .methods
             .iter()
+            .filter(|m| self.should_mirror_in_rust(m.flags.privacy))
             .filter(|m| !m.flags.is_static)
             .map(|m| self.inherent_object_method(m))
             .collect::<Result<_, _>>()?;
@@ -126,6 +130,7 @@ impl ClassInfo {
         let static_field_getters: Vec<_> = self
             .fields
             .iter()
+            .filter(|f: &&Field| self.should_mirror_in_rust(f.flags.privacy))
             .filter(|f| f.flags.is_static)
             .map(|f| self.static_field_getter(f))
             .collect::<Result<_, _>>()?;

@@ -146,7 +146,7 @@ impl Reflector {
         command
             .arg("-cp")
             .arg(classpath)
-            .arg("-public")
+            .arg("-p")
             .arg(format!("{}", class_name));
 
         let output_or_err = command.output();

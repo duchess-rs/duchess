@@ -146,12 +146,14 @@ Flags: Flags = {
     <f:Flags> "static" => Flags { is_static: true, ..f },
     <f:Flags> "default" => Flags { is_default: true, ..f },
     <f:Flags> "transient" => Flags { is_transient: true, ..f },
+    <f:Flags> "volatile" => Flags { is_volatile: true, ..f },
 };
 
 Privacy: Privacy = {
     "public" => Privacy::Public,
     "protected" => Privacy::Protected,
-    () => Privacy::Package,
+    "private" => Privacy::Private,
+    () => Privacy::Default,
 };
 
 Throws: Vec<ClassRef> = {
