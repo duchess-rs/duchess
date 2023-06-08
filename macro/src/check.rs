@@ -188,6 +188,18 @@ impl ClassInfo {
                 flags.privacy, reflected_flags.privacy,
             ));
         }
+
+        if flags.is_native && !reflected_flags.is_native {
+            push_error(format!(
+                "member declared as native but it is not native in Java",
+            ));
+        }
+
+        if !flags.is_native && reflected_flags.is_native {
+            push_error(format!(
+                "member not declared as native but it is native in Java",
+            ));
+        }
     }
 }
 
