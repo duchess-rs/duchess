@@ -48,7 +48,6 @@ pub mod prelude {
     };
     pub use crate::refs::{AsJRef, JDeref, TryJDeref};
     pub use crate::to_java::ToJava;
-    pub use crate::to_rust::ToRust;
 }
 
 /// Internal module containing non-semver protected
