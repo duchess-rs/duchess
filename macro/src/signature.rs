@@ -362,15 +362,6 @@ impl Signature {
     }
 
     fn java_scalar_ty(&self, ty: &ScalarType) -> TokenStream {
-        match ty {
-            ScalarType::Char => quote_spanned!(self.span => u16),
-            ScalarType::Int => quote_spanned!(self.span => i32),
-            ScalarType::Long => quote_spanned!(self.span => i64),
-            ScalarType::Short => quote_spanned!(self.span => i16),
-            ScalarType::Byte => quote_spanned!(self.span => i8),
-            ScalarType::F64 => quote_spanned!(self.span => f64),
-            ScalarType::F32 => quote_spanned!(self.span => f32),
-            ScalarType::Boolean => quote_spanned!(self.span => bool),
-        }
+        ty.to_tokens(self.span)
     }
 }

@@ -501,6 +501,21 @@ impl std::fmt::Display for ScalarType {
     }
 }
 
+impl ScalarType {
+    pub fn to_tokens(&self, span: Span) -> TokenStream {
+        match self {
+            ScalarType::Char => quote_spanned!(span => u16),
+            ScalarType::Int => quote_spanned!(span => i32),
+            ScalarType::Long => quote_spanned!(span => i64),
+            ScalarType::Short => quote_spanned!(span => i16),
+            ScalarType::Byte => quote_spanned!(span => i8),
+            ScalarType::F64 => quote_spanned!(span => f64),
+            ScalarType::F32 => quote_spanned!(span => f32),
+            ScalarType::Boolean => quote_spanned!(span => bool),
+        }
+    }
+}
+
 /// A single identifier
 #[derive(Eq, Hash, Ord, PartialEq, PartialOrd, Clone, Debug)]
 pub struct Id {

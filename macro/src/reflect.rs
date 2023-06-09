@@ -232,8 +232,8 @@ impl Reflector {
     }
 }
 
-type ConstructorIndex = usize;
-type MethodIndex = usize;
+pub type ConstructorIndex = usize;
+pub type MethodIndex = usize;
 
 /// Reflection on something callable.
 #[derive(Clone, Debug)]
