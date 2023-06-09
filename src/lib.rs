@@ -47,6 +47,7 @@ pub mod prelude {
 
 /// Internal module containing non-semver protected
 /// names used by generated code.
+#[doc(hidden)]
 pub mod plumbing {
     pub use crate::cast::Upcast;
     pub use crate::error::check_exception;
