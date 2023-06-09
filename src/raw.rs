@@ -7,7 +7,7 @@
 use std::{
     ffi,
     marker::PhantomData,
-    ptr::{self, NonNull},
+    ptr::{self, NonNull}, mem::MaybeUninit,
 };
 
 use jni_sys::jvalue;
@@ -116,7 +116,7 @@ pub(crate) unsafe fn try_create_jvm<'a>(
 }
 
 #[doc(hidden)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct JvmPtr(NonNull<jni_sys::JavaVM>);
 
 impl JvmPtr {
@@ -237,6 +237,24 @@ impl<'jvm> EnvPtr<'jvm> {
         call: impl FnOnce(*mut jni_sys::JNIEnv, F) -> T,
     ) -> T {
         fn_table_call(self.ptr, fn_field, call)
+    }
+
+    /// Loads the JVM pointer from this environment.
+    /// Returns Err if there is some sort of error.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the [`jni_sys::JNIEnv`] raw pointer is valid for this invocation.
+    pub unsafe fn jvm_ptr(self) -> Result<JvmPtr, ()> {
+        let env = self.ptr.as_ptr();
+        let get_java_vm = unsafe { (**env).GetJavaVM.ok_or(())? };
+        let mut jvm_ptr: MaybeUninit<*mut jni_sys::JavaVM> = MaybeUninit::uninit();
+        if get_java_vm(env, jvm_ptr.as_mut_ptr()) != 0 {
+            return Err(());
+        }
+        let jvm_ptr = jvm_ptr.assume_init();
+        assert!(!jvm_ptr.is_null());
+        JvmPtr::new(jvm_ptr).ok_or(())
     }
 }
 

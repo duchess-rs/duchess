@@ -125,6 +125,26 @@ fn get_or_default_init_jvm() -> crate::GlobalResult<JvmPtr> {
     }
 }
 
+/// Invoked from inside a JNI native function when it is called by the JVM.
+/// If `GLOBAL_JVM` is not yet set, initializes it to use the provided `jvm`.
+/// Otherwise, does nothing.
+///
+/// # Safety condition
+///
+/// Must be invoked as the first thing from inside a JNI native function.
+pub unsafe fn init_jvm_from_native_function(env: *mut jni_sys::JNIEnv) {
+    // If the JVM is the master process and it invokes Rust code,
+    // the global JVM environment may not yet have been initialized.
+    //
+    // If the Rust code is the master process, the JVM should already have
+    // been created and should be the same.
+
+    let env = raw::EnvPtr::new(env).unwrap();
+    let jvm = env.jvm_ptr().unwrap();
+    let global_jvm = GLOBAL_JVM.get_or_init(|| jvm);
+    assert_eq!(jvm, *global_jvm, "multiple JVM pointers in active use");
+}
+
 /// Get the global [`JvmPtr`] assuming that the JVM has already been initialized. Expected to be used with values
 /// that only can have been derived from an existing JVM.
 ///

@@ -54,6 +54,7 @@ pub mod plumbing {
     pub use crate::find::{find_class, find_constructor, find_field, find_method};
     pub use crate::from_ref::FromRef;
     pub use crate::global::GlobalOp;
+    pub use crate::jvm::init_jvm_from_native_function;
     pub use crate::jvm::JavaObjectExt;
     pub use crate::jvm::JavaView;
     pub use crate::raw::{FieldPtr, FromJniValue, HasEnvPtr, IntoJniValue, MethodPtr, ObjectPtr};
