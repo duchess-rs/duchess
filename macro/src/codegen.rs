@@ -151,7 +151,7 @@ impl ClassInfo {
             const _: () = {
                 use duchess::{
                     *,
-                    codegen_deps::once_cell::sync::OnceCell,
+                    plumbing::once_cell::sync::OnceCell,
                     plumbing::*,
                     prelude::*,
                 };

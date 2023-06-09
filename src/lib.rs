@@ -34,11 +34,6 @@ pub use try_catch::TryCatch;
 
 pub use prelude::*;
 
-/// Re-export the dependencies that are used by the generated code.
-pub mod codegen_deps {
-    pub use once_cell;
-}
-
 /// Contains traits with methods expected to be invoked by end-users.
 pub mod prelude {
     pub use crate::jvm::JvmOp;
@@ -63,4 +58,5 @@ pub mod plumbing {
     pub use crate::raw::{FieldPtr, FromJniValue, HasEnvPtr, IntoJniValue, MethodPtr, ObjectPtr};
     pub use crate::refs::NullJRef;
     pub use crate::to_java::ToJavaImpl;
+    pub use once_cell;
 }
