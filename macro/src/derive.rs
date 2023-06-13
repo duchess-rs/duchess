@@ -140,8 +140,8 @@ impl Driver<'_> {
 
         Ok(quote_spanned!(self.span() =>
         #[allow(unused_imports, unused_variables)]
-        impl duchess::ToRust<#self_ty> for #root_class_name {
-            fn to_rust<'jvm>(&self, jvm: &mut duchess::Jvm<'jvm>) -> duchess::Result<'jvm, #self_ty> {
+        impl duchess::ToRust<#self_ty> for &#root_class_name {
+            fn to_rust<'jvm>(self, jvm: &mut duchess::Jvm<'jvm>) -> duchess::Result<'jvm, #self_ty> {
                 use duchess::prelude::*;
                 #(
                     if let Ok(variant) = self.try_downcast::<#child_class_names>().execute_with(jvm)? {

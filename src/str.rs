@@ -40,8 +40,8 @@ impl JvmOp for &String {
     }
 }
 
-impl ToRust<String> for JavaString {
-    fn to_rust<'jvm>(&self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, String> {
+impl ToRust<String> for &JavaString {
+    fn to_rust<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, String> {
         let str_raw = self.as_raw();
 
         let env = jvm.env();

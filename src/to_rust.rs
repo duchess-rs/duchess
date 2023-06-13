@@ -7,15 +7,15 @@ use crate::{Global, JavaObject, Jvm, JvmOp, Local};
 ///
 /// This is intended to be used to explicitly bring a value back to Rust at the end of a JVM session or operation.
 pub trait ToRust<R> {
-    fn to_rust<'jvm>(&self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, R>;
+    fn to_rust<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, R>;
 }
 
 macro_rules! identity_rust_op {
     ($($t:ty,)*) => {
         $(
             impl ToRust<$t> for $t {
-                fn to_rust<'jvm>(&self, _jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, $t> {
-                    Ok(*self)
+                fn to_rust<'jvm>(self, _jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, $t> {
+                    Ok(self)
                 }
             }
         )*
@@ -37,7 +37,7 @@ where
     JO: ToRust<O>,
     JE: ToRust<E>,
 {
-    fn to_rust<'jvm>(&self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Result<O, E>> {
+    fn to_rust<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Result<O, E>> {
         match self {
             Ok(jo) => Ok(Ok(jo.to_rust(jvm)?)),
             Err(je) => Ok(Err(je.to_rust(jvm)?)),
@@ -49,7 +49,7 @@ impl<O, JO> ToRust<Option<O>> for Option<JO>
 where
     JO: ToRust<O>,
 {
-    fn to_rust<'jvm>(&self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Option<O>> {
+    fn to_rust<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Option<O>> {
         match self {
             Some(jo) => Ok(Some(jo.to_rust(jvm)?)),
             None => Ok(None),
@@ -59,28 +59,21 @@ where
 
 impl<R, J> ToRust<R> for Local<'_, J>
 where
-    J: JavaObject + ToRust<R>,
+    J: JavaObject,
+    for<'a> &'a J: ToRust<R>,
 {
-    fn to_rust<'jvm>(&self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, R> {
-        J::to_rust(self, jvm)
+    fn to_rust<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, R> {
+        <&J as ToRust<R>>::to_rust(&self, jvm)
     }
 }
 
 impl<R, J> ToRust<R> for Global<J>
 where
-    J: JavaObject + ToRust<R>,
+    J: JavaObject,
+    for<'a> &'a J: ToRust<R>,
 {
-    fn to_rust<'jvm>(&self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, R> {
-        J::to_rust(&**self, jvm)
-    }
-}
-
-impl<R, J> ToRust<R> for &J
-where
-    J: ToRust<R>,
-{
-    fn to_rust<'jvm>(&self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, R> {
-        J::to_rust(self, jvm)
+    fn to_rust<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, R> {
+        <&J as ToRust<R>>::to_rust(&self, jvm)
     }
 }
 
@@ -115,7 +108,7 @@ where
 
     fn execute_with<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
         let java = self.this.execute_with(jvm)?;
-        let rust = ToRust::to_rust(&java, jvm)?;
+        let rust = ToRust::to_rust(java, jvm)?;
         Ok(rust)
     }
 }
