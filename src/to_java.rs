@@ -1,6 +1,6 @@
 use std::{collections::HashMap, marker::PhantomData};
 
-use crate::{cast::Upcast, java, Jvm, JvmOp, Local};
+use crate::{cast::Upcast, java, Global, Jvm, JvmOp, Local};
 
 pub trait ToJava: Sized {
     type JvmOp<'a, J>: for<'jvm> JvmOp<Output<'jvm> = Option<Local<'jvm, J>>>
@@ -164,5 +164,57 @@ impl ToJavaImpl<java::Array<i8>> for Vec<u8> {
     ) -> crate::Result<'jvm, Option<Local<'jvm, java::Array<i8>>>> {
         let this: &Vec<i8> = unsafe { std::mem::transmute(rust) };
         ToJavaImpl::to_java_impl(this, jvm)
+    }
+}
+
+impl<J> ToJavaImpl<J> for Local<'_, J>
+where
+    J: Upcast<java::lang::Object>,
+{
+    fn to_java_impl<'jvm>(
+        rust: &Self,
+        jvm: &mut Jvm<'jvm>,
+    ) -> crate::Result<'jvm, Option<Local<'jvm, J>>> {
+        Ok(Some(jvm.local(rust)))
+    }
+}
+
+impl<J> ToJavaImpl<J> for Global<J>
+where
+    J: Upcast<java::lang::Object>,
+{
+    fn to_java_impl<'jvm>(
+        rust: &Self,
+        jvm: &mut Jvm<'jvm>,
+    ) -> crate::Result<'jvm, Option<Local<'jvm, J>>> {
+        Ok(Some(jvm.local(rust)))
+    }
+}
+
+impl<J> ToJavaImpl<J> for &J
+where
+    J: Upcast<java::lang::Object>,
+{
+    fn to_java_impl<'jvm>(
+        rust: &Self,
+        jvm: &mut Jvm<'jvm>,
+    ) -> crate::Result<'jvm, Option<Local<'jvm, J>>> {
+        Ok(Some(jvm.local(rust)))
+    }
+}
+
+impl<J, R> ToJavaImpl<J> for Option<R>
+where
+    J: Upcast<java::lang::Object>,
+    R: ToJavaImpl<J>,
+{
+    fn to_java_impl<'jvm>(
+        rust: &Self,
+        jvm: &mut Jvm<'jvm>,
+    ) -> crate::Result<'jvm, Option<Local<'jvm, J>>> {
+        match rust {
+            None => Ok(None),
+            Some(r) => R::to_java_impl(r, jvm),
+        }
     }
 }
