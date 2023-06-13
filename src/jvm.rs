@@ -7,9 +7,9 @@ use crate::{
     plumbing::FromRef,
     raw::{self, EnvPtr, HasEnvPtr, JvmPtr, ObjectPtr},
     thread,
-    to_rust::ToRustOp,
+    into_rust::ToRustOp,
     try_catch::TryCatch,
-    AsJRef, Error, Global, GlobalResult, Local, ToRust, TryJDeref,
+    AsJRef, Error, Global, GlobalResult, IntoRust, Local, TryJDeref,
 };
 
 use std::{ffi::CStr, fmt::Display, ptr::NonNull};
@@ -86,7 +86,7 @@ pub trait JvmOp: Copy {
     /// (e.g., from a Java String to a Rust string).
     fn to_rust<R>(self) -> ToRustOp<Self, R>
     where
-        for<'jvm> Self::Output<'jvm>: ToRust<R>,
+        for<'jvm> Self::Output<'jvm>: IntoRust<R>,
     {
         ToRustOp::new(self)
     }
