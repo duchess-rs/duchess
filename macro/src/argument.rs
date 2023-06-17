@@ -65,6 +65,15 @@ impl MethodSelector {
             MethodSelector::ClassInfo(_) => todo!(),
         }
     }
+
+    /// Returns the name of the method
+    pub fn method_name(&self) -> String {
+        match self {
+            MethodSelector::ClassName(_) => self.class_name().split().1.to_string(),
+            MethodSelector::MethodName(_, m) => m.to_string(),
+            MethodSelector::ClassInfo(_) => todo!(),
+        }
+    }
 }
 
 impl Parse for MethodSelector {

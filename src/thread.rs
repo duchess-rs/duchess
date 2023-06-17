@@ -42,6 +42,23 @@ fn attached_or(
     })
 }
 
+#[must_use = "remember to call `detach_from_jni_callback`"]
+pub unsafe fn attach_from_jni_callback(env: EnvPtr<'_>) -> State {
+    let env: EnvPtr<'static> = unsafe { std::mem::transmute(env) };
+    STATE.with(|state| state.replace(State::AttachedPermanently(env)))
+}
+
+pub unsafe fn detach_from_jni_callback(env: EnvPtr<'_>, s0: State) {
+    let env: EnvPtr<'static> = unsafe { std::mem::transmute(env) };
+    STATE.with(|state| {
+        let s1 = state.replace(s0);
+        assert!(
+            s1 == State::AttachedPermanently(env),
+            "invalid prior state `{s1:?}`"
+        );
+    });
+}
+
 pub fn attach_permanently(jvm: JvmPtr) -> GlobalResult<AttachGuard> {
     attached_or(jvm, || {
         Ok(AttachGuard {

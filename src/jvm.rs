@@ -2,17 +2,25 @@ use crate::{
     cast::{AsUpcast, TryDowncast, Upcast},
     find::find_class,
     global::{GlobalOp, IntoGlobal},
+    into_rust::ToRustOp,
     java::lang::{Class, Throwable},
+    link::{IntoJavaFns, JavaFunction},
     not_null::NotNull,
-    plumbing::FromRef,
+    plumbing::{FromRef, ToJavaImpl},
     raw::{self, EnvPtr, HasEnvPtr, JvmPtr, ObjectPtr},
     thread,
-    into_rust::ToRustOp,
     try_catch::TryCatch,
-    AsJRef, Error, Global, GlobalResult, IntoRust, Local, TryJDeref,
+    AsJRef, Error, Global, GlobalResult, IntoRust, Local, ToJava, TryJDeref,
 };
 
-use std::{ffi::CStr, fmt::Display, ptr::NonNull};
+use std::{
+    any::Any,
+    collections::HashMap,
+    ffi::{c_void, CStr},
+    fmt::Display,
+    panic::AssertUnwindSafe,
+    ptr::NonNull,
+};
 
 use once_cell::sync::OnceCell;
 
@@ -125,6 +133,76 @@ fn get_or_default_init_jvm() -> crate::GlobalResult<JvmPtr> {
     }
 }
 
+/// Invoked as the body from a JNI native function when it is called by the JVM.
+/// Initializes the environment and invokes `op`. Converts the result into a java
+/// object and returns it. Caller should then return this to the JVM.
+///
+/// # Safety condition
+///
+/// Must be invoked as the entire body of a JNI native function, with
+/// `env` being the `EnvPtr` argument provided.
+pub unsafe fn native_function_returning_object<J, R>(
+    env: EnvPtr<'_>,
+    op: impl FnOnce() -> R,
+) -> jni_sys::jobject
+where
+    J: Upcast<crate::java::lang::Object> + Upcast<J>,
+    R: ToJavaImpl<J> + std::fmt::Debug,
+{
+    init_jvm_from_native_function(env);
+    let old_state = thread::attach_from_jni_callback(env);
+
+    let result = match std::panic::catch_unwind(AssertUnwindSafe(|| op())) {
+        Ok(result) => {
+            let mut jvm = Jvm(env);
+            let obj = result.to_java().execute_with(&mut jvm);
+            match obj {
+                Ok(Some(p)) => p.into_raw().as_ptr(),
+                Ok(None) => std::ptr::null_mut(),
+                Err(e) => todo!("convert from exception `{e:?}` into java exception"),
+            }
+        }
+
+        Err(e) => {
+            rust_panic_to_java_exception(e);
+            std::ptr::null_mut()
+        }
+    };
+
+    thread::detach_from_jni_callback(env, old_state);
+
+    result
+}
+
+/// Invoked as the body from a JNI native function when it is called by the JVM.
+/// Initializes the environment and invokes `op`, returning the result, which should
+/// then be returned to the JVM.
+///
+/// # Safety condition
+///
+/// Must be invoked as the entire body of a JNI native function, with
+/// `env` being the `EnvPtr` argument provided.
+pub unsafe fn native_function_returning_scalar<J, R>(env: EnvPtr<'_>, op: impl FnOnce() -> R) -> R
+where
+    J: Upcast<crate::java::lang::Object> + Upcast<J>,
+    R: JavaScalar,
+{
+    init_jvm_from_native_function(env);
+    let old_state = thread::attach_from_jni_callback(env);
+
+    let result = match std::panic::catch_unwind(AssertUnwindSafe(|| op())) {
+        Ok(result) => result,
+        Err(e) => {
+            rust_panic_to_java_exception(e);
+            R::default()
+        }
+    };
+
+    thread::detach_from_jni_callback(env, old_state);
+
+    result
+}
+
 /// Invoked from inside a JNI native function when it is called by the JVM.
 /// If `GLOBAL_JVM` is not yet set, initializes it to use the provided `jvm`.
 /// Otherwise, does nothing.
@@ -132,17 +210,21 @@ fn get_or_default_init_jvm() -> crate::GlobalResult<JvmPtr> {
 /// # Safety condition
 ///
 /// Must be invoked as the first thing from inside a JNI native function.
-pub unsafe fn init_jvm_from_native_function(env: *mut jni_sys::JNIEnv) {
+unsafe fn init_jvm_from_native_function(env: EnvPtr<'_>) -> Jvm<'_> {
     // If the JVM is the master process and it invokes Rust code,
     // the global JVM environment may not yet have been initialized.
     //
     // If the Rust code is the master process, the JVM should already have
     // been created and should be the same.
 
-    let env = raw::EnvPtr::new(env).unwrap();
     let jvm = env.jvm_ptr().unwrap();
     let global_jvm = GLOBAL_JVM.get_or_init(|| jvm);
     assert_eq!(jvm, *global_jvm, "multiple JVM pointers in active use");
+    Jvm(env)
+}
+
+fn rust_panic_to_java_exception(_panic: Box<dyn Any + Send + 'static>) {
+    todo!("rust_panic_to_java_exception")
 }
 
 /// Get the global [`JvmPtr`] assuming that the JVM has already been initialized. Expected to be used with values
@@ -191,6 +273,35 @@ impl<'jvm> Jvm<'jvm> {
     {
         Global::new(self.0, r)
     }
+
+    fn register_native_methods(
+        &mut self,
+        java_functions: &[JavaFunction],
+    ) -> crate::Result<'jvm, ()> {
+        let mut sorted_by_class: HashMap<Local<'_, Class>, Vec<jni_sys::JNINativeMethod>> =
+            HashMap::default();
+
+        for java_function in java_functions {
+            let class = (java_function.class_fn)(self)?;
+            sorted_by_class
+                .entry(class)
+                .or_insert(vec![])
+                .push(jni_sys::JNINativeMethod {
+                    name: java_function.name.as_ptr() as *mut i8,
+                    signature: java_function.signature.as_ptr() as *mut i8,
+                    fnPtr: java_function.pointer.as_ptr() as *mut c_void,
+                });
+        }
+
+        for (class, native_methods) in &sorted_by_class {
+            unsafe {
+                self.0
+                    .register_native_methods(class.as_raw(), native_methods)?;
+            }
+        }
+
+        Ok(())
+    }
 }
 
 impl<'jvm> HasEnvPtr<'jvm> for Jvm<'jvm> {
@@ -203,6 +314,7 @@ pub struct JvmBuilder {
     options: Vec<String>,
     #[cfg(feature = "dylibjvm")]
     libjvm_path: Option<std::path::PathBuf>,
+    java_functions: Vec<JavaFunction>,
 }
 
 impl JvmBuilder {
@@ -211,6 +323,7 @@ impl JvmBuilder {
             options: vec![],
             #[cfg(feature = "dylibjvm")]
             libjvm_path: None,
+            java_functions: vec![],
         };
 
         if cfg!(debug_assertions) {
@@ -229,6 +342,11 @@ impl JvmBuilder {
 
     pub fn custom(mut self, opt_string: impl Into<String>) -> Self {
         self.options.push(opt_string.into());
+        self
+    }
+
+    pub fn link(mut self, fns: impl IntoJavaFns) -> Self {
+        self.java_functions.extend(fns.into_java_fns());
         self
     }
 
@@ -257,6 +375,10 @@ impl JvmBuilder {
         if already_exists {
             Err(Error::JvmAlreadyExists)
         } else {
+            if !self.java_functions.is_empty() {
+                Jvm::with(|jvm| jvm.register_native_methods(&self.java_functions))?;
+            }
+
             Ok(())
         }
     }

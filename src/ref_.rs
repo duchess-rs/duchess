@@ -42,6 +42,18 @@ impl<'jvm, T: JavaObject> Local<'jvm, T> {
             Self::from_raw(env, NonNull::new(new_ref).unwrap().into())
         }
     }
+
+    /// Convert this `Local` into a raw object pointer *without* running the Local destructor (which would release it from the JVM).
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that this pointer
+    /// does not escape the `'jvm` scope.
+    pub unsafe fn into_raw(self) -> ObjectPtr {
+        let p = self.as_raw();
+        std::mem::forget(self);
+        p
+    }
 }
 
 impl<T: JavaObject> Drop for Local<'_, T> {

@@ -5,7 +5,7 @@
 //! The `'static` pointers generally rely on duchess not deinitializing a JVM after it's already initialized.
 
 use std::{
-    ffi,
+    ffi::{self},
     marker::PhantomData,
     mem::MaybeUninit,
     ptr::{self, NonNull},
@@ -208,7 +208,7 @@ unsafe impl Sync for JvmPtr {}
 
 /// Points to an attached JNI environment interface for the current thread that is valid through `'jvm`.
 #[doc(hidden)]
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(transparent)]
 pub struct EnvPtr<'jvm> {
     ptr: NonNull<jni_sys::JNIEnv>,
@@ -257,6 +257,47 @@ impl<'jvm> EnvPtr<'jvm> {
         let jvm_ptr = jvm_ptr.assume_init();
         assert!(!jvm_ptr.is_null());
         JvmPtr::new(jvm_ptr).ok_or(())
+    }
+
+    /// Registers native methods on the JVM.
+    ///
+    /// # Safety
+    ///
+    /// The `class` and `native_methods` arguments must be valid to supply to the JVM.
+    pub unsafe fn register_native_methods(
+        self,
+        class: ObjectPtr,
+        native_methods: &[jni_sys::JNINativeMethod],
+    ) -> crate::Result<'jvm, ()> {
+        let result = self.invoke(
+            |f| f.RegisterNatives,
+            |env, register_natives| {
+                let nm_ptr = native_methods.as_ptr();
+                let nm_len: i32 = native_methods.len() as i32;
+                register_natives(env, class.as_ptr(), nm_ptr, nm_len)
+            },
+        );
+
+        if result == 0 {
+            Ok(())
+        } else {
+            self.check_exception()?;
+            Err(crate::Error::JvmInternal(format!(
+                "register native methods failed"
+            )))
+        }
+    }
+
+    pub fn check_exception(self) -> crate::Result<'jvm, ()> {
+        // SAFETY: we don't hold on to the return env ptr
+        let thrown = unsafe { self.invoke(|env| env.ExceptionOccurred, |env, f| f(env)) };
+        if let Some(thrown) = ObjectPtr::new(thrown) {
+            unsafe { self.invoke(|env| env.ExceptionClear, |env, f| f(env)) };
+            // SAFETY: the ptr returned by ExceptionOccurred is already a local ref and must be an instance of Throwable
+            Err(Error::Thrown(unsafe { Local::from_raw(self, thrown) }))
+        } else {
+            Ok(())
+        }
     }
 }
 

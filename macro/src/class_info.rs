@@ -390,6 +390,12 @@ pub enum Type {
     Repeat(Arc<Type>),
 }
 
+impl From<ClassRef> for Type {
+    fn from(value: ClassRef) -> Self {
+        Type::Ref(RefType::Class(value))
+    }
+}
+
 impl std::fmt::Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -401,6 +407,13 @@ impl std::fmt::Display for Type {
 }
 
 impl Type {
+    pub fn is_scalar(&self) -> bool {
+        match self {
+            Type::Scalar(_) => true,
+            Type::Ref(_) | Type::Repeat(_) => false,
+        }
+    }
+
     /// Convert a potentially repeating type to a non-repeating one.
     /// Types like `T...` become an array `T[]`.
     pub fn to_non_repeating(&self) -> NonRepeatingType {

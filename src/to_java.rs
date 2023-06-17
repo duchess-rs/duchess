@@ -1,6 +1,6 @@
 use std::{collections::HashMap, marker::PhantomData};
 
-use crate::{cast::Upcast, java, Global, Jvm, JvmOp, Local};
+use crate::{cast::Upcast, java, Error, Global, Jvm, JvmOp, Local};
 
 pub trait ToJava: Sized {
     type JvmOp<'a, J>: for<'jvm> JvmOp<Output<'jvm> = Option<Local<'jvm, J>>>
@@ -215,6 +215,58 @@ where
         match rust {
             None => Ok(None),
             Some(r) => R::to_java_impl(r, jvm),
+        }
+    }
+}
+
+impl<J, R> ToJavaImpl<J> for crate::Result<'_, R>
+where
+    J: Upcast<java::lang::Object>,
+    R: ToJavaImpl<J>,
+{
+    fn to_java_impl<'jvm>(
+        rust: &Self,
+        jvm: &mut Jvm<'jvm>,
+    ) -> crate::Result<'jvm, Option<Local<'jvm, J>>> {
+        match rust {
+            Ok(r) => R::to_java_impl(r, jvm),
+            Err(e) => match e {
+                Error::Thrown(t) => Err(Error::Thrown(jvm.local(t))),
+                Error::SliceTooLong(t) => Err(Error::SliceTooLong(*t)),
+                Error::NullDeref => Err(Error::NullDeref),
+                Error::NestedUsage => Err(Error::NestedUsage),
+                Error::JvmAlreadyExists => Err(Error::JvmAlreadyExists),
+                Error::UnableToLoadLibjvm(t) => Err(Error::UnableToLoadLibjvm(
+                    format!("UnableToLoadLibjvm({t:?})").as_str().into(), // FIXME: should to_java_impl be `self` ?
+                )),
+                Error::JvmInternal(t) => Err(Error::JvmInternal(t.clone())),
+            },
+        }
+    }
+}
+
+impl<J, R> ToJavaImpl<J> for crate::GlobalResult<R>
+where
+    J: Upcast<java::lang::Object>,
+    R: ToJavaImpl<J>,
+{
+    fn to_java_impl<'jvm>(
+        rust: &Self,
+        jvm: &mut Jvm<'jvm>,
+    ) -> crate::Result<'jvm, Option<Local<'jvm, J>>> {
+        match rust {
+            Ok(r) => R::to_java_impl(r, jvm),
+            Err(e) => match e {
+                Error::Thrown(t) => Err(Error::Thrown(jvm.local(t))),
+                Error::SliceTooLong(t) => Err(Error::SliceTooLong(*t)),
+                Error::NullDeref => Err(Error::NullDeref),
+                Error::NestedUsage => Err(Error::NestedUsage),
+                Error::JvmAlreadyExists => Err(Error::JvmAlreadyExists),
+                Error::UnableToLoadLibjvm(t) => Err(Error::UnableToLoadLibjvm(
+                    format!("UnableToLoadLibjvm({t:?})").as_str().into(), // FIXME: should to_java_impl be `self` ?
+                )),
+                Error::JvmInternal(t) => Err(Error::JvmInternal(t.clone())),
+            },
         }
     }
 }
