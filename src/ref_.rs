@@ -6,6 +6,7 @@ use crate::{cast::Upcast, jvm::CloneIn, plumbing::ObjectPtr, raw::EnvPtr, JavaOb
 
 /// An owned local reference to a non-null Java object of type `T`. The reference will be freed when
 /// dropped. Cannot be shared across threads or [`Jvm::with`] invocations.
+#[derive_where::derive_where(PartialEq, Eq, Hash, Debug)]
 pub struct Local<'jvm, T: JavaObject> {
     env: EnvPtr<'jvm>,
     obj: ObjectPtr,
@@ -63,6 +64,7 @@ impl<T: JavaObject> Deref for Local<'_, T> {
 }
 
 /// An owned global reference to a non-null Java object of type `T`. The reference will be freed when dropped.
+#[derive_where::derive_where(PartialEq, Eq, Hash)]
 pub struct Global<T: JavaObject> {
     obj: ObjectPtr,
     _marker: PhantomData<T>,

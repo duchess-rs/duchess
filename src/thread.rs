@@ -11,7 +11,8 @@ thread_local! {
     static STATE: Cell<State> = Cell::new(State::Detached);
 }
 
-enum State {
+#[derive(Debug, PartialEq, Eq)]
+pub enum State {
     /// The JVM is attached to the current thread, but we're already inside a duchess frame.
     InUse,
     /// The JVM is permanently attached to the current thread, but we're not inside a duchess frame.

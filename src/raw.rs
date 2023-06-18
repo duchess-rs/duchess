@@ -7,7 +7,8 @@
 use std::{
     ffi,
     marker::PhantomData,
-    ptr::{self, NonNull}, mem::MaybeUninit,
+    mem::MaybeUninit,
+    ptr::{self, NonNull},
 };
 
 use jni_sys::jvalue;
@@ -207,7 +208,8 @@ unsafe impl Sync for JvmPtr {}
 
 /// Points to an attached JNI environment interface for the current thread that is valid through `'jvm`.
 #[doc(hidden)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(transparent)]
 pub struct EnvPtr<'jvm> {
     ptr: NonNull<jni_sys::JNIEnv>,
     _marker: PhantomData<&'jvm ()>,
@@ -268,7 +270,7 @@ pub trait HasEnvPtr<'jvm> {
 
 /// Points to a live Java object through either a local or global ref.
 #[doc(hidden)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ObjectPtr(NonNull<jni_sys::_jobject>);
 
 impl ObjectPtr {
