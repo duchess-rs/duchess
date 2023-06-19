@@ -200,6 +200,7 @@ pub struct Flags {
     pub is_abstract: bool,
     pub is_static: bool,
     pub is_default: bool,
+    pub is_transient: bool,
 }
 
 impl Flags {
@@ -212,6 +213,7 @@ impl Flags {
             is_abstract: false,
             is_static: false,
             is_default: false,
+            is_transient: false,
         }
     }
 }
