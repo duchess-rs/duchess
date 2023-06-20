@@ -145,6 +145,7 @@ Flags: Flags = {
     <f:Flags> "abstract" => Flags { is_abstract: true, ..f },
     <f:Flags> "static" => Flags { is_static: true, ..f },
     <f:Flags> "default" => Flags { is_default: true, ..f },
+    <f:Flags> "transient" => Flags { is_transient: true, ..f },
 };
 
 Privacy: Privacy = {
