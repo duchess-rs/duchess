@@ -371,7 +371,7 @@ unsafe impl<T: JavaObject> JavaType for T {
     }
 }
 
-pub trait JavaScalar: JavaType {}
+pub trait JavaScalar: JavaType + Default {}
 
 macro_rules! scalar {
     ($($rust:ty: $array_class:literal,)*) => {
