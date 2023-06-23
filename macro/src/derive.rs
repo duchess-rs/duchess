@@ -10,7 +10,7 @@ use synstructure::VariantInfo;
 
 use crate::{
     argument::{JavaPath, MethodSelector},
-    class_info::{ClassInfo, ClassRef},
+    class_info::{ClassInfo, ClassRef, Type},
     parse::{Parse, Parser},
     reflect::Reflector,
     signature::Signature,
@@ -203,7 +203,7 @@ impl Driver<'_> {
         Ok(quote_spanned!(self.span() =>
             #[allow(unused_imports, unused_variables)]
             impl duchess::JvmOp for & #self_ty {
-                type Output<'jvm> = Local<'jvm, #root_class_name>;
+                type Output<'jvm> = duchess::Local<'jvm, #root_class_name>;
 
                 fn execute_with<'jvm>(self, jvm: &mut duchess::Jvm<'jvm>) -> duchess::Result<'jvm, Self::Output<'jvm>> {
                     use duchess::prelude::*;
@@ -214,7 +214,7 @@ impl Driver<'_> {
             }
 
             impl duchess::plumbing::ToJavaImpl<#root_class_name> for #self_ty {
-                fn to_java_impl<'jvm>(rust: &Self, jvm: &mut duchess::Jvm<'jvm>) -> duchess::Result<'jvm, Option<Local<'jvm, #root_class_name>>> {
+                fn to_java_impl<'jvm>(rust: &Self, jvm: &mut duchess::Jvm<'jvm>) -> duchess::Result<'jvm, Option<duchess::Local<'jvm, #root_class_name>>> {
                     Ok(Some(duchess::JvmOp::execute_with(rust, jvm)?))
                 }
             }
@@ -378,29 +378,29 @@ impl Driver<'_> {
             &reflected_method.class().generics,
         );
 
-        let java_types: Vec<_> = signature.forbid_capture(|signature| {
-            method_arguments
+        let args = signature.forbid_capture(|signature| {
+            variant
+                .bindings()
                 .iter()
-                .map(|t| signature.java_ty(t))
-                .collect::<Result<_, _>>()
+                .zip(method_arguments.iter())
+                .map(|(binding, t)| {
+                    Ok::<_, syn::Error>(match t {
+                        // deref scalar inputs to bare value
+                        Type::Scalar(_) => quote_spanned!(binding.span()=> *#binding),
+                        Type::Ref(_) | Type::Repeat(_) => {
+                            let java_ty = signature.java_ty(t)?;
+                            quote_spanned!(binding.span()=> duchess::ToJava::to_java::<#java_ty>(#binding))
+                        }
+                    })
+                })
+                .collect::<Result<Vec<_>, _>>()
         })?;
-
-        let args: Vec<_> = variant
-            .bindings()
-            .iter()
-            .zip(&java_types)
-            .map(|(binding, java_type)| {
-                quote_spanned!(binding.span() =>
-                    duchess::ToJava::to_java::<#java_type>(#binding)
-                )
-            })
-            .collect();
 
         let class_name = reflected_method
             .class()
             .name
             .to_module_name(method_selector.class_span());
-        let method_name = reflected_method.name().to_ident(method_selector.span());
+        let method_name = reflected_method.name().to_snake_case().to_ident(method_selector.span());
 
         let pattern = variant.pat();
         Ok(quote_spanned!(self.span() =>
