@@ -400,7 +400,10 @@ impl Driver<'_> {
             .class()
             .name
             .to_module_name(method_selector.class_span());
-        let method_name = reflected_method.name().to_snake_case().to_ident(method_selector.span());
+        let method_name = reflected_method
+            .name()
+            .to_snake_case()
+            .to_ident(method_selector.span());
 
         let pattern = variant.pat();
         Ok(quote_spanned!(self.span() =>
