@@ -1,4 +1,4 @@
-use duchess::{java, prelude::*, Global, Local};
+use duchess::{java, prelude::*, Global};
 use std::collections::HashMap;
 use thiserror::Error;
 
