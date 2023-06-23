@@ -1,5 +1,6 @@
 use std::{collections::BTreeMap, sync::Arc};
 
+use inflector::Inflector;
 use proc_macro2::{Delimiter, Ident, Span, TokenStream, TokenTree};
 use quote::quote_spanned;
 
@@ -505,6 +506,12 @@ impl Id {
     pub fn to_ident(&self, span: Span) -> Ident {
         let data = self.data.replace("$", "__");
         Ident::new(&data, span)
+    }
+
+    pub fn to_snake_case(&self) -> Self {
+        Self {
+            data: self.data.to_snake_case(),
+        }
     }
 }
 
