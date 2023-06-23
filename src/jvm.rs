@@ -147,7 +147,7 @@ pub unsafe fn native_function_returning_object<J, R>(
 ) -> jni_sys::jobject
 where
     J: Upcast<crate::java::lang::Object> + Upcast<J>,
-    R: ToJavaImpl<J> + std::fmt::Debug,
+    R: ToJavaImpl<J>,
 {
     init_jvm_from_native_function(env);
     let old_state = thread::attach_from_jni_callback(env);
