@@ -84,6 +84,5 @@ impl<'jvm> Error<Local<'jvm, Throwable>> {
 #[doc(hidden)]
 pub fn check_exception<'jvm>(jvm: &mut Jvm<'jvm>) -> Result<'jvm, ()> {
     let env = jvm.env();
-    // SAFETY: we don't hold on to the return env ptr
     env.check_exception()
 }
