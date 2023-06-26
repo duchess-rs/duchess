@@ -42,12 +42,30 @@ fn attached_or(
     })
 }
 
+/// Marks the current thread as attached until `detach_from_jni_callback` is called.
+/// Intended for use within JNI calls of native functions.
+/// Returns the previous thread state, which should be given to `detach_from_jni_callback`
+/// as a parameter.
+///
+/// # Safety condition
+///
+/// Must be used inside of a function that has been invoked from the JVM,
+/// which guarantees that the current thread is attached and will stay that way.
+///
+/// Caller must invoke `detach_from_jni_callback` before returning control to the JVM.
 #[must_use = "remember to call `detach_from_jni_callback`"]
 pub unsafe fn attach_from_jni_callback(env: EnvPtr<'_>) -> State {
     let env: EnvPtr<'static> = unsafe { std::mem::transmute(env) };
     STATE.with(|state| state.replace(State::AttachedPermanently(env)))
 }
 
+/// Restores the thread attachment state to whatever it was before the JNI invocation
+/// began.
+///
+/// # Safety condition
+///
+/// Must be called inside of a function that has been invoked from the JVM
+/// with the value returned by `attach_from_jni_callback`.
 pub unsafe fn detach_from_jni_callback(env: EnvPtr<'_>, s0: State) {
     let env: EnvPtr<'static> = unsafe { std::mem::transmute(env) };
     STATE.with(|state| {
