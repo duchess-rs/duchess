@@ -11,7 +11,8 @@ thread_local! {
     static STATE: Cell<State> = Cell::new(State::Detached);
 }
 
-enum State {
+#[derive(Debug, PartialEq, Eq)]
+pub enum State {
     /// The JVM is attached to the current thread, but we're already inside a duchess frame.
     InUse,
     /// The JVM is permanently attached to the current thread, but we're not inside a duchess frame.
@@ -39,6 +40,54 @@ fn attached_or(
             result
         }
     })
+}
+
+/// Marks the current thread as attached until `detach_from_jni_callback` is called.
+/// Intended for use within JNI calls of native functions.
+/// Returns the previous thread state, which should be given to `detach_from_jni_callback`
+/// as a parameter.
+///
+/// # Safety condition
+///
+/// Must be used inside of a function that has been invoked from the JVM,
+/// which guarantees that the current thread is attached and will stay that way.
+///
+/// Caller must drop the guard object that is returned before returning control to the JVM.
+#[must_use = "remember to call `detach_from_jni_callback`"]
+pub unsafe fn attach_from_jni_callback(env: EnvPtr<'_>) -> JniCallbackGuard<'_> {
+    let old_state = STATE.with(|state| {
+        // Unsafe condition: `env` pointer returned from transmute will not
+        // live past the drop of the guard object that we return,
+        // and that guard object is contained in in its original lifetime.
+        let env: EnvPtr<'static> = unsafe { std::mem::transmute(env) };
+        state.replace(State::AttachedPermanently(env))
+    });
+    JniCallbackGuard { env, old_state }
+}
+
+/// A guard object whose destructor restores the thread attachment state
+/// to whatever it was before the JNI invocation began.
+/// See [`attach_from_jni_callback`][] for more details.
+pub struct JniCallbackGuard<'env> {
+    env: EnvPtr<'env>,
+    old_state: State,
+}
+
+impl Drop for JniCallbackGuard<'_> {
+    fn drop(&mut self) {
+        STATE.with(|state| {
+            let old_state = std::mem::replace(&mut self.old_state, State::InUse);
+            let jni_state = state.replace(old_state);
+
+            // Unsafe condition: this pointer will not actually live past end of this block
+            // so it remains inside its original lifetime.
+            let env: EnvPtr<'static> = unsafe { std::mem::transmute(self.env) };
+            assert!(
+                jni_state == State::AttachedPermanently(env),
+                "invalid prior state `{jni_state:?}`"
+            );
+        });
+    }
 }
 
 pub fn attach_permanently(jvm: JvmPtr) -> GlobalResult<AttachGuard> {

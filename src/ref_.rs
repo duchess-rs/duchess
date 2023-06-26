@@ -6,6 +6,7 @@ use crate::{cast::Upcast, jvm::CloneIn, plumbing::ObjectPtr, raw::EnvPtr, JavaOb
 
 /// An owned local reference to a non-null Java object of type `T`. The reference will be freed when
 /// dropped. Cannot be shared across threads or [`Jvm::with`] invocations.
+#[derive_where::derive_where(PartialEq, Eq, Hash, Debug)]
 pub struct Local<'jvm, T: JavaObject> {
     env: EnvPtr<'jvm>,
     obj: ObjectPtr,
@@ -41,6 +42,18 @@ impl<'jvm, T: JavaObject> Local<'jvm, T> {
             Self::from_raw(env, NonNull::new(new_ref).unwrap().into())
         }
     }
+
+    /// Convert this `Local` into a raw object pointer *without* running the Local destructor (which would release it from the JVM).
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure that this pointer
+    /// does not escape the `'jvm` scope.
+    pub unsafe fn into_raw(self) -> ObjectPtr {
+        let p = self.as_raw();
+        std::mem::forget(self);
+        p
+    }
 }
 
 impl<T: JavaObject> Drop for Local<'_, T> {
@@ -63,6 +76,7 @@ impl<T: JavaObject> Deref for Local<'_, T> {
 }
 
 /// An owned global reference to a non-null Java object of type `T`. The reference will be freed when dropped.
+#[derive_where::derive_where(PartialEq, Eq, Hash)]
 pub struct Global<T: JavaObject> {
     obj: ObjectPtr,
     _marker: PhantomData<T>,

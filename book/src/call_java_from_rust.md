@@ -24,7 +24,7 @@ public class Widget { /* ... */ }
 
 Using duchess, we can declare a Rust version of this class with the `java_package!` macro:
 
-```rust
+```rust,ignore
 duchess::java_package! {
     // First, identify the package you are mirroring,
     // and the visibility level that you want.
@@ -44,7 +44,7 @@ duchess::java_package! {
 
 This module will expand to a module hierarchy matching the Java package name:
 
-```rust
+```rust,ignore
 pub mod com {
     pub mod widgard {
         // One struct per Java class:
@@ -80,7 +80,7 @@ pub mod com {
 
 Once you've created the Java package, you can create java objects and invoke their methods. This should mostly just work as you would expect, with one twist. Invoking a Java method doesn't immediately cause it to execute. Instead, like an iterator or an async function, it returns a `JvmOp`, which is like a suspended JVM operation that is *ready* to execute. To actually cause the method to execute, you call `execute`.
 
-```rust
+```rust,ignore
 // We need to use `FactoryExt` to call methods on factory:
 use com::widgard::{Factory, FactoryExt};
 
@@ -103,7 +103,7 @@ Note that to call methods on the JVM, we first had to start it. You do that via 
 
 Because jvm-ops are lazy, you can also chain them together:
 
-```rust
+```rust,ignore
 use com::widgard::{Factory, FactoryExt};
 
 let f = Factory::new().execute();
@@ -114,7 +114,7 @@ f.consume_widget(f.produce_widget()).execute();
 
 In fact, using the `inspect` combinator, we can go further:
 
-```rust
+```rust,ignore
 use com::widgard::{Factory, FactoryExt};
 
 duchess::Jvm::with(|jvm| {

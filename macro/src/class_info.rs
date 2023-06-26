@@ -159,6 +159,20 @@ impl ClassInfo {
                 .collect(),
         }
     }
+
+    /// Indicates whether a member with the given privacy level should be reflected in Rust.
+    /// We always mirror things declared as public.
+    /// In classes, the default privacy indicates "package level" visibility and we do not mirror.
+    /// In interfaces, the default privacy indicates "public" visibility and we DO mirror.
+    pub fn should_mirror_in_rust(&self, privacy: Privacy) -> bool {
+        match (privacy, self.kind) {
+            (Privacy::Public, _) | (Privacy::Default, ClassKind::Interface) => true,
+
+            (Privacy::Protected, _)
+            | (Privacy::Private, _)
+            | (Privacy::Default, ClassKind::Class) => false,
+        }
+    }
 }
 
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
@@ -186,13 +200,13 @@ impl std::fmt::Display for Generic {
     }
 }
 
-#[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
+#[derive(Eq, Ord, PartialEq, PartialOrd, Copy, Clone, Debug)]
 pub enum ClassKind {
     Class,
     Interface,
 }
 
-#[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
+#[derive(Eq, Ord, PartialEq, PartialOrd, Copy, Clone, Debug)]
 pub struct Flags {
     pub privacy: Privacy,
     pub is_final: bool,
@@ -202,6 +216,7 @@ pub struct Flags {
     pub is_static: bool,
     pub is_default: bool,
     pub is_transient: bool,
+    pub is_volatile: bool,
 }
 
 impl Flags {
@@ -215,15 +230,32 @@ impl Flags {
             is_static: false,
             is_default: false,
             is_transient: false,
+            is_volatile: false,
         }
     }
 }
 
-#[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
+#[derive(Eq, Ord, PartialEq, PartialOrd, Copy, Clone, Debug)]
 pub enum Privacy {
     Public,
     Protected,
-    Package,
+    Private,
+
+    /// NB: The default privacy depends on context.
+    /// In a class, it is package.
+    /// In an interface, it is public.
+    Default,
+}
+
+impl std::fmt::Display for Privacy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Privacy::Public => write!(f, "`public`"),
+            Privacy::Protected => write!(f, "`protected`"),
+            Privacy::Private => write!(f, "`private`"),
+            Privacy::Default => write!(f, "default privacy"),
+        }
+    }
 }
 
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
@@ -359,6 +391,12 @@ pub enum Type {
     Repeat(Arc<Type>),
 }
 
+impl From<ClassRef> for Type {
+    fn from(value: ClassRef) -> Self {
+        Type::Ref(RefType::Class(value))
+    }
+}
+
 impl std::fmt::Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -370,6 +408,13 @@ impl std::fmt::Display for Type {
 }
 
 impl Type {
+    pub fn is_scalar(&self) -> bool {
+        match self {
+            Type::Scalar(_) => true,
+            Type::Ref(_) | Type::Repeat(_) => false,
+        }
+    }
+
     /// Convert a potentially repeating type to a non-repeating one.
     /// Types like `T...` become an array `T[]`.
     pub fn to_non_repeating(&self) -> NonRepeatingType {
@@ -466,6 +511,21 @@ impl std::fmt::Display for ScalarType {
             ScalarType::F32 => write!(f, "float"),
             ScalarType::Boolean => write!(f, "boolean"),
             ScalarType::Char => write!(f, "char"),
+        }
+    }
+}
+
+impl ScalarType {
+    pub fn to_tokens(&self, span: Span) -> TokenStream {
+        match self {
+            ScalarType::Char => quote_spanned!(span => u16),
+            ScalarType::Int => quote_spanned!(span => i32),
+            ScalarType::Long => quote_spanned!(span => i64),
+            ScalarType::Short => quote_spanned!(span => i16),
+            ScalarType::Byte => quote_spanned!(span => i8),
+            ScalarType::F64 => quote_spanned!(span => f64),
+            ScalarType::F32 => quote_spanned!(span => f32),
+            ScalarType::Boolean => quote_spanned!(span => bool),
         }
     }
 }

@@ -6,11 +6,7 @@ use std::{
 use thiserror::Error;
 
 use crate::AsJRef;
-use crate::{
-    java::lang::Throwable,
-    raw::{HasEnvPtr, ObjectPtr},
-    Global, Jvm, JvmOp, Local,
-};
+use crate::{java::lang::Throwable, raw::HasEnvPtr, Global, Jvm, JvmOp, Local};
 
 /// Result returned by most Java operations that may contain a local reference
 /// to a thrown exception.
@@ -42,7 +38,7 @@ pub enum Error<T: AsJRef<Throwable>> {
 
     #[cfg(feature = "dylibjvm")]
     #[error(transparent)]
-    UnableToLoadLibjvm(#[from] Box<dyn std::error::Error + Send + 'static>),
+    UnableToLoadLibjvm(#[from] Box<dyn std::error::Error + Send + Sync + 'static>),
 
     #[error("{0}")]
     JvmInternal(String),
@@ -88,13 +84,5 @@ impl<'jvm> Error<Local<'jvm, Throwable>> {
 #[doc(hidden)]
 pub fn check_exception<'jvm>(jvm: &mut Jvm<'jvm>) -> Result<'jvm, ()> {
     let env = jvm.env();
-    // SAFETY: we don't hold on to the return env ptr
-    let thrown = unsafe { env.invoke(|env| env.ExceptionOccurred, |env, f| f(env)) };
-    if let Some(thrown) = ObjectPtr::new(thrown) {
-        unsafe { env.invoke(|env| env.ExceptionClear, |env, f| f(env)) };
-        // SAFETY: the ptr returned by ExceptionOccurred is already a local ref and must be an instance of Throwable
-        Err(Error::Thrown(unsafe { Local::from_raw(env, thrown) }))
-    } else {
-        Ok(())
-    }
+    env.check_exception()
 }

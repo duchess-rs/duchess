@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use crate::{
-    class_info::{ClassInfo, ClassRef, Constructor, Method, RefType, RootMap, Type},
+    class_info::{ClassInfo, ClassRef, Constructor, Flags, Method, RefType, RootMap, Type},
     reflect::Reflector,
     span_error::SpanError,
 };
@@ -29,7 +29,7 @@ impl ClassInfo {
         &self,
         root_map: &RootMap,
         reflector: &mut Reflector,
-        push_error: &mut impl FnMut(SpanError),
+        push_error: &mut dyn FnMut(SpanError),
     ) -> Result<(), SpanError> {
         let info = reflector.reflect(&self.name, self.span)?;
 
@@ -130,37 +130,41 @@ impl ClassInfo {
             }
         }
 
-        for c in &self.methods {
-            let c_method_sig = c.to_method_sig();
+        for m in &self.methods {
+            let m_method_sig = m.to_method_sig();
 
-            c.check(root_map, &mut |m| {
+            let mut push_method_error_message = |msg: String| {
                 push_error_message(format!(
-                    "{m}, which appears in method `{}`",
-                    c.to_method_sig()
+                    "{msg}, which appears in method `{}`",
+                    m.to_method_sig()
                 ));
-            });
+            };
 
-            if !info
+            m.check(root_map, &mut push_method_error_message);
+
+            if let Some(reflected_m) = info
                 .methods
                 .iter()
-                .any(|info_c| info_c.to_method_sig() == c_method_sig)
+                .find(|info_c| info_c.to_method_sig() == m_method_sig)
             {
+                self.compare_flags(m.flags, reflected_m.flags, &mut push_method_error_message);
+            } else {
                 let same_names: Vec<_> = info
                     .methods
                     .iter()
-                    .filter(|info_c| info_c.name == c_method_sig.name)
+                    .filter(|info_c| info_c.name == m_method_sig.name)
                     .map(|info_c| info_c.to_method_sig())
                     .map(|info_c| info_c.to_string())
                     .collect();
                 if same_names.is_empty() {
                     push_error_message(format!(
                         "no method named `{}` in the reflected class",
-                        c_method_sig,
+                        m_method_sig,
                     ));
                 } else {
                     push_error_message(format!(
                         "method `{}` does not match any of the methods in the reflected class: {}",
-                        c_method_sig,
+                        m_method_sig,
                         same_names.join(", "),
                     ));
                 }
@@ -169,10 +173,38 @@ impl ClassInfo {
 
         Ok(())
     }
+
+    fn compare_flags(
+        &self,
+        flags: Flags,
+        reflected_flags: Flags,
+        push_error: &mut dyn FnMut(String),
+    ) {
+        if self.should_mirror_in_rust(flags.privacy)
+            != self.should_mirror_in_rust(reflected_flags.privacy)
+        {
+            push_error(format!(
+                "member declared as {} but it is {} in Java",
+                flags.privacy, reflected_flags.privacy,
+            ));
+        }
+
+        if flags.is_native && !reflected_flags.is_native {
+            push_error(format!(
+                "member declared as native but it is not native in Java",
+            ));
+        }
+
+        if !flags.is_native && reflected_flags.is_native {
+            push_error(format!(
+                "member not declared as native but it is native in Java",
+            ));
+        }
+    }
 }
 
 impl ClassRef {
-    fn check(&self, root_map: &RootMap, push_error: &mut impl FnMut(String)) {
+    fn check(&self, root_map: &RootMap, push_error: &mut dyn FnMut(String)) {
         let (package_name, class_id) = self.name.split();
         if let Some(package) = root_map.find_package(package_name) {
             if let None = package.find_class(&class_id) {

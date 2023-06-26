@@ -2,7 +2,7 @@
 
 When you use duchess, you invoke methods via nice syntax like
 
-```rust
+```rust,ignore
 java_list.get(0).to_string().execute()
 //               ^^^^^^^^^
 // This is the method we are discussing here
@@ -15,7 +15,7 @@ How does this actually work (and why)?
 *Part* of our setup is that define relatively ordinary looking inherent methods
 on the type that defines the method, e.g.:
 
-```rust
+```rust,ignore
 impl Object {
     fn to_string(&self) -> impl JavaMethod<String> { /* tbd */ }
 }
@@ -118,7 +118,7 @@ In the following sections, we are going to walk through each part of the solutio
 
 The first step is to create a "fully qualified" notation for each Java method:
 
-```rust
+```rust,ignore
 impl Object {
     fn to_string(
         this: impl IntoJava<Object>
@@ -139,7 +139,7 @@ where `View<J>` has the same data as `J` but defines inherent methods.
 We'll create a trait `FromRef` to use for this pattern,
 where `View<J>: FromRef<J>` indicates that a view `&View<J>` can be constructed from a `&J` reference:
 
-```rust
+```rust,ignore
 pub trait FromRef<J> {
     fn from_ref(t: &J) -> &Self;
 }
@@ -147,7 +147,7 @@ pub trait FromRef<J> {
 
 A view struct is just a newtype on the underlying `J` type but with `#[repr(transparent)]`:
 
-```rust
+```rust,ignore
 #[repr(transparent)]
 pub struct View<J> {
     this: J,
@@ -158,7 +158,7 @@ The `#[repr(transparent)]` attribute ensures that `J` and `View<J>` have the sam
 and are treated equivalently in ABIs and the like. 
 Thanks to this, we can implement `FromRef` like so:
 
-```rust
+```rust,ignore
 impl FromRef<J> for View<J> {
     fn from_ref(t: &J) -> &Self {
         // Safe because of the `#[repr(transparent)]` attribute
@@ -177,7 +177,7 @@ The *method resolution order* for a type `T` is an ordered list of its transitiv
 
 For each class `X`, we define a *`ViewAsObj` struct* `ViewAsXObj<J, N>`:
 
-```rust
+```rust,ignore
 #[repr(transparent)]
 struct ViewAsXObj<J, N> {
     this: J,
@@ -194,7 +194,7 @@ The class has two type parameters:
 
 Each ViewAsObj struct includes a Deref that derefs to N:
 
-```rust
+```rust,ignore
 impl<J, N> Deref for ViewAsXObj<J, N> {
     type Target = N;
 
@@ -206,7 +206,7 @@ impl<J, N> Deref for ViewAsXObj<J, N> {
 
 So given `interface Foo extends Bar, Baz`, the type `Foo` would deref to
 
-```rust
+```rust,ignore
 ViewAsFooObj<Foo, ViewAsBarObj<Foo, ViewAsBazObj<Foo, ()>>>
 //           ---  -----------  ----------------------------------
 //           X    J            N
@@ -220,7 +220,7 @@ and so forth.
 
 Each op struct implements a trait `FromRef<J>`:
 
-```rust
+```rust,ignore
 trait FromRef<J> {
     fn from_ref(r: &J) -> &Self;
 }
@@ -230,7 +230,7 @@ The `from_ref` method allows constructing an op struct from an `&J` reference.
 Implementing this method requires a small bit of unsafe code, 
 leveraging the `repr(transparent)` attribute on each op struct:
 
-```rust
+```rust,ignore
 impl<J> FromRef<J> for ObjectOp<J>
 where
     J: IntoJava<Foo>,
@@ -249,7 +249,7 @@ also has inherent methods for each Java method.
 These are implemented by invoking the [fully qualified inherent functions]().
 For example, the ViewAsObj struct for `Object` includes a `to_string` method like so:
 
-```rust
+```rust,ignore
 impl<J, N> ViewAsObjectObj<J, N>
 where
     J: Upcast<Object>,
@@ -267,7 +267,7 @@ So we create them inside of a `const _: () = { .. }` block.
 But we do need *some* way to name them.
 We expose them via associated types of the `JavaView` trait:
 
-```rust
+```rust,ignore
 trait JavaView {
     type OfObj<J>: FromRef<J>;
     type OfObjWith<J, N>: FromRef<J>
@@ -279,7 +279,7 @@ trait JavaView {
 The `OfObj` associated type in particular provides the "default value" for `N` that defines the MRO.
 The `OfObjWith` is used to supply an explicit `N` value. For example:
 
-```rust
+```rust,ignore
 const _: () = {
     struct ViewAsFooObj<J, C> { ... }
     
@@ -299,7 +299,7 @@ The `ViewAsObj` structs allow you to invoke methods on a java object reference l
 But they do not allow you to invoke methods on some random [`JvmOp`] that happens to *return* a string.
 For that, we create a very similar set of `ViewAsOp` structs:
 
-```rust
+```rust,ignore
 #[repr(transparent)]
 struct ViewAsXOp<J, N> {
     this: J,
@@ -313,7 +313,7 @@ But the signature is slightly different; it is a `&self` method, but the `impl J
 Instead, it copies the `self.this` out. 
 This relies on the fact that all [`JvmOp`] values are `Copy`.
 
-```rust
+```rust,ignore
 impl<J, N> ViewAsObjectObj<J, N>
 where
     J: IntoJava<Object>,
@@ -336,7 +336,7 @@ The reason is that the `ViewAsObjectObj` traits are the output from `Deref` impl
 
 We also have to add a `Deref` impl to each of the op structs.
 
-```rust
+```rust,ignore
 struct SomeOp { }
 
 impl JvmOp for SomeOp {

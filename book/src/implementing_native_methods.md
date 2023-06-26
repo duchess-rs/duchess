@@ -23,7 +23,7 @@ public class ClassWithNativeMethod {
 
 you can provide an implementation for `compute` like so:
 
-```rust
+```rust,ignore
 // First, reflect the class, as described in the "calling Java from Rust" tutorial:
 duchess::java_package! {
     package me.ferris;

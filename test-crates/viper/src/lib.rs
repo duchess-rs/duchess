@@ -22,14 +22,14 @@ duchess::java_package! {
     class ArrayBuffer<A> implements scala.collection.StrictOptimizedSeqOps<
         A, scala.collection.mutable.ArrayBuffer, scala.collection.mutable.ArrayBuffer<A>
     > {
-        scala.collection.mutable.ArrayBuffer();
+        public scala.collection.mutable.ArrayBuffer();
     }
 
     package viper.silver.ast;
     class Bool {}
     class Domain {}
     class "NoTrafos$" implements viper.silver.ast.ErrorTrafo {
-        static viper.silver.ast."NoTrafos$" "MODULE$";
+        public static viper.silver.ast."NoTrafos$" "MODULE$";
     }
     class ExtensionMember {}
     class Field {}
@@ -37,10 +37,10 @@ duchess::java_package! {
     class Int {}
     class Method {}
     class "NoPosition$" implements viper.silver.ast.Position {
-        static viper.silver.ast."NoPosition$" "MODULE$";
+        public static viper.silver.ast."NoPosition$" "MODULE$";
     }
     class "NoInfo$" implements viper.silver.ast.Info {
-        static viper.silver.ast."NoInfo$" "MODULE$";
+        public static viper.silver.ast."NoInfo$" "MODULE$";
     }
     class Predicate {}
     class Program {
@@ -66,17 +66,17 @@ duchess::java_package! {
     package viper.silver.reporter;
     interface Reporter {}
     class "NoopReporter$" implements viper.silver.reporter.Reporter {
-        static viper.silver.reporter."NoopReporter$" "MODULE$";
+        public static viper.silver.reporter."NoopReporter$" "MODULE$";
     }
 
     package viper.silicon;
     class Silicon {
-        viper.silicon.Silicon();
+        public viper.silicon.Silicon();
     }
 
     package viper.carbon;
     class CarbonVerifier {
-        viper.carbon.CarbonVerifier(
+        public viper.carbon.CarbonVerifier(
             viper.silver.reporter.Reporter,
             scala.collection.immutable.Seq<scala.Tuple2<java.lang.String, java.lang.Object>>
         );

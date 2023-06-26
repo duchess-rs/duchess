@@ -146,7 +146,7 @@ impl Reflector {
         command
             .arg("-cp")
             .arg(classpath)
-            .arg("-public")
+            .arg("-p")
             .arg(format!("{}", class_name));
 
         let output_or_err = command.output();
@@ -232,8 +232,8 @@ impl Reflector {
     }
 }
 
-type ConstructorIndex = usize;
-type MethodIndex = usize;
+pub type ConstructorIndex = usize;
+pub type MethodIndex = usize;
 
 /// Reflection on something callable.
 #[derive(Clone, Debug)]

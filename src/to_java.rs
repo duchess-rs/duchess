@@ -1,9 +1,12 @@
 use std::{collections::HashMap, marker::PhantomData};
 
-use crate::{cast::Upcast, java, Jvm, JvmOp, Local};
+use crate::{
+    cast::Upcast, from_ref::FromRef, java, jvm::JavaView, Error, Global, Jvm, JvmOp, Local,
+};
 
 pub trait ToJava: Sized {
     type JvmOp<'a, J>: for<'jvm> JvmOp<Output<'jvm> = Option<Local<'jvm, J>>>
+        + std::ops::Deref<Target = <J as JavaView>::OfOp<Self::JvmOp<'a, J>>>
     where
         Self: 'a,
         Self: ToJavaImpl<J>,
@@ -59,6 +62,18 @@ where
 
     fn execute_with<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
         R::to_java_impl(self.rust, jvm)
+    }
+}
+
+impl<R, J> std::ops::Deref for ToJavaOp<'_, R, J>
+where
+    R: ToJavaImpl<J>,
+    J: Upcast<java::lang::Object> + Upcast<J>,
+{
+    type Target = <J as JavaView>::OfOp<Self>;
+
+    fn deref(&self) -> &Self::Target {
+        <Self::Target as FromRef<_>>::from_ref(self)
     }
 }
 
@@ -164,5 +179,109 @@ impl ToJavaImpl<java::Array<i8>> for Vec<u8> {
     ) -> crate::Result<'jvm, Option<Local<'jvm, java::Array<i8>>>> {
         let this: &Vec<i8> = unsafe { std::mem::transmute(rust) };
         ToJavaImpl::to_java_impl(this, jvm)
+    }
+}
+
+impl<J> ToJavaImpl<J> for Local<'_, J>
+where
+    J: Upcast<java::lang::Object>,
+{
+    fn to_java_impl<'jvm>(
+        rust: &Self,
+        jvm: &mut Jvm<'jvm>,
+    ) -> crate::Result<'jvm, Option<Local<'jvm, J>>> {
+        Ok(Some(jvm.local(rust)))
+    }
+}
+
+impl<J> ToJavaImpl<J> for Global<J>
+where
+    J: Upcast<java::lang::Object>,
+{
+    fn to_java_impl<'jvm>(
+        rust: &Self,
+        jvm: &mut Jvm<'jvm>,
+    ) -> crate::Result<'jvm, Option<Local<'jvm, J>>> {
+        Ok(Some(jvm.local(rust)))
+    }
+}
+
+impl<J> ToJavaImpl<J> for &J
+where
+    J: Upcast<java::lang::Object>,
+{
+    fn to_java_impl<'jvm>(
+        rust: &Self,
+        jvm: &mut Jvm<'jvm>,
+    ) -> crate::Result<'jvm, Option<Local<'jvm, J>>> {
+        Ok(Some(jvm.local(rust)))
+    }
+}
+
+impl<J, R> ToJavaImpl<J> for Option<R>
+where
+    J: Upcast<java::lang::Object>,
+    R: ToJavaImpl<J>,
+{
+    fn to_java_impl<'jvm>(
+        rust: &Self,
+        jvm: &mut Jvm<'jvm>,
+    ) -> crate::Result<'jvm, Option<Local<'jvm, J>>> {
+        match rust {
+            None => Ok(None),
+            Some(r) => R::to_java_impl(r, jvm),
+        }
+    }
+}
+
+impl<J, R> ToJavaImpl<J> for crate::Result<'_, R>
+where
+    J: Upcast<java::lang::Object>,
+    R: ToJavaImpl<J>,
+{
+    fn to_java_impl<'jvm>(
+        rust: &Self,
+        jvm: &mut Jvm<'jvm>,
+    ) -> crate::Result<'jvm, Option<Local<'jvm, J>>> {
+        match rust {
+            Ok(r) => R::to_java_impl(r, jvm),
+            Err(e) => match e {
+                Error::Thrown(t) => Err(Error::Thrown(jvm.local(t))),
+                Error::SliceTooLong(t) => Err(Error::SliceTooLong(*t)),
+                Error::NullDeref => Err(Error::NullDeref),
+                Error::NestedUsage => Err(Error::NestedUsage),
+                Error::JvmAlreadyExists => Err(Error::JvmAlreadyExists),
+                Error::UnableToLoadLibjvm(t) => Err(Error::UnableToLoadLibjvm(
+                    format!("UnableToLoadLibjvm({t:?})").as_str().into(), // FIXME: should to_java_impl be `self` ?
+                )),
+                Error::JvmInternal(t) => Err(Error::JvmInternal(t.clone())),
+            },
+        }
+    }
+}
+
+impl<J, R> ToJavaImpl<J> for crate::GlobalResult<R>
+where
+    J: Upcast<java::lang::Object>,
+    R: ToJavaImpl<J>,
+{
+    fn to_java_impl<'jvm>(
+        rust: &Self,
+        jvm: &mut Jvm<'jvm>,
+    ) -> crate::Result<'jvm, Option<Local<'jvm, J>>> {
+        match rust {
+            Ok(r) => R::to_java_impl(r, jvm),
+            Err(e) => match e {
+                Error::Thrown(t) => Err(Error::Thrown(jvm.local(t))),
+                Error::SliceTooLong(t) => Err(Error::SliceTooLong(*t)),
+                Error::NullDeref => Err(Error::NullDeref),
+                Error::NestedUsage => Err(Error::NestedUsage),
+                Error::JvmAlreadyExists => Err(Error::JvmAlreadyExists),
+                Error::UnableToLoadLibjvm(t) => Err(Error::UnableToLoadLibjvm(
+                    format!("UnableToLoadLibjvm({t:?})").as_str().into(), // FIXME: should to_java_impl be `self` ?
+                )),
+                Error::JvmInternal(t) => Err(Error::JvmInternal(t.clone())),
+            },
+        }
     }
 }
