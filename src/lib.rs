@@ -29,6 +29,7 @@ pub use into_rust::IntoRust;
 pub use jvm::JavaObject;
 pub use jvm::JavaType;
 pub use jvm::Jvm;
+pub use link::JavaFunction;
 pub use ref_::{Global, Local};
 pub use refs::{AsJRef, JDeref, NullJRef, Nullable, TryJDeref};
 pub use try_catch::TryCatch;
