@@ -150,7 +150,7 @@ where
     R: ToJavaImpl<J>,
 {
     init_jvm_from_native_function(env);
-    let old_state = thread::attach_from_jni_callback(env);
+    let _callback_guard = thread::attach_from_jni_callback(env);
 
     let result = match std::panic::catch_unwind(AssertUnwindSafe(|| op())) {
         Ok(result) => {
@@ -169,8 +169,6 @@ where
         }
     };
 
-    thread::detach_from_jni_callback(env, old_state);
-
     result
 }
 
@@ -188,7 +186,7 @@ where
     R: JavaScalar,
 {
     init_jvm_from_native_function(env);
-    let old_state = thread::attach_from_jni_callback(env);
+    let _callback_guard = thread::attach_from_jni_callback(env);
 
     let result = match std::panic::catch_unwind(AssertUnwindSafe(|| op())) {
         Ok(result) => result,
@@ -197,8 +195,6 @@ where
             R::default()
         }
     };
-
-    thread::detach_from_jni_callback(env, old_state);
 
     result
 }
