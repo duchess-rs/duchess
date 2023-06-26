@@ -1,9 +1,12 @@
 use std::{collections::HashMap, marker::PhantomData};
 
-use crate::{cast::Upcast, java, Error, Global, Jvm, JvmOp, Local};
+use crate::{
+    cast::Upcast, from_ref::FromRef, java, jvm::JavaView, Error, Global, Jvm, JvmOp, Local,
+};
 
 pub trait ToJava: Sized {
     type JvmOp<'a, J>: for<'jvm> JvmOp<Output<'jvm> = Option<Local<'jvm, J>>>
+        + std::ops::Deref<Target = <J as JavaView>::OfOp<Self::JvmOp<'a, J>>>
     where
         Self: 'a,
         Self: ToJavaImpl<J>,
@@ -59,6 +62,18 @@ where
 
     fn execute_with<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
         R::to_java_impl(self.rust, jvm)
+    }
+}
+
+impl<R, J> std::ops::Deref for ToJavaOp<'_, R, J>
+where
+    R: ToJavaImpl<J>,
+    J: Upcast<java::lang::Object> + Upcast<J>,
+{
+    type Target = <J as JavaView>::OfOp<Self>;
+
+    fn deref(&self) -> &Self::Target {
+        <Self::Target as FromRef<_>>::from_ref(self)
     }
 }
 

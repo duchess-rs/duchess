@@ -11,7 +11,10 @@ use duchess::Local;
 // and produce a Java list of Java objects.
 fn produce_from_local_rust_vec(r: &Vec<Local<'_, JavaString>>) {
     duchess::Jvm::with(|jvm| {
-        let _data: Option<Local<'_, JavaList<JavaString>>> = r.to_java().execute_with(jvm).unwrap();
+        let _data: Option<Local<'_, JavaList<JavaString>>> = r
+            .to_java::<JavaList<JavaString>>()
+            .execute_with(jvm)
+            .unwrap();
         Ok(())
     })
     .unwrap();
