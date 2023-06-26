@@ -14,7 +14,6 @@ This argument `X` can have the following forms:
 
 `#[java_function]` requires the decorated function to have the following arguments:
 
-* (Optional) JVM environment `env: &mut JvmEnv<'_>` -- must be named `env`!
 * If not static, a `this` parameter -- can have any name, but we recommend `this`
 * One parameter per Java argument -- can have any name, but we recommend matching the names used in Java
 
