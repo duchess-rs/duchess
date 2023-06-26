@@ -29,4 +29,4 @@ jobs:
     - name: Test client crates
       run: cargo test --all-targets --verbose --manifest-path=test-crates/Cargo.toml
     - name: Test book
-      run: mdbook test book
+      run: ./mdbook test book

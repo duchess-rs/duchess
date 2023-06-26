@@ -2,6 +2,10 @@
 
 The `java_function` macro is used to implement native functions. Make sure to read about how you [link these native functions into the JVM](./linking_native_functions.md).
 
+## Examples
+
+Just want to see the code? Read [the `greeting` example](https://github.com/duchess-rs/duchess/blob/main/examples/greeting.rs) to see the setup in action.
+
 ## Specifying which function you are defining
 
 The `#[java_function(X)]` takes an argument `X` that specifies which Java function is being defined.
