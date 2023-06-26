@@ -10,7 +10,7 @@ How the generated code works and why.
 
 Java objects are represented by a dummy struct:
 
-```rust
+```rust,ignore
 pub struct MyObject {
     _dummy: ()
 }
@@ -18,7 +18,7 @@ pub struct MyObject {
 
 which implements the `JavaObject` trait:
 
-```rust
+```rust,ignore
 unsafe impl JavaObject for MyObject { }
 ```
 
@@ -61,7 +61,7 @@ Covers various bits of rationale.
 
 We do not want users to have to supply a context object on every method call, so instead we take the lifetime of the returned java reference and tie it to the inputs:
 
-```rust
+```rust,ignore
 // from Java, and ignoring exceptions / null for clarity:
 //
 // class MyObject { ReturnType some_method(); }
@@ -81,7 +81,7 @@ We have a conflict:
 * Either we make every method take a jdk pointer context.
 * Or... we go into a suspended mode...
 
-```rust
+```rust,ignore
 MyObject::new(x, y, z)
     .execute(jdk);
 

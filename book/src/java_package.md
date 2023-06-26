@@ -68,7 +68,7 @@ This will generate a Rust module structure containing:
 
 For the example above we would get
 
-```rust
+```rust,ignore
 pub mod my {
     pub mod package {
         // References to java types branch to duchess; other references
@@ -126,7 +126,7 @@ class C2 { }
 
 This allows the macro to generate combined Rust modules:
 
-```rust
+```rust,ignore
 pub mod foo {
     pub mod bar { 
         pub struct C1 { .. }
@@ -173,7 +173,7 @@ class C2 { /* you don't have to oxidize any further details */ }
 
 When your classes reference other packages that are not currently being oxidixed, duchess will simply generate a reference to those classes. Its your responsibility to bring them into scope.
 
-```rust
+```rust,ignore
 // Bring `q` into scope from somewhere else
 use some_rust_crate::q;
 

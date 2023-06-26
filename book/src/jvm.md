@@ -17,7 +17,7 @@ Multiple threads can invoke `Jvm::with`, but only one underlying JVM can ever be
 
 When you start the JVM from your Rust code, you can set various options by using the jvm builder:
 
-```rust
+```rust,ignore
 Jvm::builder()
     .add_classpath("foo")
     .add_classpath("bar")

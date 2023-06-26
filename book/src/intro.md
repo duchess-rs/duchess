@@ -11,7 +11,7 @@ Duchess is a Rust crate that makes it easy, ergonomic, and efficient to interope
 
 Duchess permits you to reflect Java classes into Rust and easily invoke methods on Java objects. For example the following Java code...
 
-```rust
+```rust,ignore
 Logger logger = new log.Logger();
 logger.addEvent(
     Event.builder()
@@ -23,7 +23,7 @@ logger.addEvent(
 
 ...could be executed in Rust as follows:
 
-```rust
+```rust,ignore
 let logger = log::Logger::new().global().execute()?;
 logger
     .add_event(
