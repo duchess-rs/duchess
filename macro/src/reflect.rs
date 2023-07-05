@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::BTreeMap, env, process::Command, sync::Arc};
+use std::{cell::RefCell, collections::BTreeMap, env, process::Command, sync::Arc, path::PathBuf};
 
 use proc_macro2::Span;
 
@@ -136,13 +136,18 @@ impl Reflector {
             return Ok(class);
         }
 
-        let mut command = Command::new("javap");
+        let mut javap_path = PathBuf::new();
+        if let Ok(java_home) = env::var("JAVA_HOME") {
+            javap_path.extend([java_home.as_str(), "bin"]);
+        }
+        javap_path.push("javap");
 
         let classpath = match env::var("CLASSPATH") {
             Ok(val) => val,
             Err(e) => panic!("duchess cannot read the CLASSPATH environment variable: {e}"),
         };
 
+        let mut command = Command::new(javap_path);
         command
             .arg("-cp")
             .arg(classpath)
