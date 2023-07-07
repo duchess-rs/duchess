@@ -18,5 +18,24 @@ fn main() -> color_eyre::eyre::Result<()> {
     // Make sure we can depend on duchess itself in our tests
     config.dependencies_crate_manifest_path = Some("Cargo.toml".into());
 
-    run_tests(config)
+    let test_name = std::env::var_os("TESTNAME");
+
+    run_tests_generic(
+        config,
+        move |path| {
+            test_name
+                .as_ref()
+                .and_then(|name| {
+                    Some(path.components().any(|c| {
+                        c.as_os_str()
+                            .to_string_lossy()
+                            .contains(&*name.to_string_lossy())
+                    }))
+                })
+                .unwrap_or(true)
+                && path.extension().map(|ext| ext == "rs").unwrap_or(false)
+        },
+        |_, _| None,
+        status_emitter::TextAndGha,
+    )
 }
