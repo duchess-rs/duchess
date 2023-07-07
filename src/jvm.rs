@@ -16,7 +16,7 @@ use crate::{
 use std::{
     any::Any,
     collections::HashMap,
-    ffi::{c_void, CStr},
+    ffi::{c_char, c_void, CStr},
     fmt::Display,
     panic::AssertUnwindSafe,
     ptr::NonNull,
@@ -283,8 +283,8 @@ impl<'jvm> Jvm<'jvm> {
                 .entry(class)
                 .or_insert(vec![])
                 .push(jni_sys::JNINativeMethod {
-                    name: java_function.name.as_ptr() as *mut i8,
-                    signature: java_function.signature.as_ptr() as *mut i8,
+                    name: java_function.name.as_ptr() as *mut c_char,
+                    signature: java_function.signature.as_ptr() as *mut c_char,
                     fnPtr: java_function.pointer.as_ptr() as *mut c_void,
                 });
         }
