@@ -1,4 +1,4 @@
-use std::ffi::CString;
+use std::ffi::{c_char, CString};
 
 use crate::{
     error::check_exception, into_rust::IntoRust, java::lang::String as JavaString,
@@ -76,7 +76,7 @@ impl IntoRust<String> for &JavaString {
                         str_raw.as_ptr(),
                         0,
                         utf16_len,
-                        cesu_bytes.as_mut_ptr().cast::<i8>(),
+                        cesu_bytes.as_mut_ptr().cast::<c_char>(),
                     )
                 },
             );
