@@ -94,7 +94,10 @@ impl Driver<'_> {
         let variants = order_by_specificity(&variant_classes, &upcasts);
         // Root must be upcast of all children, so must come last when ordered by specificity!
         let Some((&root, children)) = variants.split_last() else {
-            return Err(syn::Error::new(self.span(), "enum must have at least one variant"));
+            return Err(syn::Error::new(
+                self.span(),
+                "enum must have at least one variant",
+            ));
         };
         if root.class.name != root_path.to_dot_id() {
             return Err(syn::Error::new(

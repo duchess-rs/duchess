@@ -103,7 +103,9 @@ pub(crate) unsafe fn try_create_jvm<'a>(
     match code {
         jni_sys::JNI_OK => {
             let Some(jvm) = JvmPtr::new(jvm) else {
-                return Err(Error::JvmInternal("JNI_CreateJavaVM returned null pointer".into()));
+                return Err(Error::JvmInternal(
+                    "JNI_CreateJavaVM returned null pointer".into(),
+                ));
             };
             // Undo default attaching of current thread like the jni crate does
             unsafe { jvm.detach_thread() }?;

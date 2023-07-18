@@ -6,7 +6,6 @@ use quote::quote_spanned;
 
 use crate::{
     parse::{Parse, TextAccum},
-    span_error::SpanError,
     upcasts::Upcasts,
 };
 
@@ -75,7 +74,7 @@ pub enum ClassDecl {
 }
 
 impl Parse for ClassDecl {
-    fn parse(p: &mut crate::parse::Parser) -> Result<Option<Self>, SpanError> {
+    fn parse(p: &mut crate::parse::Parser) -> syn::Result<Option<Self>> {
         // Look for a keyword that could start a class definition.
         let Some(t0) = p.peek_token() else {
             return Ok(None);
@@ -145,7 +144,7 @@ pub struct ClassInfo {
 }
 
 impl ClassInfo {
-    pub fn parse(text: &str, span: Span) -> Result<ClassInfo, SpanError> {
+    pub fn parse(text: &str, span: Span) -> syn::Result<ClassInfo> {
         javap::parse_class_info(span, &text)
     }
 

@@ -6,7 +6,6 @@ use crate::{
     },
     reflect::Reflector,
     signature::Signature,
-    span_error::SpanError,
     upcasts::Upcasts,
 };
 use inflector::Inflector;
@@ -14,7 +13,7 @@ use proc_macro2::{Ident, Literal, Span, TokenStream};
 use quote::quote_spanned;
 
 impl DuchessDeclaration {
-    pub fn to_tokens(&self) -> Result<TokenStream, SpanError> {
+    pub fn to_tokens(&self) -> syn::Result<TokenStream> {
         let reflector = &mut Reflector::default();
         let root_map = self.to_root_map(reflector)?;
         let () = root_map.check(reflector)?;
@@ -23,7 +22,7 @@ impl DuchessDeclaration {
 }
 
 impl RootMap {
-    fn to_tokens(self, reflector: &mut Reflector) -> Result<TokenStream, SpanError> {
+    fn to_tokens(self, reflector: &mut Reflector) -> syn::Result<TokenStream> {
         self.to_packages()
             .map(|p| p.to_tokens(&[], &self, reflector))
             .collect()
@@ -36,7 +35,7 @@ impl SpannedPackageInfo {
         parents: &[Id],
         root_map: &RootMap,
         reflector: &mut Reflector,
-    ) -> Result<TokenStream, SpanError> {
+    ) -> syn::Result<TokenStream> {
         let package_id = DotId::new(parents, &self.name);
         let name = self.name.to_ident(self.span);
 
@@ -74,7 +73,7 @@ impl SpannedPackageInfo {
 }
 
 impl ClassInfo {
-    pub fn to_tokens(&self, upcasts: &Upcasts) -> Result<TokenStream, SpanError> {
+    pub fn to_tokens(&self, upcasts: &Upcasts) -> syn::Result<TokenStream> {
         let struct_name = self.struct_name();
         let cached_class = self.cached_class();
         let this_ty = self.this_type();
@@ -241,7 +240,7 @@ impl ClassInfo {
         upcasts: &Upcasts,
         op_struct_methods: Vec<TokenStream>,
         obj_struct_methods: Vec<TokenStream>,
-    ) -> Result<TokenStream, SpanError> {
+    ) -> syn::Result<TokenStream> {
         let name = self.struct_name();
         let java_class_generics = self.class_generic_names();
 
@@ -384,7 +383,7 @@ impl ClassInfo {
     /// refine the return type.
     ///
     /// [mro]: https://duchess-rs.github.io/duchess/methods.html#method-resolution-order
-    fn mro(&self, upcasts: &Upcasts) -> Result<Vec<TokenStream>, SpanError> {
+    fn mro(&self, upcasts: &Upcasts) -> syn::Result<Vec<TokenStream>> {
         let class_refs = upcasts.upcasts_for_generated_class(&self.name);
         class_refs
             .iter()
@@ -396,7 +395,7 @@ impl ClassInfo {
             .collect()
     }
 
-    fn upcast_impls(&self, upcasts: &Upcasts) -> Result<TokenStream, SpanError> {
+    fn upcast_impls(&self, upcasts: &Upcasts) -> syn::Result<TokenStream> {
         let struct_name = self.struct_name();
         let java_class_generics = self.class_generic_names();
         Ok(self.mro(upcasts)?
@@ -428,7 +427,7 @@ impl ClassInfo {
         }
     }
 
-    fn constructor(&self, constructor: &Constructor) -> Result<TokenStream, SpanError> {
+    fn constructor(&self, constructor: &Constructor) -> syn::Result<TokenStream> {
         let mut sig = Signature::new(self.name.class_name(), self.span, &self.generics);
 
         let input_traits: Vec<_> = constructor
@@ -585,7 +584,7 @@ impl ClassInfo {
     ///
     /// NB. This function (particularly the JvmOp impl) has significant overlap with `static_method`
     /// and `static_field_getter`, so if you make changes here, you may well need changes there.
-    fn op_struct_method(&self, method: &Method) -> Result<TokenStream, SpanError> {
+    fn op_struct_method(&self, method: &Method) -> syn::Result<TokenStream> {
         let mut sig = Signature::new(&method.name, self.span, &self.generics)
             .with_internal_generics(&method.generics)?;
 
@@ -639,7 +638,7 @@ impl ClassInfo {
         Ok(inherent_method)
     }
 
-    fn obj_struct_method(&self, method: &Method) -> Result<TokenStream, SpanError> {
+    fn obj_struct_method(&self, method: &Method) -> syn::Result<TokenStream> {
         let mut sig = Signature::new(&method.name, self.span, &self.generics)
             .with_internal_generics(&method.generics)?;
 
@@ -693,7 +692,7 @@ impl ClassInfo {
         Ok(inherent_method)
     }
 
-    fn inherent_object_method(&self, method: &Method) -> Result<TokenStream, SpanError> {
+    fn inherent_object_method(&self, method: &Method) -> syn::Result<TokenStream> {
         let mut sig = Signature::new(&method.name, self.span, &self.generics)
             .with_internal_generics(&method.generics)?;
 
@@ -905,7 +904,7 @@ impl ClassInfo {
     ///
     /// NB. This function (particularly the JvmOp impl) has significant overlap with `object_method`
     /// and `static_field_getter`, so if you make changes here, you may well need changes there.
-    fn static_method(&self, method: &Method) -> Result<TokenStream, SpanError> {
+    fn static_method(&self, method: &Method) -> syn::Result<TokenStream> {
         assert!(method.flags.is_static);
 
         let mut sig = Signature::new(&method.name, self.span, &self.generics)
@@ -1094,7 +1093,7 @@ impl ClassInfo {
     ///
     /// NB. This function (particularly the JvmOp impl) has significant overlap with `object_method`
     /// and `static_method`, so if you make changes here, you may well need changes there.
-    fn static_field_getter(&self, field: &Field) -> Result<TokenStream, SpanError> {
+    fn static_field_getter(&self, field: &Field) -> syn::Result<TokenStream> {
         assert!(field.flags.is_static);
 
         let mut sig = Signature::new(&field.name, self.span, &self.generics);

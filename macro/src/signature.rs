@@ -1,7 +1,6 @@
-use crate::{
-    class_info::{ClassRef, Generic, Id, NonRepeatingType, RefType, ScalarType, Type},
-    span_error::SpanError,
-};
+use std::f32::consts::E;
+
+use crate::class_info::{ClassRef, Generic, Id, NonRepeatingType, RefType, ScalarType, Type};
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote_spanned;
 
@@ -67,7 +66,7 @@ impl Signature {
     /// added to `self.rust_generics` and `self.where_clauses`, so that in the end
     /// the caller has a unified list of all the generics that have to be declared on
     /// the Rust method.
-    pub fn with_internal_generics(self, internal_generics: &[Generic]) -> Result<Self, SpanError> {
+    pub fn with_internal_generics(self, internal_generics: &[Generic]) -> syn::Result<Self> {
         let mut s = self;
 
         s.in_scope_generics
@@ -87,7 +86,7 @@ impl Signature {
                         .push(quote_spanned!(s.span => #ident : duchess::AsJRef<#ty>));
                 }
             }
-            Ok(())
+            Ok::<(), syn::Error>(())
         })?;
 
         Ok(s)
@@ -108,12 +107,10 @@ impl Signature {
     /// translated to a Rust type like `ArrayList<Pi>` for some fresh `Pi`.
     ///
     /// See also `Self::push_where_bound`.
-    fn fresh_generic(&mut self) -> Result<Ident, SpanError> {
+    fn fresh_generic(&mut self) -> syn::Result<Ident> {
         if !self.capture_generics {
-            Err(SpanError {
-                span: self.span,
-                message: format!("unsupported wildcards in `{}`", self.item_name),
-            })
+            let msg = format!("unsupported wildcards in `{}`", self.item_name);
+            Err(syn::Error::new(self.span, msg))
         } else {
             let mut i = self.rust_generics.len();
             loop {
@@ -141,7 +138,7 @@ impl Signature {
 
     /// Returns an appropriate `impl type` for a funtion that
     /// takes `ty` as input. Assumes objects are nullable.
-    pub fn input_trait(&mut self, ty: &Type) -> Result<TokenStream, SpanError> {
+    pub fn input_trait(&mut self, ty: &Type) -> syn::Result<TokenStream> {
         match ty.to_non_repeating() {
             NonRepeatingType::Ref(ty) => {
                 let t = self.java_ref_ty(&ty)?;
@@ -156,7 +153,7 @@ impl Signature {
 
     /// Returns an appropriate `impl type` for a function that
     /// returns a `ty` or void. Assumes objects are nullable.
-    pub fn output_type(&mut self, ty: &Option<Type>) -> Result<TokenStream, SpanError> {
+    pub fn output_type(&mut self, ty: &Option<Type>) -> syn::Result<TokenStream> {
         match ty.as_ref() {
             Some(ty) => self.non_void_output_type(ty),
             None => Ok(quote_spanned!(self.span => ())),
@@ -165,7 +162,7 @@ impl Signature {
 
     /// Returns an appropriate `impl type` for a function that
     /// returns `ty`. Assumes objects are nullable.
-    pub fn non_void_output_type(&mut self, ty: &Type) -> Result<TokenStream, SpanError> {
+    pub fn non_void_output_type(&mut self, ty: &Type) -> syn::Result<TokenStream> {
         // XX: do we need the non_repeating transform here? Shouldn't be allowed in return position
         self.forbid_capture(|this| match ty.to_non_repeating() {
             NonRepeatingType::Ref(ty) => {
@@ -179,17 +176,17 @@ impl Signature {
         })
     }
 
-    pub fn jni_call_fn(&mut self, ty: &Option<Type>) -> Result<Ident, SpanError> {
+    pub fn jni_call_fn(&mut self, ty: &Option<Type>) -> syn::Result<Ident> {
         let f = match ty {
             Some(Type::Ref(_)) => "CallObjectMethodA",
             Some(Type::Repeat(_)) => {
-                return Err(SpanError {
-                    span: self.span,
-                    message: format!(
+                return Err(syn::Error::new(
+                    self.span,
+                    format!(
                         "unsupported repeating return type in method `{}`",
                         self.item_name
                     ),
-                })
+                ))
             }
             Some(Type::Scalar(scalar)) => match scalar {
                 ScalarType::Int => "CallIntMethodA",
@@ -206,17 +203,15 @@ impl Signature {
         Ok(Ident::new(f, self.span))
     }
 
-    pub fn jni_static_call_fn(&mut self, ty: &Option<Type>) -> Result<Ident, SpanError> {
+    pub fn jni_static_call_fn(&mut self, ty: &Option<Type>) -> syn::Result<Ident> {
         let f = match ty {
             Some(Type::Ref(_)) => "CallStaticObjectMethodA",
             Some(Type::Repeat(_)) => {
-                return Err(SpanError {
-                    span: self.span,
-                    message: format!(
-                        "unsupported repeating return type in static method `{}`",
-                        self.item_name
-                    ),
-                })
+                let msg = format!(
+                    "unsupported repeating return type in static method `{}`",
+                    self.item_name
+                );
+                return Err(syn::Error::new(self.span, msg));
             }
             Some(Type::Scalar(scalar)) => match scalar {
                 ScalarType::Int => "CallStaticIntMethodA",
@@ -233,17 +228,15 @@ impl Signature {
         Ok(Ident::new(f, self.span))
     }
 
-    pub fn jni_static_field_get_fn(&mut self, ty: &Type) -> Result<Ident, SpanError> {
+    pub fn jni_static_field_get_fn(&mut self, ty: &Type) -> syn::Result<Ident> {
         let f = match ty {
             Type::Ref(_) => "GetStaticObjectField",
             Type::Repeat(_) => {
-                return Err(SpanError {
-                    span: self.span,
-                    message: format!(
-                        "unsupported repeating type in getter of static field `{}`",
-                        self.item_name
-                    ),
-                })
+                let msg = format!(
+                    "unsupported repeating type in getter of static field `{}`",
+                    self.item_name
+                );
+                return Err(syn::Error::new(self.span, msg));
             }
             Type::Scalar(scalar) => match scalar {
                 ScalarType::Int => "GetStaticIntField",
@@ -261,7 +254,7 @@ impl Signature {
 
     /// Returns an appropriate trait for a method that
     /// returns `ty`. Assumes objects are nullable.
-    pub fn method_trait(&mut self, ty: &Option<Type>) -> Result<TokenStream, SpanError> {
+    pub fn method_trait(&mut self, ty: &Option<Type>) -> syn::Result<TokenStream> {
         self.forbid_capture(|this| match ty.as_ref().map(|ty| ty.to_non_repeating()) {
             Some(NonRepeatingType::Ref(ty)) => {
                 let t = this.java_ref_ty(&ty)?;
@@ -277,7 +270,7 @@ impl Signature {
 
     /// Returns an appropriate trait for a field that
     /// returns `ty`. Assumes objects are nullable.
-    pub fn field_trait(&mut self, ty: &Type) -> Result<TokenStream, SpanError> {
+    pub fn field_trait(&mut self, ty: &Type) -> syn::Result<TokenStream> {
         self.forbid_capture(|this| match ty.to_non_repeating() {
             NonRepeatingType::Ref(ty) => {
                 let t = this.java_ref_ty(&ty)?;
@@ -293,7 +286,7 @@ impl Signature {
     /// Returns the Rust type that represents this Java type -- e.g., for `Object`,
     /// returns `java::lang::Object`. Note that this is not the type of a *reference* to this
     /// java type (which would be e.g. `Global<java::lang::Object>`).
-    pub fn java_ty(&mut self, ty: &Type) -> Result<TokenStream, SpanError> {
+    pub fn java_ty(&mut self, ty: &Type) -> syn::Result<TokenStream> {
         match &ty.to_non_repeating() {
             NonRepeatingType::Ref(ty) => self.java_ref_ty(ty),
             NonRepeatingType::Scalar(ty) => Ok(self.java_scalar_ty(ty)),
@@ -301,14 +294,14 @@ impl Signature {
     }
 
     /// Like `java_ty`, but only for reference types (returns `None` for scalars).
-    pub fn java_ty_if_ref(&mut self, ty: &Type) -> Result<Option<TokenStream>, SpanError> {
+    pub fn java_ty_if_ref(&mut self, ty: &Type) -> syn::Result<Option<TokenStream>> {
         match &ty.to_non_repeating() {
             NonRepeatingType::Ref(ty) => Ok(Some(self.java_ref_ty(ty)?)),
             NonRepeatingType::Scalar(_) => Ok(None),
         }
     }
 
-    fn java_ref_ty(&mut self, ty: &RefType) -> Result<TokenStream, SpanError> {
+    fn java_ref_ty(&mut self, ty: &RefType) -> syn::Result<TokenStream> {
         match ty {
             RefType::Class(ty) => Ok(self.class_ref_ty(ty)?),
             RefType::Array(e) => {
@@ -320,13 +313,11 @@ impl Signature {
                     let t = t.to_ident(self.span);
                     Ok(quote_spanned!(self.span => #t))
                 } else {
-                    Err(SpanError {
-                        span: self.span,
-                        message: format!(
-                            "generic type parameter `{:?}` not among in-scope parameters: {:?}",
-                            t, self.in_scope_generics,
-                        ),
-                    })
+                    let msg = format!(
+                        "generic type parameter `{:?}` not among in-scope parameters: {:?}",
+                        t, self.in_scope_generics
+                    );
+                    Err(syn::Error::new(self.span, msg))
                 }
             }
             RefType::Extends(ty) => {
@@ -347,7 +338,7 @@ impl Signature {
         }
     }
 
-    pub fn class_ref_ty(&mut self, ty: &ClassRef) -> Result<TokenStream, SpanError> {
+    pub fn class_ref_ty(&mut self, ty: &ClassRef) -> syn::Result<TokenStream> {
         let ClassRef { name, generics } = ty;
         let rust_name = name.to_module_name(self.span);
         if generics.len() == 0 {

@@ -3,7 +3,6 @@ use proc_macro2::Span;
 use crate::{
     class_info::{ClassDecl, ClassInfo, DotId, Id},
     parse::{Parse, Parser},
-    span_error::SpanError,
 };
 
 pub struct DuchessDeclaration {
@@ -11,7 +10,7 @@ pub struct DuchessDeclaration {
 }
 
 impl Parse for DuchessDeclaration {
-    fn parse(p: &mut Parser) -> Result<Option<Self>, SpanError> {
+    fn parse(p: &mut Parser) -> syn::Result<Option<Self>> {
         let packages = JavaPackage::parse_many(p)?;
         Ok(Some(DuchessDeclaration { packages }))
     }
@@ -77,24 +76,24 @@ impl MethodSelector {
 }
 
 impl Parse for MethodSelector {
-    fn parse(p: &mut crate::parse::Parser) -> Result<Option<Self>, SpanError> {
+    fn parse(p: &mut crate::parse::Parser) -> syn::Result<Option<Self>> {
         // Check for a `class` declaration
         if let Some(c) = ClassDecl::parse(p)? {
             return match c {
-                ClassDecl::Reflected(r) => Err(SpanError {
-                    span: r.span,
-                    message: format!("expected a class with a single member, not `*`"),
-                }),
+                ClassDecl::Reflected(r) => Err(syn::Error::new(
+                    r.span,
+                    format!("expected a class with a single member, not `*`"),
+                )),
                 ClassDecl::Specified(c) => {
                     let members = c.constructors.len() + c.fields.len() + c.methods.len();
                     if members != 1 {
-                        Err(SpanError {
-                            span: c.span,
-                            message: format!(
+                        Err(syn::Error::new(
+                            c.span,
+                            format!(
                                 "expected a class with exactly one member, but {} members found",
                                 members
                             ),
-                        })
+                        ))
                     } else {
                         Ok(Some(MethodSelector::ClassInfo(c)))
                     }
@@ -113,10 +112,10 @@ impl Parse for MethodSelector {
                     return Ok(Some(MethodSelector::MethodName(path, ident)));
                 }
             }
-            Err(SpanError {
-                span: p.peek_span().unwrap_or(Span::call_site()),
-                message: format!("expected method name after `::`"),
-            })
+            Err(syn::Error::new(
+                p.peek_span().unwrap_or(Span::call_site()),
+                "expected method name after `::`",
+            ))
         } else {
             Ok(Some(MethodSelector::ClassName(path)))
         }
@@ -133,17 +132,23 @@ pub struct JavaPackage {
 }
 
 impl Parse for JavaPackage {
-    fn parse(p: &mut Parser) -> Result<Option<Self>, SpanError> {
+    fn parse(p: &mut Parser) -> syn::Result<Option<Self>> {
         let Some(()) = p.eat_keyword("package") else {
             return Ok(None);
         };
 
         let Some(package_name) = JavaPath::parse(p)? else {
-            return Err(p.error("expected package name"));
+            return Err(syn::Error::new(
+                p.last_span().unwrap(),
+                "expected package name",
+            ));
         };
 
         let Some(_) = p.eat_punct(';') else {
-            return Err(p.error("expected `;` after package name"));
+            return Err(syn::Error::new(
+                p.last_span().unwrap(),
+                "expected `;` after package name",
+            ));
         };
 
         let classes = ClassDecl::parse_many(p)?;
@@ -171,7 +176,7 @@ impl JavaPath {
 }
 
 impl Parse for JavaPath {
-    fn parse(p: &mut Parser) -> Result<Option<Self>, SpanError> {
+    fn parse(p: &mut Parser) -> syn::Result<Option<Self>> {
         let Some(text) = Ident::parse(p)? else {
             return Ok(None);
         };
@@ -181,7 +186,10 @@ impl Parse for JavaPath {
 
         while let Some(_) = p.eat_punct('.') {
             let Some(next) = Ident::parse(p)? else {
-                return Err(SpanError { span: p.last_span().unwrap(), message: format!("expected identifier after `.`") });
+                return Err(syn::Error::new(
+                    p.last_span().unwrap(),
+                    format!("expected identifier after `.`"),
+                ));
             };
             span = span.join(next.span).unwrap_or(span);
             ids.push(next);
@@ -221,7 +229,7 @@ impl Ident {
 }
 
 impl Parse for Ident {
-    fn parse(p: &mut Parser) -> Result<Option<Self>, SpanError> {
+    fn parse(p: &mut Parser) -> syn::Result<Option<Self>> {
         let Some(text) = p.eat_ident() else {
             return Ok(None);
         };
