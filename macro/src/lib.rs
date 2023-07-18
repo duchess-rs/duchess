@@ -12,7 +12,6 @@ mod java_function;
 mod parse;
 mod reflect;
 mod signature;
-mod span_error;
 mod substitution;
 mod upcasts;
 
