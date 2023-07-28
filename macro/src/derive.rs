@@ -214,7 +214,7 @@ impl Driver<'_> {
             }
 
             impl duchess::plumbing::ToJavaImpl<#root_class_name> for #self_ty {
-                fn to_java_impl<'jvm>(rust: &Self, jvm: &mut duchess::Jvm<'jvm>) -> duchess::Result<'jvm, Option<duchess::Local<'jvm, #root_class_name>>> {
+                fn to_java_impl<'jvm>(rust: &Self, jvm: &mut duchess::Jvm<'jvm>) -> duchess::Result<'jvm, ::core::option::Option<duchess::Local<'jvm, #root_class_name>>> {
                     Ok(Some(duchess::JvmOp::execute_with(rust, jvm)?))
                 }
             }

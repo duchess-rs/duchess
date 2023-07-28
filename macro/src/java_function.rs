@@ -129,7 +129,7 @@ pub fn java_function(selector: MethodSelector, input: syn::ItemFn) -> syn::Resul
 
         // Create a dummy type to represent this function (uninstantiable)
         #[allow(non_camel_case_types)]
-        #vis struct #input_fn_name { _private: std::convert::Infallible }
+        #vis struct #input_fn_name { _private: ::core::convert::Infallible }
 
         // Include the input from the user unchanged.
         #input
