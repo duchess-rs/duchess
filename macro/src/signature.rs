@@ -170,7 +170,7 @@ impl Signature {
         self.forbid_capture(|this| match ty.to_non_repeating() {
             NonRepeatingType::Ref(ty) => {
                 let t = this.java_ref_ty(&ty)?;
-                Ok(quote_spanned!(this.span => Option<Local<'jvm, #t>>))
+                Ok(quote_spanned!(this.span => ::core::option::Option<duchess::Local<'jvm, #t>>))
             }
             NonRepeatingType::Scalar(ty) => {
                 let t = this.java_scalar_ty(&ty);

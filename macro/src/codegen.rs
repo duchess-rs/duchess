@@ -142,20 +142,13 @@ impl ClassInfo {
 
             #[allow(non_camel_case_types)]
             pub struct #struct_name<#(#java_class_generics_with_defaults,)*> {
-                _dummy: std::marker::PhantomData<(#(#java_class_generics,)*)>
+                _dummy: ::core::marker::PhantomData<(#(#java_class_generics,)*)>
             }
 
             // Hide other generated items
             #[allow(unused_imports)]
             #[allow(nonstandard_style)]
             const _: () = {
-                use duchess::{
-                    *,
-                    plumbing::once_cell::sync::OnceCell,
-                    plumbing::*,
-                    prelude::*,
-                };
-
                 #assoc_struct_declarations
 
                 unsafe impl<#(#java_class_generics,)*> duchess::JavaObject for #struct_name<#(#java_class_generics,)*>
@@ -165,7 +158,7 @@ impl ClassInfo {
                     #cached_class
                 }
 
-                impl<#(#java_class_generics,)*> AsRef<#struct_name<#(#java_class_generics,)*>> for #struct_name<#(#java_class_generics,)*>
+                impl<#(#java_class_generics,)*> ::core::convert::AsRef<#struct_name<#(#java_class_generics,)*>> for #struct_name<#(#java_class_generics,)*>
                 where
                     #(#java_class_generics: duchess::JavaObject,)*
                 {
@@ -174,18 +167,18 @@ impl ClassInfo {
                     }
                 }
 
-                impl<#(#java_class_generics,)*> std::ops::Deref for #struct_name<#(#java_class_generics,)*>
+                impl<#(#java_class_generics,)*> ::core::ops::Deref for #struct_name<#(#java_class_generics,)*>
                 where
                     #(#java_class_generics: duchess::JavaObject,)*
                 {
-                    type Target = <Self as JavaView>::OfObj<Self>;
+                    type Target = <Self as duchess::plumbing::JavaView>::OfObj<Self>;
 
                     fn deref(&self) -> &Self::Target {
-                        FromRef::from_ref(self)
+                        duchess::plumbing::FromRef::from_ref(self)
                     }
                 }
 
-                impl<#(#java_class_generics,)*> JDeref for #struct_name<#(#java_class_generics,)*>
+                impl<#(#java_class_generics,)*> duchess::prelude::JDeref for #struct_name<#(#java_class_generics,)*>
                 where
                     #(#java_class_generics: duchess::JavaObject,)*
                 {
@@ -194,19 +187,19 @@ impl ClassInfo {
                     }
                 }
 
-                impl<#(#java_class_generics,)*> TryJDeref for #struct_name<#(#java_class_generics,)*>
+                impl<#(#java_class_generics,)*> duchess::prelude::TryJDeref for #struct_name<#(#java_class_generics,)*>
                 where
                     #(#java_class_generics: duchess::JavaObject,)*
                 {
                     type Java = Self;
 
-                    fn try_jderef(&self) -> Nullable<&Self> {
+                    fn try_jderef(&self) -> duchess::Nullable<&Self> {
                         Ok(self)
                     }
                 }
 
                 // Reflexive upcast impl
-                unsafe impl<#(#java_class_generics,)*> plumbing::Upcast<#struct_name<#(#java_class_generics,)*>> for #struct_name<#(#java_class_generics,)*>
+                unsafe impl<#(#java_class_generics,)*> duchess::plumbing::Upcast<#struct_name<#(#java_class_generics,)*>> for #struct_name<#(#java_class_generics,)*>
                 where
                     #(#java_class_generics: duchess::JavaObject,)*
                 {}
@@ -261,22 +254,22 @@ impl ClassInfo {
                 #[repr(transparent)]
                 pub struct #struct_name<#(#java_class_generics,)* #j, #n> {
                     this: #j,
-                    phantom: std::marker::PhantomData<(#name<#(#java_class_generics),*>, #n)>,
+                    phantom: ::core::marker::PhantomData<(#name<#(#java_class_generics),*>, #n)>,
                 }
             )
         };
 
         let deref_impl = |struct_name: &Ident| {
             quote_spanned!(self.span =>
-                impl<#(#java_class_generics,)* #j, #n> std::ops::Deref
+                impl<#(#java_class_generics,)* #j, #n> ::core::ops::Deref
                 for #struct_name<#(#java_class_generics,)* #j, #n>
                 where
-                    #n: FromRef<#j>,
+                    #n: duchess::plumbing::FromRef<#j>,
                 {
                     type Target = #n;
 
                     fn deref(&self) -> &#n {
-                        FromRef::from_ref(&self.this)
+                        duchess::plumbing::FromRef::from_ref(&self.this)
                     }
                 }
             )
@@ -284,12 +277,12 @@ impl ClassInfo {
 
         let from_ref_impl = |struct_name: &Ident| {
             quote_spanned!(self.span =>
-                impl<#(#java_class_generics,)* #j, #n> FromRef<#j> for #struct_name<#(#java_class_generics,)* #j, #n> {
+                impl<#(#java_class_generics,)* #j, #n> duchess::plumbing::FromRef<#j> for #struct_name<#(#java_class_generics,)* #j, #n> {
                     fn from_ref(j: &J) -> &Self {
                         // This is safe because of the `#[repr(transparent)]`
                         // on the struct declaration.
                         unsafe {
-                            std::mem::transmute::<&J, &Self>(j)
+                            ::core::mem::transmute::<&J, &Self>(j)
                         }
                     }
                 }
@@ -310,26 +303,26 @@ impl ClassInfo {
         let this_ty = self.this_type();
 
         let other_impls = quote_spanned!(self.span =>
-            impl<#(#java_class_generics,)*> JavaView for #name<#(#java_class_generics,)*>
+            impl<#(#java_class_generics,)*> duchess::plumbing::JavaView for #name<#(#java_class_generics,)*>
             {
                 type OfOp<#j> = #op_name<#(#java_class_generics,)* #j, #op_mro_tokens>;
 
                 type OfOpWith<#j, #n> = #op_name<#(#java_class_generics,)* #j, #n>
                 where
-                    N: FromRef<J>;
+                    N: duchess::plumbing::FromRef<J>;
 
                 type OfObj<#j> = #obj_name<#(#java_class_generics,)* #j, #obj_mro_tokens>;
 
                 type OfObjWith<#j, #n> = #obj_name<#(#java_class_generics,)* #j, #n>
                 where
-                    N: FromRef<J>;
+                    N: duchess::plumbing::FromRef<J>;
             }
 
             impl<#(#java_class_generics,)* #j, #n> #op_name<#(#java_class_generics,)* #j, #n>
             where
                 #(#java_class_generics: duchess::JavaObject,)*
-                #j: IntoJava<#name<#(#java_class_generics,)*>>,
-                #n: FromRef<#j>,
+                #j: duchess::prelude::IntoJava<#name<#(#java_class_generics,)*>>,
+                #n: duchess::plumbing::FromRef<#j>,
             {
                 #(#op_struct_methods)*
             }
@@ -337,7 +330,7 @@ impl ClassInfo {
             impl<#(#java_class_generics,)* #j, #n> #obj_name<#(#java_class_generics,)* #j, #n>
             where
                 #(#java_class_generics: duchess::JavaObject,)*
-                for<'jvm> &'jvm #j: IntoJava<#this_ty>,
+                for<'jvm> &'jvm #j: duchess::prelude::IntoJava<#this_ty>,
             {
                 #(#obj_struct_methods)*
             }
@@ -369,7 +362,7 @@ impl ClassInfo {
 
         let assoc_ident = Ident::new(assoc_name, self.span);
         quote_spanned!(self.span =>
-            <#head as JavaView>::#assoc_ident<#j, #tail_tokens>
+            <#head as duchess::plumbing::JavaView>::#assoc_ident<#j, #tail_tokens>
         )
     }
 
@@ -403,7 +396,7 @@ impl ClassInfo {
             .into_iter()
             .map(|tokens| {
                 quote_spanned!(self.span =>
-                    unsafe impl<#(#java_class_generics,)*> plumbing::Upcast<#tokens> for #struct_name<#(#java_class_generics,)*>
+                    unsafe impl<#(#java_class_generics,)*> duchess::plumbing::Upcast<#tokens> for #struct_name<#(#java_class_generics,)*>
                     where
                         #(#java_class_generics: duchess::JavaObject,)*
                     {}
@@ -417,10 +410,10 @@ impl ClassInfo {
 
         quote_spanned! {
             self.span =>
-            fn class<'jvm>(jvm: &mut Jvm<'jvm>) -> duchess::Result<'jvm, Local<'jvm, java::lang::Class>> {
-                static CLASS: OnceCell<Global<java::lang::Class>> = OnceCell::new();
-                let global = CLASS.get_or_try_init::<_, duchess::Error<Local<java::lang::Throwable>>>(|| {
-                    let class = find_class(jvm, #jni_class_name)?;
+            fn class<'jvm>(jvm: &mut duchess::Jvm<'jvm>) -> duchess::Result<'jvm, duchess::Local<'jvm, java::lang::Class>> {
+                static CLASS: duchess::plumbing::once_cell::sync::OnceCell<duchess::Global<java::lang::Class>> = duchess::plumbing::once_cell::sync::OnceCell::new();
+                let global = CLASS.get_or_try_init::<_, duchess::Error<duchess::Local<java::lang::Throwable>>>(|| {
+                    let class = duchess::plumbing::find_class(jvm, #jni_class_name)?;
                     Ok(jvm.global(&class))
                 })?;
                 Ok(jvm.local(global))
@@ -442,7 +435,7 @@ impl ClassInfo {
             .collect();
 
         let ty = self.this_type();
-        let output_trait = quote_spanned!(self.span => JavaConstructor<#ty>);
+        let output_trait = quote_spanned!(self.span => duchess::prelude::JavaConstructor<#ty>);
 
         let java_class_generics = self.class_generic_names();
 
@@ -464,7 +457,7 @@ impl ClassInfo {
                     #(#input_names),*
                 > {
                     #(#input_names: #input_names,)*
-                    phantom: std::marker::PhantomData<(
+                    phantom: ::core::marker::PhantomData<(
                         #(#java_class_generics,)*
                     )>,
                 }
@@ -472,7 +465,7 @@ impl ClassInfo {
                 impl<
                     #(#java_class_generics,)*
                     #(#input_names,)*
-                > Copy for Impl<
+                > ::core::marker::Copy for Impl<
                     #(#java_class_generics,)*
                     #(#input_names,)*
                 >
@@ -485,7 +478,7 @@ impl ClassInfo {
                 impl<
                     #(#java_class_generics,)*
                     #(#input_names,)*
-                > Clone for Impl<
+                > ::core::clone::Clone for Impl<
                     #(#java_class_generics,)*
                     #(#input_names,)*
                 >
@@ -501,7 +494,7 @@ impl ClassInfo {
                 impl<
                     #(#java_class_generics,)*
                     #(#input_names,)*
-                > JvmOp for Impl<
+                > duchess::prelude::JvmOp for Impl<
                     #(#java_class_generics,)*
                     #(#input_names,)*
                 >
@@ -509,40 +502,40 @@ impl ClassInfo {
                     #(#java_class_generics: duchess::JavaObject,)*
                     #(#input_names : #input_traits,)*
                 {
-                    type Output<'jvm> = Local<'jvm, #ty>;
+                    type Output<'jvm> = duchess::Local<'jvm, #ty>;
 
                     fn execute_with<'jvm>(
                         self,
-                        jvm: &mut Jvm<'jvm>,
+                        jvm: &mut duchess::Jvm<'jvm>,
                     ) -> duchess::Result<'jvm, Self::Output<'jvm>> {
                         #(#prepare_inputs)*
 
-                        let class = <#ty>::class(jvm)?;
+                        let class = <#ty as duchess::JavaObject>::class(jvm)?;
 
                         // Cache the method id for the constructor -- note that we only have one cache
                         // no matter how many generic monomorphizations there are. This makes sense
                         // given Java's erased-based generics system.
-                        static CONSTRUCTOR: OnceCell<MethodPtr> = OnceCell::new();
+                        static CONSTRUCTOR: duchess::plumbing::once_cell::sync::OnceCell<duchess::plumbing::MethodPtr> = duchess::plumbing::once_cell::sync::OnceCell::new();
                         let constructor = CONSTRUCTOR.get_or_try_init(|| {
-                            find_constructor(jvm, &class, #jni_descriptor)
+                            duchess::plumbing::find_constructor(jvm, &class, #jni_descriptor)
                         })?;
 
-                        let env = jvm.env();
+                        let env = duchess::plumbing::HasEnvPtr::env(jvm);
                         let obj = unsafe {
                             env.invoke(|env| env.NewObjectA, |env, f| f(
                                 env,
-                                class.as_raw().as_ptr(),
+                                duchess::plumbing::JavaObjectExt::as_raw(&*class).as_ptr(),
                                 constructor.as_ptr(),
                                 [
-                                    #(#input_names.into_jni_value(),)*
+                                    #(duchess::plumbing::IntoJniValue::into_jni_value(#input_names),)*
                                 ].as_ptr(),
                             ))
                         };
 
-                        if let Some(obj) = ObjectPtr::new(obj) {
-                            Ok(unsafe { Local::from_raw(env, obj) })
+                        if let Some(obj) = duchess::plumbing::ObjectPtr::new(obj) {
+                            Ok(unsafe { duchess::Local::from_raw(env, obj) })
                         } else {
-                            check_exception(jvm)?;
+                            duchess::plumbing::check_exception(jvm)?;
                             // NewObjectA should only return a null pointer when an exception occurred in the
                             // constructor, so reaching here is a strange JVM state
                             Err(duchess::Error::JvmInternal(format!(
@@ -556,20 +549,20 @@ impl ClassInfo {
                 impl<
                     #(#java_class_generics,)*
                     #(#input_names,)*
-                > std::ops::Deref for Impl<
+                > ::core::ops::Deref for Impl<
                     #(#java_class_generics,)*
                     #(#input_names,)*
                 > {
-                    type Target = <#ty as JavaView>::OfOp<Self>;
+                    type Target = <#ty as duchess::plumbing::JavaView>::OfOp<Self>;
 
                     fn deref(&self) -> &Self::Target {
-                        <Self::Target as FromRef<_>>::from_ref(self)
+                        <Self::Target as duchess::plumbing::FromRef<_>>::from_ref(self)
                     }
                 }
 
                 Impl {
                     #(#input_names: #input_names,)*
-                    phantom: Default::default()
+                    phantom: ::core::default::Default::default()
                 }
             }
         );
@@ -768,7 +761,7 @@ impl ClassInfo {
             > {
                 #this: #this,
                 #(#input_names : #input_names,)*
-                phantom: std::marker::PhantomData<(
+                phantom: ::core::marker::PhantomData<(
                     #(#method_struct_generics,)*
                 )>,
             }
@@ -786,19 +779,19 @@ impl ClassInfo {
         // Implementation of `JvmOp` for `m` -- when executed, call the method
         // via JNI, after converting its arguments appropriately.
         let jvmop_impl = quote_spanned!(self.span =>
-            impl<#(#method_struct_generics),*> Copy
+            impl<#(#method_struct_generics),*> ::core::marker::Copy
             for #rust_method_type_name<#(#method_struct_generics),*>
             where
-                #this: IntoJava<#this_ty>,
+                #this: duchess::prelude::IntoJava<#this_ty>,
                 #(#input_names: #input_traits,)*
                 #(#java_class_generics: duchess::JavaObject,)*
                 #(#sig_where_clauses,)*
             {}
 
-            impl<#(#method_struct_generics),*> Clone
+            impl<#(#method_struct_generics),*> ::core::clone::Clone
             for #rust_method_type_name<#(#method_struct_generics),*>
             where
-                #this: IntoJava<#this_ty>,
+                #this: duchess::prelude::IntoJava<#this_ty>,
                 #(#input_names: #input_traits,)*
                 #(#java_class_generics: duchess::JavaObject,)*
                 #(#sig_where_clauses,)*
@@ -808,10 +801,10 @@ impl ClassInfo {
                 }
             }
 
-            impl<#(#method_struct_generics),*> JvmOp
+            impl<#(#method_struct_generics),*> duchess::prelude::JvmOp
             for #rust_method_type_name<#(#method_struct_generics),*>
             where
-                #this: IntoJava<#this_ty>,
+                #this: duchess::prelude::IntoJava<#this_ty>,
                 #(#input_names: #input_traits,)*
                 #(#java_class_generics: duchess::JavaObject,)*
                 #(#sig_where_clauses,)*
@@ -820,36 +813,36 @@ impl ClassInfo {
 
                 fn execute_with<'jvm>(
                     self,
-                    jvm: &mut Jvm<'jvm>,
+                    jvm: &mut duchess::Jvm<'jvm>,
                 ) -> duchess::Result<'jvm, Self::Output<'jvm>> {
                     let this = self.#this.into_java(jvm)?;
-                    let this: & #this_ty = this.as_jref()?;
-                    let this = this.as_raw();
+                    let this: & #this_ty = duchess::prelude::AsJRef::as_jref(&this)?;
+                    let this = duchess::plumbing::JavaObjectExt::as_raw(this);
 
                     #(#prepare_inputs)*
 
                     // Cache the method id for this method -- note that we only have one cache
                     // no matter how many generic monomorphizations there are. This makes sense
                     // given Java's erased-based generics system.
-                    static METHOD: OnceCell<MethodPtr> = OnceCell::new();
+                    static METHOD: duchess::plumbing::once_cell::sync::OnceCell<duchess::plumbing::MethodPtr> = duchess::plumbing::once_cell::sync::OnceCell::new();
                     let method = METHOD.get_or_try_init(|| {
-                        let class = <#this_ty>::class(jvm)?;
-                        find_method(jvm, &class, #jni_method, #jni_descriptor, false)
+                        let class = <#this_ty as duchess::JavaObject>::class(jvm)?;
+                        duchess::plumbing::find_method(jvm, &class, #jni_method, #jni_descriptor, false)
                     })?;
 
                     let output = unsafe {
-                        jvm.env().invoke(|env| env.#jni_call_fn, |env, f| f(
+                        duchess::plumbing::HasEnvPtr::env(jvm).invoke(|env| env.#jni_call_fn, |env, f| f(
                             env,
                             this.as_ptr(),
                             method.as_ptr(),
                             [
-                                #(#input_names.into_jni_value(),)*
+                                #(duchess::plumbing::IntoJniValue::into_jni_value(#input_names),)*
                             ].as_ptr(),
                         ))
                     };
-                    check_exception(jvm)?;
+                    duchess::plumbing::check_exception(jvm)?;
 
-                    let output: #output_ty = unsafe { FromJniValue::from_jni_value(jvm, output) };
+                    let output: #output_ty = unsafe { duchess::plumbing::FromJniValue::from_jni_value(jvm, output) };
                     Ok(output)
                 }
             }
@@ -860,16 +853,16 @@ impl ClassInfo {
         // [method docs]:https://duchess-rs.github.io/duchess/methods.html
         let deref_impl = java_ref_output_ty.map(|java_ref_output_ty| {
             quote_spanned!(self.span =>
-                impl<#(#method_struct_generics),*> std::ops::Deref
+                impl<#(#method_struct_generics),*> ::core::ops::Deref
                 for #rust_method_type_name<#(#method_struct_generics),*>
                 where
                     #(#java_class_generics: duchess::JavaObject,)*
                     #(#sig_where_clauses,)*
                 {
-                    type Target = <#java_ref_output_ty as JavaView>::OfOp<Self>;
+                    type Target = <#java_ref_output_ty as duchess::plumbing::JavaView>::OfOp<Self>;
 
                     fn deref(&self) -> &Self::Target {
-                        <Self::Target as FromRef<_>>::from_ref(self)
+                        <Self::Target as duchess::plumbing::FromRef<_>>::from_ref(self)
                     }
                 }
             )
@@ -877,7 +870,7 @@ impl ClassInfo {
 
         let inherent_method = quote_spanned!(self.span =>
             pub fn #rust_method_name<#(#rust_method_generics),*>(
-                #this: impl IntoJava<#this_ty>,
+                #this: impl duchess::prelude::IntoJava<#this_ty>,
                 #(#input_names: impl #input_traits),*
             ) -> impl #output_trait
             where
@@ -892,7 +885,7 @@ impl ClassInfo {
                 #rust_method_type_name {
                     #this: #this,
                     #(#input_names: #input_names,)*
-                    phantom: Default::default(),
+                    phantom: ::core::default::Default::default(),
                 }
             }
         );
@@ -970,7 +963,7 @@ impl ClassInfo {
                 #(#method_struct_generics,)*
             > {
                 #(#input_names : #input_names,)*
-                phantom: std::marker::PhantomData<(
+                phantom: ::core::marker::PhantomData<(
                     #(#method_struct_generics,)*
                 )>,
             }
@@ -982,7 +975,7 @@ impl ClassInfo {
         // via JNI, after converting its arguments appropriately.
         let this_ty = self.this_type();
         let jvmop_impl = quote_spanned!(self.span =>
-            impl<#(#method_struct_generics),*> Copy
+            impl<#(#method_struct_generics),*> ::core::marker::Copy
             for #rust_method_type_name<#(#method_struct_generics),*>
             where
                 #(#input_names: #input_traits,)*
@@ -991,7 +984,7 @@ impl ClassInfo {
             {
             }
 
-            impl<#(#method_struct_generics),*> Clone
+            impl<#(#method_struct_generics),*> ::core::clone::Clone
             for #rust_method_type_name<#(#method_struct_generics),*>
             where
                 #(#input_names: #input_traits,)*
@@ -1003,7 +996,7 @@ impl ClassInfo {
                 }
             }
 
-            impl<#(#method_struct_generics),*> JvmOp
+            impl<#(#method_struct_generics),*> duchess::prelude::JvmOp
             for #rust_method_type_name<#(#method_struct_generics),*>
             where
                 #(#input_names: #input_traits,)*
@@ -1014,33 +1007,33 @@ impl ClassInfo {
 
                 fn execute_with<'jvm>(
                     self,
-                    jvm: &mut Jvm<'jvm>,
+                    jvm: &mut duchess::Jvm<'jvm>,
                 ) -> duchess::Result<'jvm, Self::Output<'jvm>> {
                     #(#prepare_inputs)*
 
                     // Cache the method id for this method -- note that we only have one cache
                     // no matter how many generic monomorphizations there are. This makes sense
                     // given Java's erased-based generics system.
-                    static METHOD: OnceCell<MethodPtr> = OnceCell::new();
+                    static METHOD: duchess::plumbing::once_cell::sync::OnceCell<duchess::plumbing::MethodPtr> = duchess::plumbing::once_cell::sync::OnceCell::new();
                     let method = METHOD.get_or_try_init(|| {
-                        let class = <#this_ty>::class(jvm)?;
-                        find_method(jvm, &class, #jni_method, #jni_descriptor, true)
+                        let class = <#this_ty as duchess::JavaObject>::class(jvm)?;
+                        duchess::plumbing::find_method(jvm, &class, #jni_method, #jni_descriptor, true)
                     })?;
 
-                    let class = <#this_ty>::class(jvm)?;
+                    let class = <#this_ty as duchess::JavaObject>::class(jvm)?;
                     let output = unsafe {
-                        jvm.env().invoke(|env| env.#jni_call_fn, |env, f| f(
+                        duchess::plumbing::HasEnvPtr::env(jvm).invoke(|env| env.#jni_call_fn, |env, f| f(
                             env,
-                            class.as_raw().as_ptr(),
+                            duchess::plumbing::JavaObjectExt::as_raw(&*class).as_ptr(),
                             method.as_ptr(),
                             [
-                                #(#input_names.into_jni_value(),)*
+                                #(duchess::plumbing::IntoJniValue::into_jni_value(#input_names),)*
                             ].as_ptr(),
                         ))
                     };
-                    check_exception(jvm)?;
+                    duchess::plumbing::check_exception(jvm)?;
 
-                    let output: #output_ty = unsafe { FromJniValue::from_jni_value(jvm, output) };
+                    let output: #output_ty = unsafe { duchess::plumbing::FromJniValue::from_jni_value(jvm, output) };
                     Ok(output)
                 }
             }
@@ -1051,16 +1044,16 @@ impl ClassInfo {
         // [method docs]:https://duchess-rs.github.io/duchess/methods.html
         let deref_impl = java_ref_output_ty.map(|java_ref_output_ty| {
             quote_spanned!(self.span =>
-                impl<#(#method_struct_generics),*> std::ops::Deref
+                impl<#(#method_struct_generics),*> ::core::ops::Deref
                 for #rust_method_type_name<#(#method_struct_generics),*>
                 where
                     #(#java_class_generics: duchess::JavaObject,)*
                     #(#sig_where_clauses,)*
                 {
-                    type Target = <#java_ref_output_ty as JavaView>::OfOp<Self>;
+                    type Target = <#java_ref_output_ty as duchess::plumbing::JavaView>::OfOp<Self>;
 
                     fn deref(&self) -> &Self::Target {
-                        <Self::Target as FromRef<_>>::from_ref(self)
+                        <Self::Target as duchess::plumbing::FromRef<_>>::from_ref(self)
                     }
                 }
             )
@@ -1081,7 +1074,7 @@ impl ClassInfo {
 
                 #rust_method_type_name {
                     #(#input_names: #input_names,)*
-                    phantom: Default::default(),
+                    phantom: ::core::default::Default::default(),
                 }
             }
         );
@@ -1124,7 +1117,7 @@ impl ClassInfo {
             pub struct #rust_field_type_name<
                 #(#field_struct_generics,)*
             > {
-                phantom: std::marker::PhantomData<(
+                phantom: ::core::marker::PhantomData<(
                     #(#field_struct_generics,)*
                 )>,
             }
@@ -1136,7 +1129,7 @@ impl ClassInfo {
         // via JNI, after converting its arguments appropriately.
         let this_ty = self.this_type();
         let jvmop_impl = quote_spanned!(self.span =>
-            impl<#(#field_struct_generics),*> JvmOp
+            impl<#(#field_struct_generics),*> duchess::prelude::JvmOp
             for #rust_field_type_name<#(#field_struct_generics),*>
             where
                 #(#java_class_generics: duchess::JavaObject,)*
@@ -1146,41 +1139,41 @@ impl ClassInfo {
 
                 fn execute_with<'jvm>(
                     self,
-                    jvm: &mut Jvm<'jvm>,
+                    jvm: &mut duchess::Jvm<'jvm>,
                 ) -> duchess::Result<'jvm, Self::Output<'jvm>> {
 
                     // Cache the field id for this field -- note that we only have one cache
                     // no matter how many generic monomorphizations there are. This makes sense
                     // given Java's erased-based generics system.
-                    static FIELD: OnceCell<FieldPtr> = OnceCell::new();
+                    static FIELD: duchess::plumbing::once_cell::sync::OnceCell<duchess::plumbing::FieldPtr> = duchess::plumbing::once_cell::sync::OnceCell::new();
                     let field = FIELD.get_or_try_init(|| {
-                        let class = <#this_ty>::class(jvm)?;
-                        find_field(jvm, &class, #jni_field, #jni_descriptor, true)
+                        let class = <#this_ty as duchess::JavaObject>::class(jvm)?;
+                        duchess::plumbing::find_field(jvm, &class, #jni_field, #jni_descriptor, true)
                     })?;
 
-                    let class = <#this_ty>::class(jvm)?;
+                    let class = <#this_ty as duchess::JavaObject>::class(jvm)?;
                     let output = unsafe {
-                        jvm.env().invoke(|env| env.#jni_field_fn, |env, f| f(
+                        duchess::plumbing::HasEnvPtr::env(jvm).invoke(|env| env.#jni_field_fn, |env, f| f(
                             env,
-                            class.as_raw().as_ptr(),
+                            duchess::plumbing::JavaObjectExt::as_raw(&*class).as_ptr(),
                             field.as_ptr(),
                         ))
                     };
-                    check_exception(jvm)?;
+                    duchess::plumbing::check_exception(jvm)?;
 
-                    let output: #output_ty = unsafe { FromJniValue::from_jni_value(jvm, output) };
+                    let output: #output_ty = unsafe { duchess::plumbing::FromJniValue::from_jni_value(jvm, output) };
                     Ok(output)
                 }
             }
 
-            impl<#(#field_struct_generics),*> Copy for #rust_field_type_name<#(#field_struct_generics),*>
+            impl<#(#field_struct_generics),*> ::core::marker::Copy for #rust_field_type_name<#(#field_struct_generics),*>
             where
                 #(#java_class_generics: duchess::JavaObject,)*
                 #(#sig_where_clauses,)*
             {
             }
 
-            impl<#(#field_struct_generics),*> Clone for #rust_field_type_name<#(#field_struct_generics),*>
+            impl<#(#field_struct_generics),*> ::core::clone::Clone for #rust_field_type_name<#(#field_struct_generics),*>
             where
                 #(#java_class_generics: duchess::JavaObject,)*
                 #(#sig_where_clauses,)*
@@ -1201,7 +1194,7 @@ impl ClassInfo {
                 #jvmop_impl
 
                 #rust_field_type_name {
-                    phantom: Default::default(),
+                    phantom: ::core::default::Default::default(),
                 }
             }
         );
@@ -1255,7 +1248,7 @@ impl ClassInfo {
                 ),
                 NonRepeatingType::Ref(_) => quote_spanned!(self.span =>
                     let #input_name = self.#input_name.into_java(jvm)?;
-                    let #input_name = #input_name.as_jref()?;
+                    let #input_name = duchess::prelude::AsJRef::as_jref(&#input_name)?;
                 ),
             })
             .collect()
@@ -1272,5 +1265,5 @@ fn jni_c_str(contents: impl Into<String>, span: Span) -> TokenStream {
     contents.push(0);
 
     let byte_string = Literal::byte_string(&contents);
-    quote_spanned!(span => unsafe { ::std::ffi::CStr::from_bytes_with_nul_unchecked(#byte_string) })
+    quote_spanned!(span => unsafe { ::core::ffi::CStr::from_bytes_with_nul_unchecked(#byte_string) })
 }

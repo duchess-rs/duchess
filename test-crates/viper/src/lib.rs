@@ -56,6 +56,7 @@ duchess::java_package! {
             viper.silver.ast.ErrorTrafo
         );
     }
+    class Result {}
     interface ErrorTrafo {}
     interface Info {}
     interface Position {}
