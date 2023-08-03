@@ -3,29 +3,21 @@ use std::fmt::Display;
 use lalrpop_util::{lalrpop_mod, lexer::Token};
 use proc_macro2::Span;
 
-use crate::span_error::SpanError;
-
 use super::{ClassDecl, ClassInfo};
 
 lalrpop_mod!(pub javap_parser, "/class_info/javap_parser.rs"); // synthesized by LALRPOP
 
-pub(super) fn parse_class_decl(span: Span, input: &str) -> Result<ClassDecl, SpanError> {
+pub(super) fn parse_class_decl(span: Span, input: &str) -> syn::Result<ClassDecl> {
     match javap_parser::ClassDeclParser::new().parse(span, input) {
         Ok(v) => Ok(v),
-        Err(error) => Err(SpanError {
-            span,
-            message: format_lalrpop_error(input, error),
-        }),
+        Err(error) => Err(syn::Error::new(span, format_lalrpop_error(input, error))),
     }
 }
 
-pub(super) fn parse_class_info(span: Span, input: &str) -> Result<ClassInfo, SpanError> {
+pub(super) fn parse_class_info(span: Span, input: &str) -> syn::Result<ClassInfo> {
     match javap_parser::ClassInfoParser::new().parse(span, input) {
         Ok(v) => Ok(v),
-        Err(error) => Err(SpanError {
-            span,
-            message: format_lalrpop_error(input, error),
-        }),
+        Err(error) => Err(syn::Error::new(span, format_lalrpop_error(input, error))),
     }
 }
 

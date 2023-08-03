@@ -3,11 +3,10 @@ use std::collections::HashSet;
 use crate::{
     class_info::{ClassInfo, ClassRef, Constructor, Flags, Method, RefType, RootMap, Type},
     reflect::Reflector,
-    span_error::SpanError,
 };
 
 impl RootMap {
-    pub fn check(&self, reflector: &mut Reflector) -> Result<(), SpanError> {
+    pub fn check(&self, reflector: &mut Reflector) -> syn::Result<()> {
         let mut errors = vec![];
 
         for class_name in &self.class_names() {
@@ -29,15 +28,15 @@ impl ClassInfo {
         &self,
         root_map: &RootMap,
         reflector: &mut Reflector,
-        push_error: &mut dyn FnMut(SpanError),
-    ) -> Result<(), SpanError> {
+        push_error: &mut dyn FnMut(syn::Error),
+    ) -> syn::Result<()> {
         let info = reflector.reflect(&self.name, self.span)?;
 
         let mut push_error_message = |m: String| {
-            push_error(SpanError {
-                span: self.span,
-                message: format!("error in class `{}`: {m}", self.name),
-            });
+            push_error(syn::Error::new(
+                self.span,
+                format!("error in class `{}`: {m}", self.name),
+            ));
         };
 
         // We always allow people to elide generics, in which case

@@ -12,7 +12,6 @@ mod java_function;
 mod parse;
 mod reflect;
 mod signature;
-mod span_error;
 mod substitution;
 mod upcasts;
 
@@ -33,12 +32,12 @@ pub fn java_package(input: TokenStream) -> TokenStream {
     let input: proc_macro2::TokenStream = input.into();
     let decl = match Parser::from(input).parse::<DuchessDeclaration>() {
         Ok(decl) => decl,
-        Err(err) => return err.into_tokens().into(),
+        Err(err) => return err.to_compile_error().into(),
     };
 
     match decl.to_tokens() {
         Ok(t) => return t.into(),
-        Err(e) => return e.into_tokens().into(),
+        Err(e) => return e.into_compile_error().into(),
     }
 }
 
@@ -47,7 +46,7 @@ pub fn java_function(args: TokenStream, input: TokenStream) -> TokenStream {
     let args: proc_macro2::TokenStream = args.into();
     let args = match Parser::from(args).parse::<MethodSelector>() {
         Ok(decl) => decl,
-        Err(err) => return err.into_tokens().into(),
+        Err(err) => return err.to_compile_error().into(),
     };
 
     let item_fn = match syn::parse::<syn::ItemFn>(input) {
@@ -66,7 +65,9 @@ synstructure::decl_derive!([ToRust, attributes(java)] => derive::derive_to_rust)
 synstructure::decl_derive!([ToJava, attributes(java)] => derive::derive_to_java);
 
 fn debug_tokens(name: impl std::fmt::Display, token_stream: &proc_macro2::TokenStream) {
-    let Ok(f) = std::env::var("DUCHESS_DEBUG") else { return };
+    let Ok(f) = std::env::var("DUCHESS_DEBUG") else {
+        return;
+    };
     if f == "*" || f == "1" || name.to_string().starts_with(&f) {
         match rust_format::RustFmt::default().format_tokens(token_stream.clone()) {
             Ok(v) => {

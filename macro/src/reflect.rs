@@ -7,12 +7,11 @@ use crate::{
     class_info::{
         ClassDecl, ClassInfo, DotId, Generic, Id, Method, RootMap, SpannedPackageInfo, Type,
     },
-    span_error::SpanError,
     upcasts::Upcasts,
 };
 
 impl DuchessDeclaration {
-    pub fn to_root_map(&self, reflector: &mut Reflector) -> Result<RootMap, SpanError> {
+    pub fn to_root_map(&self, reflector: &mut Reflector) -> syn::Result<RootMap> {
         let mut subpackages = BTreeMap::new();
         let mut classes = BTreeMap::new();
         for package in &self.packages {
@@ -41,7 +40,7 @@ impl JavaPackage {
         reflector: &mut Reflector,
         map: &mut BTreeMap<Id, SpannedPackageInfo>,
         classes: &mut BTreeMap<DotId, Arc<ClassInfo>>,
-    ) -> Result<(), SpanError> {
+    ) -> syn::Result<()> {
         let (first, rest) = name.split_first().unwrap();
 
         let package_info = || SpannedPackageInfo {
@@ -69,7 +68,7 @@ impl JavaPackage {
         reflector: &mut Reflector,
         package: &mut SpannedPackageInfo,
         classes: &mut BTreeMap<DotId, Arc<ClassInfo>>,
-    ) -> Result<(), SpanError> {
+    ) -> syn::Result<()> {
         for c in &self.classes {
             let (dot_id, info) = match c {
                 ClassDecl::Reflected(c) => {
@@ -96,7 +95,7 @@ impl JavaPackage {
     }
 
     /// The users give classnames that may not include java package information.
-    fn make_absolute_dot_id(&self, span: Span, class_dot_id: &DotId) -> Result<DotId, SpanError> {
+    fn make_absolute_dot_id(&self, span: Span, class_dot_id: &DotId) -> syn::Result<DotId> {
         let package_ids: Vec<Id> = self.package_name.ids.iter().map(|n| n.to_id()).collect();
 
         let (package, class) = class_dot_id.split();
@@ -108,13 +107,10 @@ impl JavaPackage {
 
         // Otherwise, check that the package the user wrote matches our name.
         if &package_ids[..] != package {
-            return Err(SpanError {
+            return Err(syn::Error::new(
                 span,
-                message: format!(
-                    "class `{}` expected to be in package `{}`",
-                    class_dot_id, self.package_name
-                ),
-            });
+                format!("expected package `{}`", self.package_name),
+            ));
         }
 
         Ok(class_dot_id.clone())
@@ -130,7 +126,7 @@ pub struct Reflector {
 
 impl Reflector {
     /// Returns the (potentially cached) info about `class_name`;
-    pub fn reflect(&self, class_name: &DotId, span: Span) -> Result<Arc<ClassInfo>, SpanError> {
+    pub fn reflect(&self, class_name: &DotId, span: Span) -> syn::Result<Arc<ClassInfo>> {
         // yields an error if we cannot reflect on that class.
         if let Some(class) = self.classes.borrow().get(class_name).map(Arc::clone) {
             return Ok(class);
@@ -159,30 +155,30 @@ impl Reflector {
         let output = match output_or_err {
             Ok(o) => o,
             Err(err) => {
-                return Err(SpanError {
+                return Err(syn::Error::new(
                     span,
-                    message: format!("failed to execute `{command:?}`: {err}"),
-                });
+                    format!("failed to execute `{command:?}`: {err}"),
+                ));
             }
         };
 
         if !output.status.success() {
-            return Err(SpanError {
+            return Err(syn::Error::new(
                 span,
-                message: format!(
+                format!(
                     "unsuccessful execution of `{command:?}`: {}",
                     String::from_utf8(output.stderr).unwrap_or(String::from("error"))
                 ),
-            });
+            ));
         }
 
         let s = match String::from_utf8(output.stdout) {
             Ok(o) => o,
             Err(err) => {
-                return Err(SpanError {
+                return Err(syn::Error::new(
                     span,
-                    message: format!("failed to parse output of `{command:?}` as utf-8: {err}"),
-                });
+                    format!("failed to parse output of `{command:?}` as utf-8: {err}"),
+                ));
             }
         };
 
@@ -200,18 +196,15 @@ impl Reflector {
     }
 
     ///
-    pub fn reflect_method(
-        &self,
-        method_selector: &MethodSelector,
-    ) -> Result<ReflectedMethod, SpanError> {
+    pub fn reflect_method(&self, method_selector: &MethodSelector) -> syn::Result<ReflectedMethod> {
         match method_selector {
             MethodSelector::ClassName(cn) => {
                 let dot_id = cn.to_dot_id();
                 let class_info = self.reflect(&dot_id, cn.span)?;
                 match class_info.constructors.len() {
                     1 => Ok(ReflectedMethod::Constructor(class_info, 0)),
-                    0 => Err(SpanError { span: cn.span, message: format!("no constructors found") }),
-                    n => Err(SpanError { span: cn.span, message: format!("{n} constructors found, use an explicit class declaration to disambiguate") }),
+                    0 => Err(syn::Error::new(cn.span, "no constructors found".to_string())),
+                    n => Err(syn::Error::new(cn.span, format!("{n} constructors found, use an explicit class declaration to disambiguate")))
                 }
             }
             MethodSelector::MethodName(cn, mn) => {
@@ -228,8 +221,8 @@ impl Reflector {
                         let (id, _method) = methods[0];
                         Ok(ReflectedMethod::Method(class_info, id))
                     },
-                    0 => Err(SpanError { span: cn.span, message: format!("no methods named `{mn}` found") }),
-                    n => Err(SpanError { span: cn.span, message: format!("{n} methods named `{mn}` found, use an explicit class declaration to disambiguate") }),
+                    0 => Err(syn::Error::new(cn.span,  format!("no methods named `{mn}` found"))),
+                    n => Err(syn::Error::new(cn.span, format!("{n} methods named `{mn}` found, use an explicit class declaration to disambiguate") )),
                 }
             }
             MethodSelector::ClassInfo(_) => todo!(),

@@ -2,8 +2,6 @@ use std::iter::Peekable;
 
 use proc_macro2::{Spacing, Span, TokenStream, TokenTree};
 
-use crate::span_error::SpanError;
-
 pub struct Parser {
     tokens: Peekable<Box<dyn Iterator<Item = TokenTree>>>,
     last_span: Option<Span>,
@@ -21,14 +19,14 @@ impl From<TokenStream> for Parser {
 
 impl Parser {
     /// Top-level parse function that parses the input to the proc macro.
-    pub fn parse<T: Parse>(mut self) -> Result<T, SpanError> {
+    pub fn parse<T: Parse>(mut self) -> syn::Result<T> {
         match T::parse(&mut self) {
             Ok(Some(t)) => {
                 if let Some(s) = self.peek_span() {
-                    return Err(SpanError {
-                        span: s,
-                        message: format!("extra input after the end of what was expected"),
-                    });
+                    return Err(syn::Error::new(
+                        s,
+                        format!("extra input after the end of what was expected"),
+                    ));
                 }
                 Ok(t)
             }
@@ -37,20 +35,20 @@ impl Parser {
 
             Ok(None) => {
                 let span = Span::call_site();
-                return Err(SpanError {
+                return Err(syn::Error::new(
                     span,
-                    message: format!("expected a {}", T::description()),
-                });
+                    format!("expected a {}", T::description()),
+                ));
             }
         }
     }
 
     /// Returns an error struct located at the last consumed token.
-    pub fn error(&self, message: impl ToString) -> SpanError {
-        SpanError {
-            span: self.last_span().unwrap_or_else(|| Span::call_site()),
-            message: message.to_string(),
-        }
+    pub fn error(&self, message: impl ToString) -> syn::Result<()> {
+        Err(syn::Error::new(
+            self.last_span().unwrap_or(Span::call_site()),
+            message.to_string(),
+        ))
     }
 
     /// Returns the next token without consuming it, or None if no tokens remain.
@@ -195,10 +193,10 @@ pub trait Parse: Sized {
     /// Err -- parse error after recognizing the start of a `Self`, may have consumed tokens
     /// Ok(None) -- didn't recognize `Self` at this location, didn't consume any tokens
     /// Ok(Some(e)) -- successful parse of `Self`
-    fn parse(p: &mut Parser) -> Result<Option<Self>, SpanError>;
+    fn parse(p: &mut Parser) -> syn::Result<Option<Self>>;
 
     /// parse any number of instances of self.
-    fn parse_many(p: &mut Parser) -> Result<Vec<Self>, SpanError> {
+    fn parse_many(p: &mut Parser) -> syn::Result<Vec<Self>> {
         let mut result = vec![];
 
         while let Some(e) = Self::parse(p)? {
