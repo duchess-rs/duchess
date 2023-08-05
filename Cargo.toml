@@ -30,6 +30,9 @@ derive-where = "1.2.1"
 [dev-dependencies]
 ui_test = "0.10.0"
 
+[build_dependencies]
+walkdir = "2.3"
+
 [features]
 default = ["dylibjvm"]
 dylibjvm = ["java-locator", "libloading"]
