@@ -24,6 +24,7 @@ jobs:
         distribution: 'corretto'
         java-version: '17'
     - name: Install mdBook
+      if: matrix.os == 'ubuntu-latest'
       run: curl -sSL https://github.com/rust-lang/mdBook/releases/download/v0.4.28/mdbook-v0.4.28-x86_64-unknown-linux-gnu.tar.gz | tar -xz
     - name: Build
       run: cargo build --verbose
@@ -32,4 +33,5 @@ jobs:
     - name: Test client crates
       run: cargo test --all-targets --verbose --manifest-path=test-crates/Cargo.toml
     - name: Test book
+      if: matrix.os == 'ubuntu-latest'
       run: ./mdbook test book
