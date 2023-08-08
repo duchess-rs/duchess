@@ -8,7 +8,7 @@ duchess = { path = "../.." }
 thiserror = "1.0.40"
 
 [dev-dependencies]
-ui_test = "0.10.0"
+ui_test = "0.17.0"
 
 [build_dependencies]
 walkdir = "2.3"
