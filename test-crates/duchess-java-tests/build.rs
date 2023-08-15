@@ -7,11 +7,12 @@ use walkdir::WalkDir;
 
 // These two control where this script looks for source and corresponding class files
 const SOURCE_PATH: &str = "java";
-const TARGET_PATH: &str = "target";
+const TARGET_PATH: &str = "../target";
 
 fn main() -> std::io::Result<()> {
     // Rerun java build if any source file changes, but then we'll check each file individually below
     println!("cargo:rerun-if-changed={}", SOURCE_PATH);
+    println!("cargo:rustc-env=CLASSPATH=target/java");
 
     let target_dir = Path::new(TARGET_PATH);
 

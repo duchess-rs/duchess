@@ -1,2 +1,0 @@
-[env]
-CLASSPATH = { value = "target/java", relative = true, force = true }

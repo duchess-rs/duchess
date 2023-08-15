@@ -4,7 +4,7 @@ The `java_function` macro is used to implement native functions. Make sure to re
 
 ## Examples
 
-Just want to see the code? Read [the `greeting` example](https://github.com/duchess-rs/duchess/blob/main/examples/greeting.rs) to see the setup in action.
+Just want to see the code? Read [the `greeting` example](https://github.com/duchess-rs/duchess/blob/main/test-crates/duchess-java-tests/tests/ui/examples/greeting.rs) to see the setup in action.
 
 ## Specifying which function you are defining
 
