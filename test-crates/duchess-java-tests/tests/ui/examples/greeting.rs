@@ -1,3 +1,4 @@
+//@check-pass
 use duchess::{java, prelude::*};
 
 // Declare the java class that includes a native method

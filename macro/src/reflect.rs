@@ -138,17 +138,14 @@ impl Reflector {
         }
         javap_path.push("javap");
 
-        let classpath = match env::var("CLASSPATH") {
-            Ok(val) => val,
-            Err(e) => panic!("duchess cannot read the CLASSPATH environment variable: {e}"),
-        };
-
         let mut command = Command::new(javap_path);
-        command
-            .arg("-cp")
-            .arg(classpath)
-            .arg("-p")
-            .arg(format!("{}", class_name));
+
+        // If the CLASSPATH variable is set we will use it, otherwise allow javap to use its default classpath
+        if let Some(classpath) = env::var("CLASSPATH").ok() {
+            command.arg("-cp").arg(classpath);
+        }
+
+        command.arg("-p").arg(format!("{}", class_name));
 
         let output_or_err = command.output();
 

@@ -2,7 +2,7 @@
 
 ## Examples
 
-* The [examples directory](https://github.com/duchess-rs/duchess/tree/main/examples) on github contains some self-contained examples; the corresponding Java code is in the [java directory](https://github.com/duchess-rs/duchess/tree/main/java). 
+* The [examples directory](https://github.com/duchess-rs/duchess/tree/main/test-crates/duchess-java-tests/tests/ui/examples) on github contains some self-contained examples; the corresponding Java code is in the [java directory](https://github.com/duchess-rs/duchess/tree/main/java). 
 * The [test-crates directory]() contains some other standalone tests.
 * Duchess itself uses duchess to [mirror the classes from the JVM](https://github.com/duchess-rs/duchess/blob/main/src/java.rs).
 
