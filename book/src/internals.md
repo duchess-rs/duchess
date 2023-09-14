@@ -34,7 +34,7 @@ Given a reference `&'l MyObject`, the lifetime `'l` is tied to the JVM's "local 
 
 Whenever we invoke a JNI method, or execute a construct, it creates a new local handle. These are returned to the user as a `Local<'jni, MyObject>` struct, where the `'jni` is (again) the lifetime of the local frame. Internally, the `Local` struct is actually just a `jobject` pointer, though we cast it to `*mut MyObject`; it supports deref to `&'jni MyObject` in the natural way. Note that this maintains the representation invariant for `&MyObject` (i.e., it is still a jobject pointer).
 
-`Local` has a `Drop` impl that deletes the local handle. This is important because there is a limit to the number of references you can have in the JNI, so you may have to ensure that you drop locals in a timely fashion.
+`Local` has a `Drop` impl that deletes the local handle. This is important because there is a limit to the number of references you can have in the JNI, so you may have to ensure that you drop locals in a timely fashion. Also note that all JNI function calls that return Java objects implicitly create a local ref!
 
 ### `Global` Java objects
 
@@ -44,14 +44,14 @@ The `jdk` object offers a method to create a Global reference a Java object. Glo
 
 The underlying `sys::jobject` can be null, but we maintain the invariant that this is never the case, instead using `Option<&R>` etc.
 
-## Exceptions 
+## Exceptions
 
-The [JNI exposes Java exception state](https://docs.oracle.com/javase/7/docs/technotes/guides/jni/spec/functions.html#wp5234) via 
+The [JNI exposes Java exception state](https://docs.oracle.com/javase/7/docs/technotes/guides/jni/spec/functions.html#wp5234) via
  * `ExceptionCheck()` returning `true` if an unhandled exception has been thrown
  * `ExceptionOccurred()` returning a local reference to the thrown object
  * `ExceptionClear()` clearing the exception (if any)
 
-If an exception has occurred and isn't cleared before the next JNI call, the invoked Java code will immediately "see" the exception. Since this can cause an exception to propagate outside of the normal stack bubble-up, we must always call `duchess::error::check_exception()?` after any JNI call that could throw. It will return `Err(duchess::Error::Thrown)` if one has occurred. 
+If an exception has occurred and isn't cleared before the next JNI call, the invoked Java code will immediately "see" the exception. Since this can cause an exception to propagate outside of the normal stack bubble-up, we must always call `duchess::EnvPtr::check_exception()?` after any JNI call that could throw. It will return `Err(duchess::Error::Thrown)` if one has occurred. The `duchess::EnvPtr::invoke_checked()` will both ensure the exception check occurred and that it was done in a way that any created local ref will be dropped correctly.
 
 ## Frequently asked questions
 
@@ -74,7 +74,7 @@ impl MyObject {
 }
 ```
 
-This implies though that every 
+This implies though that every
 
 We have a conflict:
 

@@ -1,5 +1,3 @@
-use std::f32::consts::E;
-
 use crate::class_info::{ClassRef, Generic, Id, NonRepeatingType, RefType, ScalarType, Type};
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote_spanned;

@@ -1,8 +1,8 @@
 use std::ffi::{c_char, CString};
 
 use crate::{
-    error::check_exception, into_rust::IntoRust, java::lang::String as JavaString,
-    jvm::JavaObjectExt, plumbing::HasEnvPtr, raw::ObjectPtr, Error, Jvm, JvmOp, Local,
+    into_rust::IntoRust, java::lang::String as JavaString, jvm::JavaObjectExt, Error, Jvm, JvmOp,
+    Local,
 };
 
 impl JvmOp for &str {
@@ -18,14 +18,10 @@ impl JvmOp for &str {
 
         let env = jvm.env();
         // SAFETY: c_string is non-null pointer to cesu8-encoded encoded string ending in a trailing nul byte
-        let string =
-            unsafe { env.invoke(|env| env.NewStringUTF, |env, f| f(env, c_string.as_ptr())) };
-        if let Some(string) = ObjectPtr::new(string) {
-            Ok(unsafe { Local::from_raw(env, string) })
-        } else {
-            check_exception(jvm)?; // likely threw an OutOfMemoryError
-            Err(Error::JvmInternal("JVM failed to create new String".into()))
-        }
+        let string: Option<Local<JavaString>> = unsafe {
+            env.invoke_checked(|env| env.NewStringUTF, |env, f| f(env, c_string.as_ptr()))
+        }?;
+        string.ok_or_else(|| Error::JvmInternal("JVM faild to create new String".into()))
     }
 }
 
@@ -52,23 +48,31 @@ impl IntoRust<String> for &JavaString {
 
         // SAFETY: J::Output impls AsRef<JavaString>, so we know str_raw points to a non-null Java String
         let cesu8_len = unsafe {
-            env.invoke(
+            env.invoke_unchecked(
                 |env| env.GetStringUTFLength,
                 |env, f| f(env, str_raw.as_ptr()),
             )
         };
-        assert!(cesu8_len >= 0);
+        // Shortcut for common case of empty strings. This also avoids us trying to write
+        // to the null ptr of an empty Vec
+        if cesu8_len == 0 {
+            return Ok(String::new());
+        }
+        // java uses signed lengths
+        assert!(cesu8_len > 0);
 
         // SAFETY: same as for cesu8_len
-        let utf16_len =
-            unsafe { env.invoke(|env| env.GetStringLength, |env, f| f(env, str_raw.as_ptr())) };
-        assert!(utf16_len >= 0);
+        let utf16_len = unsafe {
+            env.invoke_unchecked(|env| env.GetStringLength, |env, f| f(env, str_raw.as_ptr()))
+        };
+        assert!(utf16_len > 0);
 
-        let mut cesu_bytes = Vec::<u8>::with_capacity(cesu8_len as usize);
+        let mut cesu_bytes =
+            Vec::<u8>::with_capacity(cesu8_len as usize + 1 /* JNI appends trailing nul */);
         // SAFETY: cesu_bytes is a non-null pointer with enough capacity for the entire string when encoded in Modified
-        // UTF-8 (with no trailing nul byte).
+        // UTF-8 (with a trailing nul byte).
         unsafe {
-            env.invoke(
+            env.invoke_unchecked(
                 |env| env.GetStringUTFRegion,
                 |env, f| {
                     f(
@@ -80,9 +84,8 @@ impl IntoRust<String> for &JavaString {
                     )
                 },
             );
-            cesu_bytes.set_len(cesu8_len as usize);
+            cesu_bytes.set_len(cesu8_len as usize); // ignore trailing nul
         };
-        check_exception(jvm)?;
 
         // In the common case where there are no surrogate bytes, we can do a (checked) conversion of the Vec into a
         // Rust String. Otherwise, we'll need to use the cesu8 crate to convert properly. Note that this is the same

@@ -43,14 +43,6 @@ impl Parser {
         }
     }
 
-    /// Returns an error struct located at the last consumed token.
-    pub fn error(&self, message: impl ToString) -> syn::Result<()> {
-        Err(syn::Error::new(
-            self.last_span().unwrap_or(Span::call_site()),
-            message.to_string(),
-        ))
-    }
-
     /// Returns the next token without consuming it, or None if no tokens remain.
     pub fn peek_token(&mut self) -> Option<&TokenTree> {
         self.tokens.peek()

@@ -13,7 +13,7 @@ use std::{
 
 use jni_sys::jvalue;
 
-use crate::{jvm::JavaObjectExt, Error, GlobalResult, JavaObject, Jvm, Local};
+use crate::{jvm::JavaObjectExt, Error, GlobalResult, JavaObject, Local};
 
 const VERSION: jni_sys::jint = jni_sys::JNI_VERSION_1_8;
 
@@ -229,13 +229,38 @@ impl<'jvm> EnvPtr<'jvm> {
         })
     }
 
-    /// Invoke a JNI method dispatched through a virtual table lookup. Used by codegen to make most JNI calls.
+    /// Invoke a JNI method dispatched through a virtual table lookup. Used by codegen to make most JNI calls and so
+    /// must be public.
+    ///
+    /// First invokes [`FromJniValue::from_jni_value()`] before checking for a JVM exception. This allows [`Local`] drop
+    /// code to run and safely decrement the ref count before exiting early on an exception.
     ///
     /// # Safety
     ///
     /// The caller must ensure that the [`jni_sys::JNIEnv`] raw pointer is only used for this invocation.
     #[doc(hidden)]
-    pub unsafe fn invoke<F, T>(
+    pub unsafe fn invoke_checked<F, T: FromJniValue<'jvm>>(
+        self,
+        fn_field: impl FnOnce(&jni_sys::JNINativeInterface_) -> Option<F>,
+        call: impl FnOnce(*mut jni_sys::JNIEnv, F) -> T::JniValue,
+    ) -> crate::Result<'jvm, T> {
+        let value = self.invoke_unchecked(fn_field, call);
+
+        // Even if there was an exception thrown, we still need to free any non-null local ref
+        let value = T::from_jni_value(self, value);
+        self.check_exception()?;
+
+        Ok(value)
+    }
+
+    /// Invoke a JNI method dispatched through a virtual table lookup. Does *not* check for an exception and should
+    /// only be used when other mechanisms can prove the absence of an exception (e.g. a non-null return value or a
+    /// separate call to [`Self::check_exception()`]).
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the [`jni_sys::JNIEnv`] raw pointer is only used for this invocation.
+    pub(crate) unsafe fn invoke_unchecked<F, T>(
         self,
         fn_field: impl FnOnce(&jni_sys::JNINativeInterface_) -> Option<F>,
         call: impl FnOnce(*mut jni_sys::JNIEnv, F) -> T,
@@ -271,19 +296,18 @@ impl<'jvm> EnvPtr<'jvm> {
         class: ObjectPtr,
         native_methods: &[jni_sys::JNINativeMethod],
     ) -> crate::Result<'jvm, ()> {
-        let result = self.invoke(
+        let result: jni_sys::jint = self.invoke_checked(
             |f| f.RegisterNatives,
             |env, register_natives| {
                 let nm_ptr = native_methods.as_ptr();
                 let nm_len: i32 = native_methods.len() as i32;
                 register_natives(env, class.as_ptr(), nm_ptr, nm_len)
             },
-        );
+        )?;
 
         if result == 0 {
             Ok(())
         } else {
-            self.check_exception()?;
             Err(crate::Error::JvmInternal(format!(
                 "register native methods failed"
             )))
@@ -292,23 +316,15 @@ impl<'jvm> EnvPtr<'jvm> {
 
     pub fn check_exception(self) -> crate::Result<'jvm, ()> {
         // SAFETY: we don't hold on to the return env ptr
-        let thrown = unsafe { self.invoke(|env| env.ExceptionOccurred, |env, f| f(env)) };
+        let thrown = unsafe { self.invoke_unchecked(|env| env.ExceptionOccurred, |env, f| f(env)) };
         if let Some(thrown) = ObjectPtr::new(thrown) {
-            unsafe { self.invoke(|env| env.ExceptionClear, |env, f| f(env)) };
+            unsafe { self.invoke_unchecked(|env| env.ExceptionClear, |env, f| f(env)) };
             // SAFETY: the ptr returned by ExceptionOccurred is already a local ref and must be an instance of Throwable
             Err(Error::Thrown(unsafe { Local::from_raw(self, thrown) }))
         } else {
             Ok(())
         }
     }
-}
-
-// Note: EnvPtr isn't Send/Sync!
-
-/// Trait used by codegen to get access to the raw [`EnvPtr`] on structs like [`Jvm`].
-#[doc(hidden)]
-pub trait HasEnvPtr<'jvm> {
-    fn env(&self) -> EnvPtr<'jvm>;
 }
 
 /// Points to a live Java object through either a local or global ref.
@@ -417,15 +433,15 @@ impl<T: JavaObject> IntoJniValue for Option<&T> {
 #[doc(hidden)]
 pub trait FromJniValue<'jvm> {
     type JniValue;
-    unsafe fn from_jni_value(jvm: &mut Jvm<'jvm>, value: Self::JniValue) -> Self;
+    unsafe fn from_jni_value(env: EnvPtr<'jvm>, value: Self::JniValue) -> Self;
 }
 
 impl<'jvm, T: JavaObject> FromJniValue<'jvm> for Option<Local<'jvm, T>> {
     type JniValue = jni_sys::jobject;
 
-    unsafe fn from_jni_value(jvm: &mut Jvm<'jvm>, value: Self::JniValue) -> Self {
+    unsafe fn from_jni_value(env: EnvPtr<'jvm>, value: Self::JniValue) -> Self {
         // SAFETY: objects returned by JNI calls are already local refs
-        ObjectPtr::new(value).map(|obj| unsafe { Local::from_raw(jvm.env(), obj) })
+        ObjectPtr::new(value).map(|obj| unsafe { Local::from_raw(env, obj) })
     }
 }
 
@@ -433,7 +449,7 @@ impl<'jvm, T: JavaObject> FromJniValue<'jvm> for Option<Local<'jvm, T>> {
 impl<'jvm> FromJniValue<'jvm> for () {
     type JniValue = ();
 
-    unsafe fn from_jni_value(_jvm: &mut Jvm<'jvm>, _value: Self::JniValue) -> Self {
+    unsafe fn from_jni_value(_env: EnvPtr<'jvm>, _value: Self::JniValue) -> Self {
         ()
     }
 }
@@ -452,7 +468,7 @@ macro_rules! scalar_jni_value {
             impl<'jvm> FromJniValue<'jvm> for $rust {
                 type JniValue = jni_sys::$java;
 
-                unsafe fn from_jni_value(_jvm: &mut Jvm<'jvm>, value: Self::JniValue) -> Self {
+                unsafe fn from_jni_value(_env: EnvPtr<'jvm>, value: Self::JniValue) -> Self {
                     value
                 }
             }
@@ -483,7 +499,7 @@ impl IntoJniValue for bool {
 impl<'jvm> FromJniValue<'jvm> for bool {
     type JniValue = jni_sys::jboolean;
 
-    unsafe fn from_jni_value(_jvm: &mut Jvm<'jvm>, value: Self::JniValue) -> Self {
+    unsafe fn from_jni_value(_env: EnvPtr<'jvm>, value: Self::JniValue) -> Self {
         value == jni_sys::JNI_TRUE
     }
 }

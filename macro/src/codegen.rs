@@ -519,9 +519,9 @@ impl ClassInfo {
                             duchess::plumbing::find_constructor(jvm, &class, #jni_descriptor)
                         })?;
 
-                        let env = duchess::plumbing::HasEnvPtr::env(jvm);
-                        let obj = unsafe {
-                            env.invoke(|env| env.NewObjectA, |env, f| f(
+                        let env = jvm.env();
+                        let obj: ::core::option::Option<duchess::Local<#ty>> = unsafe {
+                            env.invoke_checked(|env| env.NewObjectA, |env, f| f(
                                 env,
                                 duchess::plumbing::JavaObjectExt::as_raw(&*class).as_ptr(),
                                 constructor.as_ptr(),
@@ -529,19 +529,15 @@ impl ClassInfo {
                                     #(duchess::plumbing::IntoJniValue::into_jni_value(#input_names),)*
                                 ].as_ptr(),
                             ))
-                        };
-
-                        if let Some(obj) = duchess::plumbing::ObjectPtr::new(obj) {
-                            Ok(unsafe { duchess::Local::from_raw(env, obj) })
-                        } else {
-                            duchess::plumbing::check_exception(jvm)?;
+                        }?;
+                        obj.ok_or_else(|| {
                             // NewObjectA should only return a null pointer when an exception occurred in the
                             // constructor, so reaching here is a strange JVM state
-                            Err(duchess::Error::JvmInternal(format!(
+                            duchess::Error::JvmInternal(format!(
                                 "failed to create new `{}` via constructor `{}`",
                                 #name, #descriptor,
-                            )))
-                        }
+                            ))
+                        })
                     }
                 }
 
@@ -829,8 +825,8 @@ impl ClassInfo {
                         duchess::plumbing::find_method(jvm, &class, #jni_method, #jni_descriptor, false)
                     })?;
 
-                    let output = unsafe {
-                        duchess::plumbing::HasEnvPtr::env(jvm).invoke(|env| env.#jni_call_fn, |env, f| f(
+                    unsafe {
+                        jvm.env().invoke_checked(|env| env.#jni_call_fn, |env, f| f(
                             env,
                             this.as_ptr(),
                             method.as_ptr(),
@@ -838,11 +834,7 @@ impl ClassInfo {
                                 #(duchess::plumbing::IntoJniValue::into_jni_value(#input_names),)*
                             ].as_ptr(),
                         ))
-                    };
-                    duchess::plumbing::check_exception(jvm)?;
-
-                    let output: #output_ty = unsafe { duchess::plumbing::FromJniValue::from_jni_value(jvm, output) };
-                    Ok(output)
+                    }
                 }
             }
         );
@@ -1020,8 +1012,8 @@ impl ClassInfo {
                     })?;
 
                     let class = <#this_ty as duchess::JavaObject>::class(jvm)?;
-                    let output = unsafe {
-                        duchess::plumbing::HasEnvPtr::env(jvm).invoke(|env| env.#jni_call_fn, |env, f| f(
+                    unsafe {
+                        jvm.env().invoke_checked(|env| env.#jni_call_fn, |env, f| f(
                             env,
                             duchess::plumbing::JavaObjectExt::as_raw(&*class).as_ptr(),
                             method.as_ptr(),
@@ -1029,11 +1021,7 @@ impl ClassInfo {
                                 #(duchess::plumbing::IntoJniValue::into_jni_value(#input_names),)*
                             ].as_ptr(),
                         ))
-                    };
-                    duchess::plumbing::check_exception(jvm)?;
-
-                    let output: #output_ty = unsafe { duchess::plumbing::FromJniValue::from_jni_value(jvm, output) };
-                    Ok(output)
+                    }
                 }
             }
         );
@@ -1151,17 +1139,13 @@ impl ClassInfo {
                     })?;
 
                     let class = <#this_ty as duchess::JavaObject>::class(jvm)?;
-                    let output = unsafe {
-                        duchess::plumbing::HasEnvPtr::env(jvm).invoke(|env| env.#jni_field_fn, |env, f| f(
+                    unsafe {
+                        jvm.env().invoke_checked(|env| env.#jni_field_fn, |env, f| f(
                             env,
                             duchess::plumbing::JavaObjectExt::as_raw(&*class).as_ptr(),
                             field.as_ptr(),
                         ))
-                    };
-                    duchess::plumbing::check_exception(jvm)?;
-
-                    let output: #output_ty = unsafe { duchess::plumbing::FromJniValue::from_jni_value(jvm, output) };
-                    Ok(output)
+                    }
                 }
             }
 

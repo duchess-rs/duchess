@@ -4,7 +4,7 @@ use crate::{
     cast::Upcast, from_ref::FromRef, java, jvm::JavaView, Error, Global, Jvm, JvmOp, Local,
 };
 
-pub trait ToJava: Sized {
+pub trait ToJava {
     type JvmOp<'a, J>: for<'jvm> JvmOp<Output<'jvm> = Option<Local<'jvm, J>>>
         + std::ops::Deref<Target = <J as JavaView>::OfOp<Self::JvmOp<'a, J>>>
     where
@@ -28,7 +28,7 @@ where
     ) -> crate::Result<'jvm, Option<Local<'jvm, J>>>;
 }
 
-impl<R> ToJava for R {
+impl<R: ?Sized> ToJava for R {
     type JvmOp<'a, J> = ToJavaOp<'a, R, J>
     where
         Self: 'a,
@@ -48,14 +48,14 @@ impl<R> ToJava for R {
 }
 
 #[derive_where::derive_where(Copy, Clone)]
-pub struct ToJavaOp<'a, R, J> {
+pub struct ToJavaOp<'a, R: ?Sized, J> {
     rust: &'a R,
     phantom: PhantomData<J>,
 }
 
 impl<R, J> JvmOp for ToJavaOp<'_, R, J>
 where
-    R: ToJavaImpl<J>,
+    R: ToJavaImpl<J> + ?Sized,
     J: Upcast<java::lang::Object> + Upcast<J>,
 {
     type Output<'jvm> = Option<Local<'jvm, J>>;
@@ -67,7 +67,7 @@ where
 
 impl<R, J> std::ops::Deref for ToJavaOp<'_, R, J>
 where
-    R: ToJavaImpl<J>,
+    R: ToJavaImpl<J> + ?Sized,
     J: Upcast<java::lang::Object> + Upcast<J>,
 {
     type Target = <J as JavaView>::OfOp<Self>;

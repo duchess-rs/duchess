@@ -3,8 +3,7 @@ use std::ffi::CStr;
 use crate::{
     java,
     jvm::JavaObjectExt,
-    plumbing::{check_exception, HasEnvPtr},
-    raw::{FieldPtr, MethodPtr, ObjectPtr},
+    raw::{FieldPtr, MethodPtr},
     Jvm, Local, Result,
 };
 
@@ -12,18 +11,18 @@ pub fn find_class<'jvm>(
     jvm: &mut Jvm<'jvm>,
     jni_name: &CStr,
 ) -> Result<'jvm, Local<'jvm, java::lang::Class>> {
-    let env = jvm.env();
-    let class = unsafe { env.invoke(|env| env.FindClass, |env, f| f(env, jni_name.as_ptr())) };
-    if let Some(class) = ObjectPtr::new(class) {
-        Ok(unsafe { Local::from_raw(env, class) })
-    } else {
-        check_exception(jvm)?;
+    let class: Option<Local<java::lang::Class>> = unsafe {
+        // SAFETY: jni_name is a valid pointer to a nul-terminated byte string
+        jvm.env()
+            .invoke_checked(|env| env.FindClass, |env, f| f(env, jni_name.as_ptr()))
+    }?;
+    class.ok_or_else(|| {
         // Class not existing should've triggered NoClassDefFoundError so something strange is now happening
-        Err(crate::Error::JvmInternal(format!(
+        crate::Error::JvmInternal(format!(
             "failed to find class `{}`",
             jni_name.to_string_lossy()
-        )))
-    }
+        ))
+    })
 }
 
 pub fn find_method<'jvm>(
@@ -37,7 +36,7 @@ pub fn find_method<'jvm>(
 
     let env = jvm.env();
     let method = unsafe {
-        env.invoke(
+        env.invoke_unchecked(
             |env| {
                 if is_static {
                     env.GetStaticMethodID
@@ -55,10 +54,11 @@ pub fn find_method<'jvm>(
             },
         )
     };
+    // JVM guarantees that valid method IDs are non-null, so the null check here suffices
     if let Some(method) = MethodPtr::new(method) {
         Ok(method)
     } else {
-        check_exception(jvm)?;
+        jvm.env().check_exception()?;
         // Method not existing should've triggered NoSuchMethodError so something strange is now happening
         Err(crate::Error::JvmInternal(format!(
             "failed to find method `{}` with signature `{}`",
@@ -79,7 +79,7 @@ pub fn find_field<'jvm>(
 
     let env = jvm.env();
     let field = unsafe {
-        env.invoke(
+        env.invoke_unchecked(
             |env| {
                 if is_static {
                     env.GetStaticFieldID
@@ -97,10 +97,11 @@ pub fn find_field<'jvm>(
             },
         )
     };
+    // JVM guarantees that valid field IDs are non-null, so the null check here suffices
     if let Some(field) = FieldPtr::new(field) {
         Ok(field)
     } else {
-        check_exception(jvm)?;
+        jvm.env().check_exception()?;
         // Field not existing should've triggered NoSuchFieldError so something strange is now happening
         Err(crate::Error::JvmInternal(format!(
             "failed to find field `{}` with signature `{}`",
