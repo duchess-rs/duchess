@@ -6,6 +6,12 @@ duchess::java_package! {
     class AnyVal { * }
     class Function1 {}
     class Tuple2<T1, T2> {}
+    class Option<A> {}
+    class Some<A> extends scala.Option<A> {}
+    class "None$" extends scala.Option<scala.runtime."Nothing$"> {}
+
+    package scala.runtime;
+    class "Nothing$" {}
 
     package scala.collection;
     interface IterableOnceOps<A, CC, C> {

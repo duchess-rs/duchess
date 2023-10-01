@@ -90,9 +90,12 @@ GenericBounds: Vec<ClassRef> = {
 Header: () = r#"Compiled from "[a-zA-Z0-9_$. ]+""#;
 
 DotId: DotId = {
-    <a:Id> r"[./]" <b:ID> => a.dot(b),
-    <i:DotId> r"[./]" <s:ID> => i.dot(s),
+    <a:Id> PathSeparator <b:ID> => a.dot(b),
+    <i:DotId> PathSeparator <s:ID> => i.dot(s),
 };
+
+#[inline]
+PathSeparator = { ".", "/" }
 
 Id: Id = {
     <a:ID> => Id::from(a),
@@ -110,7 +113,7 @@ MemberFunction: Option<MemberFunction> = {
 }
 
 Constructor: Constructor = {
-    <f:Flags> <g:Generics> <n:DotId> "(" <a:Comma<Type>> ")" <t:Throws> ";"  => {
+    <f:Flags> <g:Generics> ClassRef "(" <a:Comma<Type>> ")" <t:Throws> ";"  => {
         Constructor { flags: f, generics: g, argument_tys: a, throws: t,  }
     }
 };
@@ -198,8 +201,20 @@ ClassRefOrId: RefType = {
 };
 
 ClassRef: ClassRef = {
-    <name:DotId> => ClassRef { name, generics: vec![] },
-    <name:DotId> "<" <generics:Comma<RefType>> ">" => ClassRef { <> },
+    <a:Id> TypeArguments PathSeparator <b:ID> <generics:TypeArguments> => ClassRef {
+        name: a.dot(b),
+        generics
+    },
+    <base:ClassRef> PathSeparator <b:ID> <generics:TypeArguments> => ClassRef {
+        name: base.name.dot(b),
+        generics
+    }
+};
+
+#[inline]
+TypeArguments: Vec<RefType> = {
+    () => vec![],
+    ("<" <Comma<RefType>> ">"),
 };
 
 Comma<E>: Vec<E> = {
