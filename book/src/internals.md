@@ -47,11 +47,12 @@ The underlying `sys::jobject` can be null, but we maintain the invariant that th
 ## Exceptions
 
 The [JNI exposes Java exception state](https://docs.oracle.com/javase/7/docs/technotes/guides/jni/spec/functions.html#wp5234) via
- * `ExceptionCheck()` returning `true` if an unhandled exception has been thrown
- * `ExceptionOccurred()` returning a local reference to the thrown object
- * `ExceptionClear()` clearing the exception (if any)
 
-If an exception has occurred and isn't cleared before the next JNI call, the invoked Java code will immediately "see" the exception. Since this can cause an exception to propagate outside of the normal stack bubble-up, we must always call `duchess::EnvPtr::check_exception()?` after any JNI call that could throw. It will return `Err(duchess::Error::Thrown)` if one has occurred. The `duchess::EnvPtr::invoke_checked()` will both ensure the exception check occurred and that it was done in a way that any created local ref will be dropped correctly.
+* `ExceptionCheck()` returning `true` if an unhandled exception has been thrown
+* `ExceptionOccurred()` returning a local reference to the thrown object
+* `ExceptionClear()` clearing the exception (if any)
+
+If an exception has occurred and isn't cleared before the next JNI call, the invoked Java code will immediately "see" the exception. Since this can cause an exception to propagate outside of the normal stack bubble-up, we must always call `duchess::EnvPtr::check_exception()?` after any JNI call that could throw. It will return `Err(duchess::Error::Thrown)` if one has occurred. The `duchess::EnvPtr::invoke()` will both ensure the exception check occurred and that it was done in a way that any created local ref will be dropped correctly.
 
 ## Frequently asked questions
 
