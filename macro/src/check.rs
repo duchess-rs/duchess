@@ -38,12 +38,15 @@ impl ClassInfo {
                 format!("error in class `{}`: {m}", self.name),
             ));
         };
-        
+
         // does reflection kind match self.kind
         if info.kind != self.kind {
-            push_error_message(format!("reflected kind does not match ClassInfo.kind for {}", self.name));
+            push_error_message(format!(
+                "reflected kind does not match ClassInfo.kind for {}",
+                self.name
+            ));
         }
-        
+
         // We always allow people to elide generics, in which case
         // they are mirroring the "erased" version of the class.
         //

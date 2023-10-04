@@ -78,13 +78,23 @@ impl JavaPackage {
                 }
                 ClassDecl::Specified(c) => {
                     let dot_id = self.make_absolute_dot_id(c.span, &c.name)?;
-                    (
-                        dot_id.clone(),
-                        Arc::new(ClassInfo {
-                            name: dot_id,
-                            ..c.clone()
-                        }),
-                    )
+
+                    let info = Arc::new(ClassInfo {
+                        name: dot_id.clone(),
+                        ..c.clone()
+                    });
+
+                    if c.should_mirror_in_rust(info.flags.privacy)
+                        == info.should_mirror_in_rust(c.flags.privacy)
+                        && !info.should_mirror_in_rust(c.flags.privacy)
+                    {
+                        reflector
+                            .classes
+                            .borrow_mut()
+                            .entry(dot_id.clone())
+                            .or_insert(info.clone());
+                    }
+                    (dot_id.clone(), info.clone())
                 }
             };
 
