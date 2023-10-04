@@ -239,7 +239,7 @@ impl<'jvm> EnvPtr<'jvm> {
     ///
     /// The caller must ensure that the [`jni_sys::JNIEnv`] raw pointer is only used for this invocation.
     #[doc(hidden)]
-    pub unsafe fn invoke_checked<F, T: FromJniValue<'jvm>>(
+    pub unsafe fn invoke<F, T: FromJniValue<'jvm>>(
         self,
         fn_field: impl FnOnce(&jni_sys::JNINativeInterface_) -> Option<F>,
         call: impl FnOnce(*mut jni_sys::JNIEnv, F) -> T::JniValue,
@@ -296,7 +296,7 @@ impl<'jvm> EnvPtr<'jvm> {
         class: ObjectPtr,
         native_methods: &[jni_sys::JNINativeMethod],
     ) -> crate::Result<'jvm, ()> {
-        let result: jni_sys::jint = self.invoke_checked(
+        let result: jni_sys::jint = self.invoke(
             |f| f.RegisterNatives,
             |env, register_natives| {
                 let nm_ptr = native_methods.as_ptr();

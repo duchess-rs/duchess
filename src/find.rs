@@ -14,7 +14,7 @@ pub fn find_class<'jvm>(
     let class: Option<Local<java::lang::Class>> = unsafe {
         // SAFETY: jni_name is a valid pointer to a nul-terminated byte string
         jvm.env()
-            .invoke_checked(|env| env.FindClass, |env, f| f(env, jni_name.as_ptr()))
+            .invoke(|env| env.FindClass, |env, f| f(env, jni_name.as_ptr()))
     }?;
     class.ok_or_else(|| {
         // Class not existing should've triggered NoClassDefFoundError so something strange is now happening

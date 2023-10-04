@@ -141,7 +141,7 @@ macro_rules! primivite_array {
                     let env = jvm.env();
                     let array: Option<Local<JavaArray<$rust>>> = unsafe {
                         // SAFETY: env points to an attached JNI
-                        env.invoke_checked(|env| env.$new_fn, |env, f| f(env, len))
+                        env.invoke(|env| env.$new_fn, |env, f| f(env, len))
                     }?;
 
                     let Some(array) = array else {

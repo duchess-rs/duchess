@@ -521,7 +521,7 @@ impl ClassInfo {
 
                         let env = jvm.env();
                         let obj: ::core::option::Option<duchess::Local<#ty>> = unsafe {
-                            env.invoke_checked(|env| env.NewObjectA, |env, f| f(
+                            env.invoke(|env| env.NewObjectA, |env, f| f(
                                 env,
                                 duchess::plumbing::JavaObjectExt::as_raw(&*class).as_ptr(),
                                 constructor.as_ptr(),
@@ -826,7 +826,7 @@ impl ClassInfo {
                     })?;
 
                     unsafe {
-                        jvm.env().invoke_checked(|env| env.#jni_call_fn, |env, f| f(
+                        jvm.env().invoke(|env| env.#jni_call_fn, |env, f| f(
                             env,
                             this.as_ptr(),
                             method.as_ptr(),
@@ -1013,7 +1013,7 @@ impl ClassInfo {
 
                     let class = <#this_ty as duchess::JavaObject>::class(jvm)?;
                     unsafe {
-                        jvm.env().invoke_checked(|env| env.#jni_call_fn, |env, f| f(
+                        jvm.env().invoke(|env| env.#jni_call_fn, |env, f| f(
                             env,
                             duchess::plumbing::JavaObjectExt::as_raw(&*class).as_ptr(),
                             method.as_ptr(),
@@ -1140,7 +1140,7 @@ impl ClassInfo {
 
                     let class = <#this_ty as duchess::JavaObject>::class(jvm)?;
                     unsafe {
-                        jvm.env().invoke_checked(|env| env.#jni_field_fn, |env, f| f(
+                        jvm.env().invoke(|env| env.#jni_field_fn, |env, f| f(
                             env,
                             duchess::plumbing::JavaObjectExt::as_raw(&*class).as_ptr(),
                             field.as_ptr(),

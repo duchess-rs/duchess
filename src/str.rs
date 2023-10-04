@@ -18,9 +18,8 @@ impl JvmOp for &str {
 
         let env = jvm.env();
         // SAFETY: c_string is non-null pointer to cesu8-encoded encoded string ending in a trailing nul byte
-        let string: Option<Local<JavaString>> = unsafe {
-            env.invoke_checked(|env| env.NewStringUTF, |env, f| f(env, c_string.as_ptr()))
-        }?;
+        let string: Option<Local<JavaString>> =
+            unsafe { env.invoke(|env| env.NewStringUTF, |env, f| f(env, c_string.as_ptr())) }?;
         string.ok_or_else(|| Error::JvmInternal("JVM faild to create new String".into()))
     }
 }
