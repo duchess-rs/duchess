@@ -1,9 +1,7 @@
 use std::marker::PhantomData;
 
 use crate::Jvm;
-use crate::{
-    jvm::JavaObjectExt, raw::HasEnvPtr, refs::AsJRef, JavaObject, JvmOp, Local, TryJDeref,
-};
+use crate::{jvm::JavaObjectExt, refs::AsJRef, JavaObject, JvmOp, Local, TryJDeref};
 
 /// A trait to represent safe upcast operations for a [`JavaObject`].
 ///
@@ -52,7 +50,7 @@ where
 
         let env = jvm.env();
         let is_inst = unsafe {
-            env.invoke(
+            env.invoke_unchecked(
                 |env| env.IsInstanceOf,
                 |env, f| f(env, instance_raw.as_ptr(), class_raw.as_ptr()),
             ) == jni_sys::JNI_TRUE
@@ -105,7 +103,7 @@ where
 
             let instance_raw = instance.as_jref()?.as_raw();
             assert!(unsafe {
-                jvm.env().invoke(
+                jvm.env().invoke_unchecked(
                     |env| env.IsInstanceOf,
                     |env, f| f(env, instance_raw.as_ptr(), class_raw.as_ptr()),
                 ) == jni_sys::JNI_TRUE

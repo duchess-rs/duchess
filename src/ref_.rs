@@ -35,7 +35,7 @@ impl<'jvm, T: JavaObject> Local<'jvm, T> {
     pub(crate) fn new(env: EnvPtr<'jvm>, obj: &T) -> Self {
         // SAFETY: The JavaObject trait contract ensures that &T points to a Java object that is an instance of T.
         unsafe {
-            let new_ref = env.invoke(
+            let new_ref = env.invoke_unchecked(
                 |jni| jni.NewLocalRef,
                 |jni, f| f(jni, obj.as_raw().as_ptr()),
             );
@@ -61,7 +61,7 @@ impl<T: JavaObject> Drop for Local<'_, T> {
         // SAFETY: Local owns the local ref and it's no longer possible to dereference the object pointer.
         unsafe {
             self.env
-                .invoke(|jni| jni.DeleteLocalRef, |jni, f| f(jni, self.obj.as_ptr()));
+                .invoke_unchecked(|jni| jni.DeleteLocalRef, |jni, f| f(jni, self.obj.as_ptr()));
         }
     }
 }
@@ -101,7 +101,8 @@ impl<T: JavaObject> Global<T> {
     pub(crate) fn new(env: EnvPtr<'_>, obj: &T) -> Self {
         // SAFETY: The JavaObject trait contract ensures that &T points to a Java object that is an instance of T.
         unsafe {
-            let new_ref = env.invoke(|e| e.NewGlobalRef, |e, f| f(e, obj.as_raw().as_ptr()));
+            let new_ref =
+                env.invoke_unchecked(|e| e.NewGlobalRef, |e, f| f(e, obj.as_raw().as_ptr()));
             Self::from_raw(NonNull::new(new_ref).unwrap().into())
         }
     }
@@ -113,7 +114,7 @@ impl<T: JavaObject> Drop for Global<T> {
 
         // SAFETY: Global owns the global ref and it's no longer possible to dereference the object pointer.
         let delete = |env: EnvPtr<'_>| unsafe {
-            env.invoke(
+            env.invoke_unchecked(
                 |jni| jni.DeleteGlobalRef,
                 |jni, f| f(jni, self.obj.as_ptr()),
             )

@@ -6,7 +6,7 @@ use std::{
 use thiserror::Error;
 
 use crate::AsJRef;
-use crate::{java::lang::Throwable, raw::HasEnvPtr, Global, Jvm, JvmOp, Local};
+use crate::{java::lang::Throwable, Global, Jvm, JvmOp, Local};
 
 /// Result returned by most Java operations that may contain a local reference
 /// to a thrown exception.
@@ -78,11 +78,4 @@ impl<'jvm> Error<Local<'jvm, Throwable>> {
             Error::JvmInternal(m) => Error::JvmInternal(m),
         }
     }
-}
-
-/// Used by codegen to check if the JVM exception flag is set, materializing an [`Error::Thrown`] if it is.
-#[doc(hidden)]
-pub fn check_exception<'jvm>(jvm: &mut Jvm<'jvm>) -> Result<'jvm, ()> {
-    let env = jvm.env();
-    env.check_exception()
 }
