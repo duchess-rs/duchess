@@ -28,7 +28,7 @@ Using duchess, we can declare a Rust version of this class with the `java_packag
 duchess::java_package! {
     // First, identify the package you are mirroring,
     // and the visibility level that you want.
-    pub package com.widgard;
+    package com.widgard;
 
     // Next, identify classes whose methods you would like to call. 
     // The `*` indicates "reflect all methods".
