@@ -4,5 +4,5 @@ error: error in class `log.Builder`: duplicate reference in 'implements' to 'log
 4 |     public class log.Builder implements log.BuildStep, log.BuildStep {}
   |     ^^^^^^
 
-error: aborting due to previous error
+error: aborting due to 1 previous error
 
