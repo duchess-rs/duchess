@@ -5,6 +5,7 @@ use crate::AsJRef;
 use crate::Global;
 use crate::JavaObject;
 use crate::Local;
+use crate::Null;
 
 macro_rules! identity_jvm_op {
     ($([$($param:tt)*] $t:ty,)*) => {
@@ -40,6 +41,8 @@ identity_jvm_op! {
     [R: JavaObject] &Global<R>,
     [R: JavaObject] &Option<Local<'_, R>>,
     [R: JavaObject] &Option<Global<R>>,
+
+    [] Null,
 }
 
 /// Types that are able to be used as a Java `T`, either because they will produce a Java `T` (e.g. [`JvmOp`]s that
