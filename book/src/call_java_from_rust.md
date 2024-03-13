@@ -92,7 +92,27 @@ let w = f.produce_widget().execute();
 
 // ...references to Java objects are passed with `&`.
 f.consume_widget(&w).execute();
-})
+```
+
+## Passing null values
+
+If you want to pass a null value as a parameter, you can use `duchess::Null`:
+
+```rust,ignore
+use com::widgard::{Factory, FactoryExt};
+let f = Factory::new().execute();
+f.consume_widget(duchess::Null).execute();
+//               ^^^^^^^^^^^^^ like this!
+```
+
+Another option is to use `Option` types:
+
+```rust,ignore
+use com::widgard::{Factory, FactoryExt, Widget};
+let f = Factory::new().execute();
+let j: Option<Global<Widget>> = None;
+f.consume_widget(j).execute();
+//               ^ like this!
 ```
 
 ## Launching the JVM
