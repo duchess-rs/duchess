@@ -4,5 +4,5 @@ error: error in class `log.Builder`: duplicate reference in 'extends' to 'java.l
 4 |     public class log.Builder extends java.lang.Object, java.lang.Object {}
   |     ^^^^^^
 
-error: aborting due to previous error
+error: aborting due to 1 previous error
 

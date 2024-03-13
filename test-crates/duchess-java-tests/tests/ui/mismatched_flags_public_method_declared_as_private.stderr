@@ -4,5 +4,5 @@ error: error in class `flags.Flags`: member declared as `private` but it is `pub
 4 |     public class flags.Flags {
   |     ^^^^^^
 
-error: aborting due to previous error
+error: aborting due to 1 previous error
 
