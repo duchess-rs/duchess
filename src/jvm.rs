@@ -116,6 +116,50 @@ pub trait JvmOp: Copy {
     fn do_jni<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, Self::Output<'jvm>>;
 }
 
+/// A (pseudo) alias for a`JvmOp` that provides "something converted to a Java `T`".
+/// Don't implement this yourself, just implement `JvmOp`.
+///
+/// # Implementation note
+///
+/// Ideally this would be a "trait alias" for `JvmOp<Output<'_>: JvmRefOp<T>>`, but
+/// adding a where-clause to that effect did not seem to work in all cases, so we define
+/// a distinct associated type.
+pub trait JvmRefOp<T: JavaObject>: Copy {
+    // nikomatsakis:
+    type Output<'jvm>: AsJRef<T>;
+
+    fn into_as_jref<'jvm>(
+        self,
+        jvm: &mut Jvm<'jvm>,
+    ) -> crate::LocalResult<'jvm, Self::Output<'jvm>>;
+}
+
+impl<J, T> JvmRefOp<T> for J
+where
+    T: JavaObject,
+    J: JvmOp,
+    for<'jvm> <J as JvmOp>::Output<'jvm>: AsJRef<T>,
+{
+    type Output<'jvm> = <J as JvmOp>::Output<'jvm>;
+
+    fn into_as_jref<'jvm>(
+        self,
+        jvm: &mut Jvm<'jvm>,
+    ) -> crate::LocalResult<'jvm, <Self as JvmRefOp<T>>::Output<'jvm>> {
+        JvmOp::do_jni(self, jvm)
+    }
+}
+
+/// A [`JvmOp`] that produces a scalar value, like `i8` or `i32`.
+pub trait JvmScalarOp<T: JavaScalar>: for<'jvm> JvmOp<Output<'jvm> = T> {}
+
+impl<J, T> JvmScalarOp<T> for J
+where
+    T: JavaScalar,
+    J: for<'jvm> JvmOp<Output<'jvm> = T>,
+{
+}
+
 /// This trait is only implemented for `()`; it allows the `JvmOp::execute` method to only
 /// be used for `()`.
 pub trait IsVoid: Default {}

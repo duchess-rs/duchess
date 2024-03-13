@@ -134,17 +134,26 @@ impl Signature {
         self.where_clauses.push(t);
     }
 
-    /// Returns an appropriate `impl type` for a funtion that
+    /// Returns an appropriate `impl type` for a function that
     /// takes `ty` as input. Assumes objects are nullable.
-    pub fn input_trait(&mut self, ty: &Type) -> syn::Result<TokenStream> {
+    pub fn input_and_jvm_op_traits(
+        &mut self,
+        ty: &Type,
+    ) -> syn::Result<(TokenStream, TokenStream)> {
         match ty.to_non_repeating() {
             NonRepeatingType::Ref(ty) => {
                 let t = self.java_ref_ty(&ty)?;
-                Ok(quote_spanned!(self.span => duchess::IntoJava<#t>))
+                Ok((
+                    quote_spanned!(self.span => duchess::IntoJava<#t>),
+                    quote_spanned!(self.span => duchess::plumbing::JvmRefOp<#t>),
+                ))
             }
             NonRepeatingType::Scalar(ty) => {
                 let t = self.java_scalar_ty(&ty);
-                Ok(quote_spanned!(self.span => duchess::IntoScalar<#t>))
+                Ok((
+                    quote_spanned!(self.span => duchess::IntoScalar<#t>),
+                    quote_spanned!(self.span => duchess::plumbing::JvmScalarOp<#t>),
+                ))
             }
         }
     }
