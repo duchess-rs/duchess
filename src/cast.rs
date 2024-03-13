@@ -13,7 +13,8 @@ use crate::{jvm::JavaObjectExt, refs::AsJRef, JavaObject, JvmOp, Local, TryJDere
 /// XX: having to impl `Upcast<T>` for T on each struct is pretty annoying to get `AsJRef<T>` to work without conflicts
 pub unsafe trait Upcast<S: JavaObject>: JavaObject {}
 
-#[derive_where::derive_where(Copy, Clone)]
+#[derive_where::derive_where(Clone)]
+#[derive_where(Copy; J: Copy)]
 pub struct TryDowncast<J: JvmOp, To> {
     op: J,
     _marker: PhantomData<To>,
@@ -66,7 +67,8 @@ where
     }
 }
 
-#[derive_where::derive_where(Copy, Clone)]
+#[derive_where::derive_where(Clone)]
+#[derive_where(Copy; J: Copy)]
 pub struct AsUpcast<J: JvmOp, To> {
     op: J,
     _marker: PhantomData<To>,

@@ -467,19 +467,6 @@ impl ClassInfo {
                 impl<
                     #(#java_class_generics,)*
                     #(#input_names,)*
-                > ::core::marker::Copy for Impl<
-                    #(#java_class_generics,)*
-                    #(#input_names,)*
-                >
-                where
-                    #(#java_class_generics: duchess::JavaObject,)*
-                    #(#input_names : #jvm_op_traits,)*
-                {
-                }
-
-                impl<
-                    #(#java_class_generics,)*
-                    #(#input_names,)*
                 > ::core::clone::Clone for Impl<
                     #(#java_class_generics,)*
                     #(#input_names,)*
@@ -489,7 +476,10 @@ impl ClassInfo {
                     #(#input_names : #jvm_op_traits,)*
                 {
                     fn clone(&self) -> Self {
-                        *self
+                        Impl {
+                            #(#input_names: Clone::clone(&self.#input_names),)*
+                            phantom: self.phantom,
+                        }
                     }
                 }
 
@@ -623,7 +613,7 @@ impl ClassInfo {
                 #(#sig_where_clauses,)*
             {
                 <#this_ty>::#rust_method_name(
-                    self.this,
+                    Clone::clone(&self.this),
                     #(#input_names,)*
                 )
             }
@@ -783,15 +773,6 @@ impl ClassInfo {
         // Implementation of `JvmOp` for `m` -- when executed, call the method
         // via JNI, after converting its arguments appropriately.
         let jvmop_impl = quote_spanned!(self.span =>
-            impl<#(#method_struct_generics),*> ::core::marker::Copy
-            for #rust_method_type_name<#(#method_struct_generics),*>
-            where
-                #this: duchess::plumbing::JvmRefOp<#this_ty>,
-                #(#input_names: #jvm_op_traits,)*
-                #(#java_class_generics: duchess::JavaObject,)*
-                #(#sig_where_clauses,)*
-            {}
-
             impl<#(#method_struct_generics),*> ::core::clone::Clone
             for #rust_method_type_name<#(#method_struct_generics),*>
             where
@@ -801,7 +782,11 @@ impl ClassInfo {
                 #(#sig_where_clauses,)*
             {
                 fn clone(&self) -> Self {
-                    *self
+                    #rust_method_type_name {
+                        #this: Clone::clone(&self.#this),
+                        #(#input_names: Clone::clone(&self.#input_names),)*
+                        phantom: self.phantom,
+                    }
                 }
             }
 
@@ -977,15 +962,6 @@ impl ClassInfo {
         // via JNI, after converting its arguments appropriately.
         let this_ty = self.this_type();
         let jvmop_impl = quote_spanned!(self.span =>
-            impl<#(#method_struct_generics),*> ::core::marker::Copy
-            for #rust_method_type_name<#(#method_struct_generics),*>
-            where
-                #(#input_names: #jvm_op_traits,)*
-                #(#java_class_generics: duchess::JavaObject,)*
-                #(#sig_where_clauses,)*
-            {
-            }
-
             impl<#(#method_struct_generics),*> ::core::clone::Clone
             for #rust_method_type_name<#(#method_struct_generics),*>
             where
@@ -994,7 +970,10 @@ impl ClassInfo {
                 #(#sig_where_clauses,)*
             {
                 fn clone(&self) -> Self {
-                    *self
+                    #rust_method_type_name {
+                        #(#input_names: Clone::clone(&self.#input_names),)*
+                        phantom: self.phantom,
+                    }
                 }
             }
 
@@ -1160,20 +1139,15 @@ impl ClassInfo {
                 }
             }
 
-            impl<#(#field_struct_generics),*> ::core::marker::Copy for #rust_field_type_name<#(#field_struct_generics),*>
-            where
-                #(#java_class_generics: duchess::JavaObject,)*
-                #(#sig_where_clauses,)*
-            {
-            }
-
             impl<#(#field_struct_generics),*> ::core::clone::Clone for #rust_field_type_name<#(#field_struct_generics),*>
             where
                 #(#java_class_generics: duchess::JavaObject,)*
                 #(#sig_where_clauses,)*
             {
                 fn clone(&self) -> Self {
-                    *self
+                    #rust_field_type_name {
+                        phantom: self.phantom,
+                    }
                 }
             }
         );

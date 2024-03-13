@@ -34,7 +34,7 @@ mod test;
 /// over into the JVM, so the more you can chain together your jvm-ops,
 /// the better.
 #[must_use = "JvmOps do nothing unless you call `.execute()"]
-pub trait JvmOp: Copy {
+pub trait JvmOp: Clone {
     type Output<'jvm>;
 
     fn assert_not_null<T>(self) -> NotNull<Self>
@@ -124,7 +124,7 @@ pub trait JvmOp: Copy {
 /// Ideally this would be a "trait alias" for `JvmOp<Output<'_>: JvmRefOp<T>>`, but
 /// adding a where-clause to that effect did not seem to work in all cases, so we define
 /// a distinct associated type.
-pub trait JvmRefOp<T: JavaObject>: Copy {
+pub trait JvmRefOp<T: JavaObject>: Clone {
     // nikomatsakis:
     type Output<'jvm>: AsJRef<T>;
 
@@ -159,11 +159,6 @@ where
     J: for<'jvm> JvmOp<Output<'jvm> = T>,
 {
 }
-
-/// This trait is only implemented for `()`; it allows the `JvmOp::execute` method to only
-/// be used for `()`.
-pub trait IsVoid: Default {}
-impl IsVoid for () {}
 
 static GLOBAL_JVM: OnceCell<JvmPtr> = OnceCell::new();
 
@@ -263,7 +258,7 @@ where
         }
 
         Err(e) => {
-            let panic_as_err = rust_panic_to_java_exception(env, e);
+            let () = rust_panic_to_java_exception(env, e);
             std::ptr::null_mut()
         }
     };
@@ -654,17 +649,4 @@ scalar! {
     i64:  b"[J\0",
     f32:  b"[F\0",
     f64:  b"[D\0",
-}
-
-pub trait CloneIn<'jvm> {
-    fn clone_in(&self, jvm: &mut Jvm<'jvm>) -> Self;
-}
-
-impl<T> CloneIn<'_> for T
-where
-    T: Clone,
-{
-    fn clone_in(&self, _jvm: &mut Jvm<'_>) -> Self {
-        self.clone()
-    }
 }
