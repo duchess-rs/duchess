@@ -52,8 +52,6 @@ struct Driver<'a> {
 
 impl Driver<'_> {
     fn try_derive_to_rust(&mut self) -> Result<proc_macro2::TokenStream, syn::Error> {
-        self.check_generics()?;
-
         match self.input.ast().data {
             syn::Data::Struct(_) => self.try_derive_to_rust_struct(),
             syn::Data::Enum(_) => self.try_derive_to_rust_enum(),
@@ -64,8 +62,6 @@ impl Driver<'_> {
     }
 
     fn try_derive_to_java(&mut self) -> Result<proc_macro2::TokenStream, syn::Error> {
-        self.check_generics()?;
-
         match self.input.ast().data {
             syn::Data::Struct(_) => self.try_derive_to_java_struct(),
             syn::Data::Enum(_) => self.try_derive_to_java_enum(),
@@ -140,11 +136,12 @@ impl Driver<'_> {
             .collect::<Result<Vec<_>, _>>()?;
 
         let self_ty = &self.input.ast().ident;
+        let (impl_generics, ty_generics, where_clause) = self.input.ast().generics.split_for_impl();
 
         Ok(quote_spanned!(self.span() =>
         #[allow(unused_imports, unused_variables)]
-        impl duchess::IntoRust<#self_ty> for &#root_class_name {
-            fn into_rust<'jvm>(self, jvm: &mut duchess::Jvm<'jvm>) -> duchess::Result<'jvm, #self_ty> {
+        impl #impl_generics duchess::IntoRust<#self_ty #ty_generics> for &#root_class_name #where_clause {
+            fn into_rust<'jvm>(self, jvm: &mut duchess::Jvm<'jvm>) -> duchess::Result<'jvm, #self_ty #ty_generics> {
                 use duchess::prelude::*;
                 #(
                     if let Ok(variant) = self.try_downcast::<#child_class_names>().execute_with(jvm)? {
@@ -203,9 +200,11 @@ impl Driver<'_> {
             .collect::<Result<Vec<_>, _>>()?;
 
         let self_ty = &self.input.ast().ident;
+        let (impl_generics, ty_generics, where_clause) = self.input.ast().generics.split_for_impl();
+
         Ok(quote_spanned!(self.span() =>
             #[allow(unused_imports, unused_variables)]
-            impl duchess::JvmOp for & #self_ty {
+            impl #impl_generics duchess::JvmOp for & #self_ty #ty_generics #where_clause {
                 type Output<'jvm> = duchess::Local<'jvm, #root_class_name>;
 
                 fn execute_with<'jvm>(self, jvm: &mut duchess::Jvm<'jvm>) -> duchess::Result<'jvm, Self::Output<'jvm>> {
@@ -216,7 +215,7 @@ impl Driver<'_> {
                 }
             }
 
-            impl duchess::plumbing::ToJavaImpl<#root_class_name> for #self_ty {
+            impl #impl_generics duchess::plumbing::ToJavaImpl<#root_class_name> for #self_ty #ty_generics #where_clause {
                 fn to_java_impl<'jvm>(rust: &Self, jvm: &mut duchess::Jvm<'jvm>) -> duchess::Result<'jvm, ::core::option::Option<duchess::Local<'jvm, #root_class_name>>> {
                     Ok(Some(duchess::JvmOp::execute_with(rust, jvm)?))
                 }
@@ -244,18 +243,6 @@ impl Driver<'_> {
                 })
             })
             .collect::<Result<Vec<_>, _>>()
-    }
-
-    fn check_generics(&self) -> Result<(), syn::Error> {
-        if self.input.ast().generics.params.is_empty() {
-            Ok(())
-        } else {
-            // FIXME
-            Err(syn::Error::new(
-                self.span(),
-                "generic structs not yet supported",
-            ))
-        }
     }
 
     /// Generates the code to create this variant as part of a `ToRust` impl.

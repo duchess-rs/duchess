@@ -94,6 +94,20 @@ mod auto {
             public abstract java.lang.String toString();
         }
 
+        public final class java.lang.Long {
+            public static long parseLong(java.lang.String) throws java.lang.NumberFormatException;
+            public static long parseUnsignedLong(java.lang.String) throws java.lang.NumberFormatException;
+            public static java.lang.Long valueOf(java.lang.String) throws java.lang.NumberFormatException;
+            public static java.lang.Long decode(java.lang.String) throws java.lang.NumberFormatException;
+            public java.lang.Long(java.lang.String) throws java.lang.NumberFormatException;
+            public byte byteValue();
+            public short shortValue();
+            public int intValue();
+            public long longValue();
+            public float floatValue();
+            public double doubleValue();
+            public static java.lang.Long getLong(java.lang.String);
+          }
 
         package java.util;
 
