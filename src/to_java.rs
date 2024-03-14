@@ -46,6 +46,7 @@ impl<R: ?Sized> ToJava for R {
         }
     }
 }
+
 #[derive_where::derive_where(Copy, Clone)]
 pub struct ToJavaOp<'a, R: ?Sized, J> {
     rust: &'a R,
@@ -214,7 +215,7 @@ where
         rust: &Self,
         jvm: &mut Jvm<'jvm>,
     ) -> crate::Result<'jvm, Option<Local<'jvm, J>>> {
-        ToJavaImpl::to_java_impl(*rust, jvm)
+        R::to_java_impl(rust, jvm)
     }
 }
 

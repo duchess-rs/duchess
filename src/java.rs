@@ -237,7 +237,7 @@ mod auto {
             //   public java.util.Date(int, int, int);
             //   public java.util.Date(int, int, int, int, int);
             //   public java.util.Date(int, int, int, int, int, int);
-            //  public java.util.Date(java.lang.String);
+            //   public java.util.Date(java.lang.String);
             // public java.lang.Object clone();
             public static long UTC(int, int, int, int, int, int);
             public static long parse(java.lang.String);
