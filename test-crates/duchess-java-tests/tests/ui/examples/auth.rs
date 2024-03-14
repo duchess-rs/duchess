@@ -71,6 +71,15 @@ pub struct AuthorizeRequest {
     pub context: HashMap<String, String>,
 }
 
+
+#[derive(Debug, duchess::ToJava)]
+#[java(auth.AuthorizeRequest)]
+pub struct AuthorizeRequestWithReferences<'a> {
+    pub resource: &'a str,
+    pub action: &'a str,
+    pub context: &'a HashMap<String, String>,
+}
+
 #[derive(Debug, Error, duchess::ToRust)]
 #[java(java.lang.Throwable)]
 pub enum AuthorizeError {
@@ -140,6 +149,16 @@ fn main() -> duchess::GlobalResult<()> {
         "User `{}` in `{}` authenticated",
         authenticated.user, authenticated.account_id
     );
+
+    let resource = "my-resource";
+    let action = "delete";
+    let context = HashMap::new();
+
+    let _request_with_ref = AuthorizeRequestWithReferences {
+        resource: &resource,
+        action: &action,
+        context: &context,
+    };
 
     let request = AuthorizeRequest {
         resource: "my-resource".into(),

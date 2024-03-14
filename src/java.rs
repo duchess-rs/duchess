@@ -232,12 +232,12 @@ mod auto {
         }
 
         public class java.util.Date { // implements java.io.Serializable, java.lang.Cloneable, java.lang.Comparable<java.util.Date> {
-            // public java.util.Date();
+            public java.util.Date();
             //   public java.util.Date(long);
             //   public java.util.Date(int, int, int);
             //   public java.util.Date(int, int, int, int, int);
             //   public java.util.Date(int, int, int, int, int, int);
-              public java.util.Date(java.lang.String);
+            //  public java.util.Date(java.lang.String);
             // public java.lang.Object clone();
             public static long UTC(int, int, int, int, int, int);
             public static long parse(java.lang.String);

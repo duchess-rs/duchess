@@ -205,17 +205,6 @@ where
     }
 }
 
-// impl<J> ToJavaImpl<J> for &J
-// where
-//     J: Upcast<java::lang::Object>,
-// {
-//     fn to_java_impl<'jvm>(
-//         rust: &Self,
-//         jvm: &mut Jvm<'jvm>,
-//     ) -> crate::Result<'jvm, Option<Local<'jvm, J>>> {
-//         Ok(Some(jvm.local(rust)))
-//     }
-// }
 impl<J, R> ToJavaImpl<J> for &R
 where
     J: Upcast<java::lang::Object>,
