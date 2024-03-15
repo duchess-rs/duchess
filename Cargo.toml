@@ -1,7 +1,7 @@
 [workspace]
 
 [workspace.package]
-version = "0.1.6"
+version = "0.1.8"
 license = "Apache-2.0 OR MIT"
 repository = "https://github.com/duchess-rs/duchess"
 homepage = "https://duchess-rs.github.io/duchess/"
@@ -17,7 +17,7 @@ readme = "README.md"
 
 [dependencies]
 derive_more = "0.99.17"
-duchess-macro = { path = "macro", version = "0.1.6" }
+duchess-macro = { path = "macro", version = "0.1.8" }
 jni-sys = "0.3.0"
 cesu8 = "1.1.0"
 once_cell = "1.17.1"
