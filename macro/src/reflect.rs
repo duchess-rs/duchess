@@ -163,7 +163,8 @@ impl Reflector {
             return Err(syn::Error::new(
                 span,
                 format!(
-                    "unsuccessful execution of `{command:?}`: {}",
+                    "unsuccessful execution of `{command:?}` (exit status: {}): {}",
+                    output.status,
                     String::from_utf8(output.stderr).unwrap_or(String::from("error"))
                 ),
             ));
