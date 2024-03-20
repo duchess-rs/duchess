@@ -91,6 +91,16 @@ fn debug_tokens(name: impl std::fmt::Display, token_stream: &proc_macro2::TokenS
                 std::fs::write(&path, format!("{token_stream:?}")).expect("failed to write to debug file");
             }
         }
-        eprintln!("file:///{}", path.display())
+        // in JetBrains terminal, links are only clickable with a `file:///` prefix. But in VsCode
+        // iTerm, and most other terminals, they are only clickable if they are absolute paths.
+        if running_in_jetbrains() {
+            eprintln!("file:///{}", path.display())
+        } else {
+            eprintln!("{}", path.display())
+        }
     }
+}
+
+fn running_in_jetbrains() -> bool {
+    std::env::var("TERMINAL_EMULATOR").map(|var|var.contains("JetBrains")).unwrap_or_default()
 }
