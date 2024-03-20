@@ -2,6 +2,7 @@ use argument::{DuchessDeclaration, MethodSelector};
 use parse::Parser;
 use proc_macro::TokenStream;
 use rust_format::Formatter;
+use std::path::PathBuf;
 
 mod argument;
 mod check;
@@ -64,18 +65,32 @@ synstructure::decl_derive!([ToRust, attributes(java)] => derive::derive_to_rust)
 
 synstructure::decl_derive!([ToJava, attributes(java)] => derive::derive_to_java);
 
+lazy_static::lazy_static! {
+    static ref DEBUG_DIR: PathBuf = {
+        let tmp_dir = tempfile::TempDir::new().expect("failed to create temp directory");
+        tmp_dir.into_path()
+    };
+}
+
 fn debug_tokens(name: impl std::fmt::Display, token_stream: &proc_macro2::TokenStream) {
-    let Ok(f) = std::env::var("DUCHESS_DEBUG") else {
+    let Ok(debug_filter) = std::env::var("DUCHESS_DEBUG") else {
         return;
     };
-    if f == "*" || f == "1" || name.to_string().starts_with(&f) {
+    let name = name.to_string();
+    let debug_enabled = match debug_filter {
+        f if f.eq_ignore_ascii_case("true") || f.eq_ignore_ascii_case("1") => true,
+        filter => name.starts_with(&filter)
+    };
+    if debug_enabled {
+        let path = DEBUG_DIR.join(name.replace('.', "_")).with_extension("rs");
         match rust_format::RustFmt::default().format_tokens(token_stream.clone()) {
-            Ok(v) => {
-                eprintln!("{v}");
+            Ok(formatted_tokens) => {
+                std::fs::write(&path, formatted_tokens).expect("failed to write to debug file");
             }
             Err(_) => {
-                eprintln!("{token_stream:?}");
+                std::fs::write(&path, format!("{token_stream:?}")).expect("failed to write to debug file");
             }
         }
+        eprintln!("file:///{}", path.display())
     }
 }
