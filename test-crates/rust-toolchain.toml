@@ -1,0 +1,4 @@
+# the UI tests depend on a specific version of Rust since the compiler error messages change slightly release-to-release
+[toolchain]
+channel = "1.76.0"
+

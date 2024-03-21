@@ -1,6 +1,4 @@
-use std::marker::PhantomData;
-
-use crate::{AsJRef, JavaObject, NullJRef, TryJDeref};
+use crate::{AsJRef, JavaObject, NullJRef};
 
 #[derive(Copy, Clone)]
 pub struct Null;
