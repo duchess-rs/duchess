@@ -5,6 +5,7 @@
     - [Setup](./setup.md)
     - [Calling Java from Rust](./call_java_from_rust.md)
     - [Implementing native methods](./implementing_native_methods.md)
+- [Memory safety requirements](./safety.md)
 - [Reference](./reference.md)
     - [The `java_package` macro](./java_package.md)
     - [The `java_function` macro](./java_function.md)
