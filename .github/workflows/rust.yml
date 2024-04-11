@@ -42,3 +42,27 @@ jobs:
     - name: Test book
       if: matrix.os == 'ubuntu-latest'
       run: ./mdbook test book
+
+  coverage:
+    runs-on: 'ubuntu-latest'
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-java@v3
+        with:
+          distribution: 'corretto'
+          java-version: 17
+      - uses: Swatinem/rust-cache@v2
+      - name: install just
+        run: |
+          cargo install just
+      - name: coverage-deps
+        run: just coverage-tools
+      - name:
+        run: just coverage
+        env:
+          NO_OPEN: true
+      - name: Upload Coverage Report
+        uses: actions/upload-artifact@v3
+        with:
+          name: ui-coverage-report
+          path: target/ui-coverage-report/
