@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [ "main" ]
 
+# Allow one instance of this workflow per pull request, and cancel older runs when new changes are pushed
+concurrency:
+  group: ci-yaml-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   CARGO_TERM_COLOR: always
 
@@ -15,6 +20,7 @@ jobs:
       matrix:
         # windows-latest does not work because of https://github.com/oli-obk/ui_test/issues/147
         os: [ubuntu-latest, macos-latest]
+        java-version: ['17', '21']
       fail-fast: false
     runs-on: ${{ matrix.os }}
 
@@ -23,7 +29,7 @@ jobs:
     - uses: actions/setup-java@v3
       with:
         distribution: 'corretto'
-        java-version: '17'
+        java-version: ${{ matrix.java-version }}
     - name: Install mdBook
       if: matrix.os == 'ubuntu-latest'
       run: curl -sSL https://github.com/rust-lang/mdBook/releases/download/v0.4.28/mdbook-v0.4.28-x86_64-unknown-linux-gnu.tar.gz | tar -xz
