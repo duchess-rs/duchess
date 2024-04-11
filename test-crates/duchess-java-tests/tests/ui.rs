@@ -10,6 +10,15 @@ fn main() -> color_eyre::eyre::Result<()> {
     let mut config = Config {
         ..Config::rustc(Path::new("tests").join("ui"))
     };
+
+    if std::env::var("RUSTFLAGS")
+        .unwrap_or_default()
+        .contains("instrument-coverage")
+    {
+        config.program.args.push("-C".into());
+        config.program.args.push("instrument-coverage".into());
+    }
+
     let args = Args::test()?;
 
     if bless {
@@ -53,6 +62,6 @@ fn main() -> color_eyre::eyre::Result<()> {
             ui_test::status_emitter::Gha::<true> {
                 name: "ui tests".into(),
             },
-        )
+        ),
     )
 }
