@@ -1,9 +1,11 @@
 # Memory safety requirements
 
-Duchess provides a **safe abstraction** atop the Java Native Interface (JNI).
+Duchess provides a **safe abstraction** atop the [Java Native Interface (JNI)][jni].
 This means that, as long as you are using Duchess to interact with the JVM,
 you cannot cause memory unsafety.
 However, there are edge cases that can "void" this guarantee and which Duchess cannot control.
+
+[jni]: https://docs.oracle.com/javase/8/docs/technotes/guides/jni/spec/jniTOC.html
 
 ## Memory safety requirements
 
