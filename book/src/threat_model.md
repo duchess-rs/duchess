@@ -1,5 +1,7 @@
 # Threat model
 
+![Status: Experimental](https://img.shields.io/badge/Status-WIP-yellow)
+
 This page analyzes Duchess's use of the JNI APIs to explain how it guarantees memory safety in each case. 
 
 ## Code invariants
