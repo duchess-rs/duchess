@@ -39,6 +39,7 @@ logger
 
 Check out the...
 
+* [Rustdoc](./rustdoc/doc/duchess/index.html)
 * The [examples](https://github.com/duchess-rs/duchess/tree/main/test-crates/duchess-java-tests/tests/ui/examples)
 * The [tutorials](https://duchess-rs.github.io/duchess/tutorials.html) chapter
 
