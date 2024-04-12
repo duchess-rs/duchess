@@ -5,6 +5,7 @@ version = "0.1.8"
 license = "Apache-2.0 OR MIT"
 repository = "https://github.com/duchess-rs/duchess"
 homepage = "https://duchess-rs.github.io/duchess/"
+documentation = "https://duchess-rs.github.io/duchess/rustdoc/doc/duchess/index.html"
 
 [package]
 name = "duchess"

@@ -2,7 +2,7 @@
 
 [<img src="https://img.shields.io/badge/chat-on%20Zulip-green"></img>][Zulip]
 
-Duchess is a Rust crate that makes it easy, ergonomic, and efficient to interoperate with Java code.
+Duchess is a Rust crate that makes it [safe](./safety.md), ergonomic, and efficient to interoperate with Java code.
 
 <img src="duchess.svg" width="300"></img>
 
@@ -39,6 +39,7 @@ logger
 
 Check out the...
 
+* [Rustdoc](./rustdoc/doc/duchess/index.html)
 * The [examples](https://github.com/duchess-rs/duchess/tree/main/test-crates/duchess-java-tests/tests/ui/examples)
 * The [tutorials](https://duchess-rs.github.io/duchess/tutorials.html) chapter
 

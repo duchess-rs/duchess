@@ -32,6 +32,10 @@ jobs:
       MDBOOK_VERSION: 0.4.21
     steps:
       - uses: actions/checkout@v3
+      - uses: actions/setup-java@v3
+        with:
+          distribution: 'corretto'
+          java-version: '17'
       - name: Install mdBook
         run: |
           curl -sSL https://github.com/rust-lang/mdBook/releases/download/v0.4.28/mdbook-v0.4.28-x86_64-unknown-linux-gnu.tar.gz | tar -xz
@@ -43,6 +47,8 @@ jobs:
         uses: actions/configure-pages@v3
       - name: Build with mdBook
         run: ./mdbook build book
+      - name: Rust rustdoc
+        run: cargo doc --target-dir book/book/rustdoc
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1
         with:
