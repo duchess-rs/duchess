@@ -409,6 +409,7 @@ impl JvmBuilder {
 /// 3. The alignment of `T` must *not* be greater than the alignment of [jni::sys::_jobject]. (I
 ///    *think* this is always true for zero-sized types, so would be implied by rule #1, but I'm not
 ///    sure.)
+/// 4. The conditions on the trait methods.
 ///
 /// # Example
 ///
@@ -420,9 +421,15 @@ impl JvmBuilder {
 /// unsafe impl JavaObject for BigDecimal {}
 /// ```
 pub unsafe trait JavaObject: 'static + Sized + JavaType + JavaView {
-    // XX: can't be put on extension trait nor define a default because we want to cache the resolved
-    // class in a static OnceCell.
     /// Returns Java Class object for this type.
+    ///
+    /// # Implementation safety conditions
+    ///
+    /// Implementations of `JavaObject` must ensure that the `class` object
+    /// resulting from this call is permanently cached in a JVM global reference.
+    /// This is needed so that we can cache field and method IDs derived from
+    /// reference, as those IDs are only guaranteed to remain stable so long as
+    /// the Java class is not collected.
     fn class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Local<'jvm, Class>>;
 }
 

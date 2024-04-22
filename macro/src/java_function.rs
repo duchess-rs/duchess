@@ -1,4 +1,4 @@
-use std::{iter::once, sync::Arc};
+ use std::{iter::once, sync::Arc};
 
 use proc_macro2::{Ident, Literal, TokenStream};
 use quote::quote_spanned;
