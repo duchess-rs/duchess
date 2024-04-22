@@ -46,9 +46,19 @@ Inductive argument that this invariant is maintained:
 * Inductive case -- all operations performed within a `Jvm::with` maintain the invariant. Violating the invariant would require introducing a new JNI local frame, which can happen in two ways:
     * invoking [`PushLocalFrame`][]: duchess does not expose this operation, and we [assume users do not do this](#assumptions) via some other crate
     * calling into Java code which in turn calls back into Rust code via a `native` method: In this case, we would have a stack with Rust code `R1`, then Java code `J`, then a Rust function `R2` that implements a Java native method. `R1` must have invoked `Jvm::with` to obtain a `&mut Jvm<'jvm>`. If `R1` could somehow give this `Jvm<'jvm>` value to `R2`, `R2` could create locals that would outlive its dynamic extent, violating the invariant. However, `R1` to invoke Java code `J`, `R1` had to invoke a duchess method with `&mut Jvm<'jvm>` as argument, which means that it has given the  Java code unique access to the (unique) `Jvm<'jvm>` value, leant out its only reference, and the Java code does not give this value to `R2`.
-        * Flaw:
-            * We could invoke `Jvm::with` in a nested fashion. The other `Jvm<'jvm>` could be given to `R2`.
-            * In fact this is not possible in safe code, or really any reasoable way. because of limitations of the Rust type system, but do we want to rely on that?
+
+**Flaw:**
+
+It is theoretically possible to do something like this...
+
+* `Jvm::with(|jvm1| ...)`
+    * stash the `jvm1` somewhere in thread-local data using unsafe code
+    * `Jvm::with(|jvm2| ...)`
+        * invoke jvm code that calls back into Rust
+            * from inside that call, recover the `Jvm<'jvm1>`, alocate a new `Local` with it, and store the result back (unsafely)
+    * recover the pair of `jvm1` and the object that was created
+
+...it is difficult to write the code that would do this and it requires unsafe code, but that unsafe code doesn't seem to be doing anything that should not *theoretically* work. Avoiding this is difficult, but if we focus on `execute`, we can make it so that users never directly get their ands on a `Jvm` and make this safe.
 
 ### All references to `impl JavaObject` types are JNI local or global references
 
