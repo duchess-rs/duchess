@@ -2,7 +2,12 @@
 
 ![Status: Experimental](https://img.shields.io/badge/Status-WIP-yellow)
 
-This page analyzes Duchess's use of the JNI APIs to explain how it guarantees memory safety in each case. 
+This page analyzes Duchess's use of the JNI APIs to explain how it guarantees memory safety. Sections:
+
+* [Assumptions](#assumptions) -- covers requirements for safe usage of Duchess which Duchess itself cannot enforce.
+* [Code invariants](#code-invariants) -- covers invariants that Duchess maintains
+* [Threat vectors that cause UB](#threat-vectors-that-cause-ub) -- ways to create undefined behavior using JNI, and how duchess prevents them (references code invariants and assumptions)
+* [Threat vectors that do not cause UB](#threat-vectors-that-do-not-cause-ub) -- suboptimal uses of the JNI that do not create UB; duchess prevents some of these but not all (references code invariants and assumptions)
 
 ## Assumptions
 
@@ -58,9 +63,9 @@ The [`JavaObject`][] trait is an `unsafe` trait. When implemented on a struct `S
 [`Object::new`]: https://duchess-rs.github.io/duchess/rustdoc/doc/duchess/java/lang/struct.Object.html#method.new
 [impl `JavaConstructor`]: https://duchess-rs.github.io/duchess/rustdoc/doc/duchess/prelude/trait.JavaConstructor.html
 
-### 1:1 correspondence between JNI global references and `Global`
+### 1:1 correspondence between JNI global/local references and `Global`/`Local`
 
-Every time we create a [`Global`][] value (via `Global::new`) we invoke the JNI method to create a new global reference. The `Drop` for `Global` releases the global reference. We do not create global references at any other point.
+Every time we create a [`Global`][] value (resp. `Local`), it is created with a new global or local reference on the JNI side as well. The `Drop` for `Global` releases the global (resp., local) reference.
 
 [`Global`]: https://duchess-rs.github.io/duchess/rustdoc/doc/duchess/struct.Global.html
 
@@ -99,33 +104,39 @@ The [JNI manual documents](https://docs.oracle.com/javase/8/docs/technotes/guide
 
 **How Duchess avoids this:** See discussion [here](#local-references-are-tied-to-the-lifetime-of-a-jni-method-call) and the [`jvm` invariant](#the-jvm-lifetime-mut-jvmjvm-is-the-innermost-scope-for-local-variables).
 
-### Invoke execution occurred regularly
-
-[Recommendation:](https://docs.oracle.com/javase/8/docs/technotes/guides/jni/spec/design.html#asynchronous_exceptions)
-
-> Native methods should insert `ExceptionOccurred()` checks in necessary places (such as in a tight loop without other exception checks) to ensure that the current thread responds to asynchronous exceptions in a reasonable amount of time.
-
-**Outcome of nonadherence:** Asynchronous exceptions won't be detected.
-
-**How Duchess avoids this:** We check this flag at every interaction with the JVM but not other times; it is possible for Rust code to execute for arbitrary amounts of time without checkin the flag. Asynchronous exceptions are not recommended in modern code and the outcome of not checking is not undefined behavior.
-
 ### Always check for exceptions (or return codes) on return from a JNI function. Always handle a deferred exception immediately you detect it.
 
 **Outcome of nonadherence:** Unexplained exceptions or undefined behavior, crashes
 
 **How Duchess avoids this:** End-users do not directly invoke JNI functions. Within Duchess, virtually all calls to JNI functions use the `EnvPtr::invoke` helper function which checks for exceptions. A small number use `invoke_unchecked`:
 
-* XX (audit)
+* `array.rs`
+    * invokes `invoke_unchecked` on [`GetArrayLength`](https://docs.oracle.com/javase/8/docs/technotes/guides/jni/spec/functions.html#GetArrayLength), which is not documented as having failure conditions
+    * invokes [primitive setter](https://docs.oracle.com/javase/8/docs/technotes/guides/jni/spec/functions.html#Set_PrimitiveType_ArrayRegion_routines) with known-valid bounds
+    * invokes [primitive getter](https://docs.oracle.com/javase/8/docs/technotes/guides/jni/spec/functions.html#Get_PrimitiveType_ArrayRegion_routines) with known-valid bounds
+* `cast.rs`
+    * invokes infallible method [`IsInstanceOf`](https://docs.oracle.com/javase/8/docs/technotes/guides/jni/spec/functions.html#IsInstanceOf)
+* `find.rs`
+    * invokes `GetMethodID` and `GetStaticMethodID` "unchecked" but checks the return value for null and handles exception that occurs
+* `raw.rs`
+    * invokes `invoke_unchecked` in the implementation of `invoke` :)
+* `ref_.rs`
+    * invokes `NewLocalRef` with a known-non-null argument
+    * invokes `NewLocalRef` with a known-non-null argument
+* `str.rs`
+    * invokes [`GetStringLength`](https://docs.oracle.com/javase/8/docs/technotes/guides/jni/spec/functions.html#GetStringLength) — infallible
+    * invokes [`GetStringUTFLength`](https://docs.oracle.com/javase/8/docs/technotes/guides/jni/spec/functions.html#GetStringUTFLength) — infallible
+    * invokes [`GetStringUTFRegion`](https://docs.oracle.com/javase/8/docs/technotes/guides/jni/spec/functions.html#GetStringUTFRegion) with known-valid bounds
 
 ### Clear exceptions before invoking other JNI calls
 
 > After an exception has been raised, the native code must first clear the exception before making other JNI calls. 
 
-**Outcome of nonadherence:** 
+[Citation.](https://docs.oracle.com/en/java/javase/17/docs/specs/jni/design.html#exception-handling)
 
-**How Duchess avoids this:** Uh, do we? Certainly we internally propagate exceptions. What happens if you don't?
+**Outcome of nonadherence:** Undefined behavior.
 
-XXXX
+**How Duchess avoids this:** When we detect an exception, we always clear the exception immediately before returning a `Result`.
 
 ### Illegal argument types
 
@@ -139,7 +150,21 @@ XXXX
 
 **How Duchess avoids this:** We generate strongly typed interfaces based on the signatures found in the class files and we [assume that the same class files are present at runtime](#assumptions).
 
+**Example tests:**
+
+* `type_mismatch_*.rs` in the test directory
+
 ## Threat vectors that do not cause UB
+
+### Invoke execution occurred regularly
+
+[Recommendation:](https://docs.oracle.com/javase/8/docs/technotes/guides/jni/spec/design.html#asynchronous_exceptions)
+
+> Native methods should insert `ExceptionOccurred()` checks in necessary places (such as in a tight loop without other exception checks) to ensure that the current thread responds to asynchronous exceptions in a reasonable amount of time.
+
+**Outcome of nonadherence:** Asynchronous exceptions won't be detected.
+
+**How Duchess avoids this:** We check this flag at every interaction with the JVM but not other times; it is possible for Rust code to execute for arbitrary amounts of time without checkin the flag. Asynchronous exceptions are not recommended in modern code and the outcome of not checking is not undefined behavior.
 
 ### Local variable capacity
 
@@ -149,7 +174,10 @@ Each JNI frame has a guaranteed capacity which can be extended via `EnsureLocalC
 
 **Outcome of nonadherence:** Slower performance or, in extreme cases, aborting the process via reporting a [Fatal Error](https://docs.oracle.com/en/java/javase/21/vm/error-reporting.html).
 
-**How Duchess avoids this:** Duchess is not aware of this limit and does not limit the number of local variables that will be created. If needed, we could support annotations or other means.
+**How Duchess avoids this:**
+
+* Duchess is not aware of this limit and does not limit the number of local variables that will be created. If needed, we could support annotations or other means.
+* However, if using `Duchess` in its recommended configuration (with `execute` calls), all local variables will be cleaned up in between operations, and operations always create a finite (and statically known) number of locals
 
 ### Ensure that every global reference created has a path that deletes that global reference.
 
@@ -172,7 +200,7 @@ Every time we create a global reference, we store it in a `Global` type. The des
 
 **Outcome of nonadherence:** Memory exhaustion.
 
-**How Duchess avoids this:** We do not prevent this, but the result is not UB, and we do not expect users to do fine-grained interaction with Java objects in this fashion.
+**How Duchess avoids this:** We do not expect users to do fine-grained interaction with Java objects in this fashion and we do not provide absolute protection from memory exhaustion. However, we do mitigate the likelihood, as the `Local` type has a destructor that deletes local references. Therefore common usage patterns where a `Local` is created and then dropped within a loop (but not live across loop iterations) would result in intermediate locals being deleted.
 
 ### Native references crossing threads
 

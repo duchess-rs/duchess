@@ -67,6 +67,16 @@ where
     }
 }
 
+impl<R, J> IntoRust<R> for &Local<'_, J>
+where
+    J: JavaObject,
+    for<'a> &'a J: IntoRust<R>,
+{
+    fn into_rust<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, R> {
+        <&J as IntoRust<R>>::into_rust(self, jvm)
+    }
+}
+
 impl<R, J> IntoRust<R> for Global<J>
 where
     J: JavaObject,
@@ -74,6 +84,16 @@ where
 {
     fn into_rust<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, R> {
         <&J as IntoRust<R>>::into_rust(&self, jvm)
+    }
+}
+
+impl<R, J> IntoRust<R> for &Global<J>
+where
+    J: JavaObject,
+    for<'a> &'a J: IntoRust<R>,
+{
+    fn into_rust<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, R> {
+        <&J as IntoRust<R>>::into_rust(self, jvm)
     }
 }
 

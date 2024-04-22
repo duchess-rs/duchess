@@ -1,0 +1,49 @@
+error[E0277]: the trait bound `u64: duchess::JvmOp` is not satisfied
+  --> $DIR/type_mismatch_bad_argument_type_explicit.rs:14:41
+   |
+14 |     type_mismatch::TakesInt::new().take(i).execute();
+   |                                    ---- ^ the trait `duchess::JvmOp` is not implemented for `u64`
+   |                                    |
+   |                                    required by a bound introduced by this call
+   |
+   = help: the following other types implement trait `duchess::JvmOp`:
+             i8
+             i16
+             i32
+             i64
+             u16
+             f32
+             f64
+   = note: required for `u64` to implement `IntoScalar<i32>`
+note: required by a bound in `ViewAsTakesIntOp::<J, N>::take`
+  --> $DIR/type_mismatch_bad_argument_type_explicit.rs:7:5
+   |
+7  |     public class TakesInt {
+   |     ^^^^^^ required by this bound in `ViewAsTakesIntOp::<J, N>::take`
+
+error[E0277]: the trait bound `u32: duchess::JvmOp` is not satisfied
+  --> $DIR/type_mismatch_bad_argument_type_explicit.rs:19:41
+   |
+19 |     type_mismatch::TakesInt::new().take(i).execute();
+   |                                    ---- ^ the trait `duchess::JvmOp` is not implemented for `u32`
+   |                                    |
+   |                                    required by a bound introduced by this call
+   |
+   = help: the following other types implement trait `duchess::JvmOp`:
+             i8
+             i16
+             i32
+             i64
+             u16
+             f32
+             f64
+   = note: required for `u32` to implement `IntoScalar<i32>`
+note: required by a bound in `ViewAsTakesIntOp::<J, N>::take`
+  --> $DIR/type_mismatch_bad_argument_type_explicit.rs:7:5
+   |
+7  |     public class TakesInt {
+   |     ^^^^^^ required by this bound in `ViewAsTakesIntOp::<J, N>::take`
+
+error: aborting due to 2 previous errors
+
+For more information about this error, try `rustc --explain E0277`.
