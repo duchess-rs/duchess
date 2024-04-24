@@ -23,6 +23,8 @@ fn main() -> color_eyre::eyre::Result<()> {
 
     if bless {
         config.output_conflict_handling = OutputConflictHandling::Bless;
+    } else {
+        config.output_conflict_handling = OutputConflictHandling::Ignore;
     }
 
     // Place the build artifacts in the `../target/ui` directory instead of in the
