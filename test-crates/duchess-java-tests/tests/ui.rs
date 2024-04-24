@@ -4,8 +4,8 @@ use ui_test::*;
 fn main() -> color_eyre::eyre::Result<()> {
     std::env::set_var("CLASSPATH", "../target/java");
 
-    // Tests can be blessed with `cargo test -- -- --bless`.
-    let bless = std::env::args().any(|arg| arg == "--bless");
+    // Tests can be blessed with `DUCHESS_BLESS=1``
+    let bless = std::env::var("DUCHESS_BLESS").is_ok();
 
     let mut config = Config {
         ..Config::rustc(Path::new("tests").join("ui"))
@@ -23,6 +23,8 @@ fn main() -> color_eyre::eyre::Result<()> {
 
     if bless {
         config.output_conflict_handling = OutputConflictHandling::Bless;
+    } else {
+        config.output_conflict_handling = OutputConflictHandling::Ignore;
     }
 
     // Place the build artifacts in the `../target/ui` directory instead of in the

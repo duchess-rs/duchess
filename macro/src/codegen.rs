@@ -141,6 +141,7 @@ impl ClassInfo {
 
             #[allow(non_camel_case_types)]
             pub struct #struct_name<#(#java_class_generics_with_defaults,)*> {
+                _empty: std::convert::Infallible,
                 _dummy: ::core::marker::PhantomData<(#(#java_class_generics,)*)>
             }
 
