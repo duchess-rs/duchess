@@ -1,0 +1,44 @@
+name: autobless
+
+on:
+  schedule:
+    - cron: '44 4 * * *' # At 4:44 UTC every day.
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        # windows-latest does not work because of https://github.com/oli-obk/ui_test/issues/147
+        os: [ubuntu-latest, macos-latest]
+        java-version: ['17', '21']
+      fail-fast: false
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-java@v3
+      with:
+        distribution: 'corretto'
+        java-version: ${{ matrix.java-version }}
+    - name: Build
+      run: cargo build --verbose
+    - name: Test crates
+      run: cargo test --all-targets --verbose
+    - name: setup bot git name and email
+      run: |
+          git config --global user.name 'The Duchess Cronjob Bot'
+          git config --global user.email 'duchess@cron.bot'
+    - name: Push changes to a branch
+      run: |
+        BRANCH="bless-$(date -u +%Y-%m-%d)"
+        git switch -c $BRANCH
+        git push -u origin $BRANCH
+    - name: Create Pull Request
+      run: gh pr create -B master --title 'Automatic bless' --body ''
+    env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        DUCHESS_BLESS: 1
