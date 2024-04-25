@@ -36,6 +36,7 @@ jobs:
         with:
           distribution: 'corretto'
           java-version: '17'
+      - uses: Swatinem/rust-cache@v2
       - name: Install mdBook
         run: |
           curl -sSL https://github.com/rust-lang/mdBook/releases/download/v0.4.28/mdbook-v0.4.28-x86_64-unknown-linux-gnu.tar.gz | tar -xz
@@ -47,12 +48,28 @@ jobs:
         uses: actions/configure-pages@v3
       - name: Build with mdBook
         run: ./mdbook build book
-      - name: Rust rustdoc
-        run: cargo doc --target-dir book/book/rustdoc
+      - name: stub
+        run: mkdir -p target/ui-coverage-report && echo "hello world!" > target/ui-coverage-report/index.html
+      #- name: install just
+      #  run: |
+      #    cargo install just
+      #- name: coverage-deps
+      #  run: just coverage-tools
+      #- name:
+      #  run: just coverage
+      #  env:
+      #    NO_OPEN: true
+      - name: Assemble pages
+        run: |
+          mkdir pages-site
+          mv target/ui-coverage-report pages-site/coverage
+          mv book/book pages-site/book
+      #- name: Rust rustdoc
+      #  run: cargo doc --target-dir book/book/rustdoc
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1
         with:
-          path: ./book/book
+          path: ./pages-site
 
   # Deployment job
   deploy:
