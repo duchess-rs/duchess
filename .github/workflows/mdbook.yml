@@ -32,6 +32,10 @@ jobs:
       MDBOOK_VERSION: 0.4.21
     steps:
       - uses: actions/checkout@v3
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-all-crates: true
+      # Needed so that the coverage tests can actually work & rustdoc can successfully build examples
       - uses: actions/setup-java@v3
         with:
           distribution: 'corretto'
@@ -47,12 +51,28 @@ jobs:
         uses: actions/configure-pages@v3
       - name: Build with mdBook
         run: ./mdbook build book
+      #- name: stub
+      #  run: mkdir -p target/ui-coverage-report && echo "hello world!" > target/ui-coverage-report/index.html
+      - name: install just
+        run: |
+          cargo install just
+      - name: coverage-deps
+        run: just coverage-tools
+      - name:
+        run: just coverage
+        env:
+          NO_OPEN: true
+      # Needed so that mdbook can point directly to rustdoc
       - name: Rust rustdoc
         run: cargo doc --target-dir book/book/rustdoc
+      - name: Assemble pages
+        run: |
+          mv book/book pages-site
+          mv target/ui-coverage-report pages-site/coverage
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1
         with:
-          path: ./book/book
+          path: ./pages-site/
 
   # Deployment job
   deploy:

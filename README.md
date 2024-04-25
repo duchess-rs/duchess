@@ -1,6 +1,7 @@
 # Duchess: silky smooth Java integration
 
 [<img src="https://img.shields.io/badge/chat-on%20Zulip-green"></img>][Zulip]
+[<img src="https://img.shields.io/badge/Coverage-green"></img>][Coverage]
 
 Duchess is a Rust crate that makes it easy, ergonomic, and efficient to interoperate with Java code.
 
@@ -45,8 +46,9 @@ Check out the...
 ## Curious to get involved?
 
 Look for [issues tagged with good first issue][] and join the [Zulip][]. For more information on how to develop duchess, 
-see [Contributing][].
+see [Contributing][]. You may also be able to improve test [coverage].
 
 [issues tagged with good first issue]: https://github.com/duchess-rs/duchess/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22
 [Zulip]: https://duchess.zulipchat.com/
 [Contributing]: CONTRIBUTING.md
+[Coverage]: https://duchess-rs.github.io/duchess/coverage
