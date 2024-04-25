@@ -6,6 +6,8 @@ Duchess is a Rust crate that makes it [safe](./safety.md), ergonomic, and effici
 
 <img src="duchess.svg" width="300"></img>
 
+<a href="./coverage">Coverage Report</a>
+
 
 ## TL;DR
 

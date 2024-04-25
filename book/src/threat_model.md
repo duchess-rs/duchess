@@ -11,13 +11,16 @@ This page analyzes Duchess's use of the JNI APIs to explain how it guarantees me
 
 ## Assumptions
 
-We assume two things
+We assume three things
 
-* the Java `.class` files that are present at build time have the same type signatures and public interfaces as the class files that will be present at runtime
-* the user does not attempt to start the JVM via some other crate in parallel with using duchess methods
+1. The Java `.class` files that are present at build time have the same type signatures and public interfaces as the class files that will be present at runtime.
+2. The user does not attempt to start the JVM via some other crate in parallel with using duchess methods
     * there can only be one JVM per process. Duchess execute methods will start the JVM if it has not already been started by other means. Duchess methods are internally synchronized, so they can run in parallel, but if a duchess method executes in parallel with code from another library (including another major version of duchess) that attempts to start the JVM, a crash can occur. We recommend starting the JVM explicitly in `main` via `Jvm::builder()`, which will avoid any possibility of encountering this issue.
-* the user does not use the JNI [`PushLocalFrame`][] method to introduce "local variable frames" within the context of `Jvm::with` call
+3. the user does not use the JNI [`PushLocalFrame`][] method to introduce "local variable frames" within the context of `Jvm::with` call
     * duchess not expose [`PushLocalFrame`][], but it is possible to invoke this method via unsafe code or from other crates (e.g., the [`jni` crate's `push_local_frame` method](https://docs.rs/jni/latest/jni/struct.JNIEnv.html#method.push_local_frame)). This method will cause local variables created within its dynamic scope to be released when [`PopLocalFrame`][] is invoked. The `'jvm` lifetime mechanism used to ensure local variables do not escape their scope could be invalidated by these methods. See [the section on the jvm lifetime](#the-jvm-lifetime-mut-jvmjvm-is-the-innermost-scope-for-local-variables) for more details.
+
+[`PushLocalFrame`]: (https://docs.oracle.com/javase/8/docs/technotes/guides/jni/spec/functions.html#PushLocalFrame)
+[`PopLocalFrame`]: (https://docs.oracle.com/javase/8/docs/technotes/guides/jni/spec/functions.html#PopLocalFrame)
 
 ## Code invariants
 
@@ -72,6 +75,7 @@ The [`JavaObject`][] trait is an `unsafe` trait. When implemented on a struct `S
 [`duchess::java::lang::Object`]: https://duchess-rs.github.io/duchess/rustdoc/doc/duchess/java/lang/struct.Object.html
 [`Object::new`]: https://duchess-rs.github.io/duchess/rustdoc/doc/duchess/java/lang/struct.Object.html#method.new
 [impl `JavaConstructor`]: https://duchess-rs.github.io/duchess/rustdoc/doc/duchess/prelude/trait.JavaConstructor.html
+[`Local`]: https://duchess-rs.github.io/duchess/rustdoc/doc/duchess/struct.Local.html
 
 ### 1:1 correspondence between JNI global/local references and `Global`/`Local`
 
