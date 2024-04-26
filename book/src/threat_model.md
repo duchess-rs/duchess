@@ -168,6 +168,19 @@ The [JNI manual documents](https://docs.oracle.com/javase/8/docs/technotes/guide
 
 * `type_mismatch_*.rs` in the test directory
 
+### Native references crossing threads
+
+[JNI document states:](https://docs.oracle.com/javase/8/docs/technotes/guides/jni/spec/design.html#global_and_local_references)
+
+> Local references are only valid in the thread in which they are created. The native code must not pass local references from one thread to another.
+
+**Outcome of nonadherence:** Undefined Behavior
+
+**How Duchess avoids this:** Duchess prevents this because `Local` is `!Sync`.
+
+**Example Tests:**
+* doctest in `ref_.rs`
+
 ## Threat vectors that do not cause UB
 
 ### Invoke execution occurred regularly
@@ -216,15 +229,6 @@ Every time we create a global reference, we store it in a `Global` type. The des
 
 **How Duchess avoids this:** We do not expect users to do fine-grained interaction with Java objects in this fashion and we do not provide absolute protection from memory exhaustion. However, we do mitigate the likelihood, as the `Local` type has a destructor that deletes local references. Therefore common usage patterns where a `Local` is created and then dropped within a loop (but not live across loop iterations) would result in intermediate locals being deleted.
 
-### Native references crossing threads
-
-[JNI document states:](https://docs.oracle.com/javase/8/docs/technotes/guides/jni/spec/design.html#global_and_local_references)
-
-> Local references are only valid in the thread in which they are created. The native code must not pass local references from one thread to another.
-
-**Outcome of nonadherence:** Memory exhaustion.
-
-**How Duchess avoids this:** Duchess does not prevent this, but the result is not UB, and we do not expect users to do fine-grained interaction with Java objects in this fashion.
 
 ### Ensure that you use the isCopy and mode flags correctly. See Copying and pinning.
 
