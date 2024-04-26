@@ -4,20 +4,18 @@
 
 This page analyzes Duchess's use of the JNI APIs to explain how it guarantees memory safety. Sections:
 
-* [Assumptions](#assumptions) -- covers requirements for safe usage of Duchess which Duchess itself cannot enforce.
-* [Code invariants](#code-invariants) -- covers invariants that Duchess maintains
-* [Threat vectors that cause UB](#threat-vectors-that-cause-ub) -- ways to create undefined behavior using JNI, and how duchess prevents them (references code invariants and assumptions)
-* [Threat vectors that do not cause UB](#threat-vectors-that-do-not-cause-ub) -- suboptimal uses of the JNI that do not create UB; duchess prevents some of these but not all (references code invariants and assumptions)
+* [Assumptions](#assumptions): requirements for safe usage of Duchess which Duchess itself cannot enforce.
+* [Code invariants](#code-invariants): invariants that Duchess maintains
+* [Threat vectors that cause UB](#threat-vectors-that-cause-ub): ways to create undefined behavior using JNI, and how duchess prevents them (references code invariants and assumptions)
+* [Threat vectors that do not cause UB](#threat-vectors-that-do-not-cause-ub): suboptimal uses of the JNI that do not create UB; duchess prevents some of these but not all (references code invariants and assumptions)
 
 ## Assumptions
 
 We assume three things
 
 1. The Java `.class` files that are present at build time have the same type signatures and public interfaces as the class files that will be present at runtime.
-2. The user does not attempt to start the JVM via some other crate in parallel with using duchess methods
-    * there can only be one JVM per process. Duchess execute methods will start the JVM if it has not already been started by other means. Duchess methods are internally synchronized, so they can run in parallel, but if a duchess method executes in parallel with code from another library (including another major version of duchess) that attempts to start the JVM, a crash can occur. We recommend starting the JVM explicitly in `main` via `Jvm::builder()`, which will avoid any possibility of encountering this issue.
-3. the user does not use the JNI [`PushLocalFrame`][] method to introduce "local variable frames" within the context of `Jvm::with` call
-    * duchess not expose [`PushLocalFrame`][], but it is possible to invoke this method via unsafe code or from other crates (e.g., the [`jni` crate's `push_local_frame` method](https://docs.rs/jni/latest/jni/struct.JNIEnv.html#method.push_local_frame)). This method will cause local variables created within its dynamic scope to be released when [`PopLocalFrame`][] is invoked. The `'jvm` lifetime mechanism used to ensure local variables do not escape their scope could be invalidated by these methods. See [the section on the jvm lifetime](#the-jvm-lifetime-mut-jvmjvm-is-the-innermost-scope-for-local-variables) for more details.
+2. The user [does not attempt to start the JVM via some other crate](#multiple-jvms-started-in-the-same-process) in parallel with using duchess methods
+3. The user [does not use](#pushlocalframe-invoked-by-a-mechanism-external-to-duchess) the JNI [`PushLocalFrame`][] method to introduce "local variable frames" within the context of `Jvm::with` call.
 
 [`PushLocalFrame`]: (https://docs.oracle.com/javase/8/docs/technotes/guides/jni/spec/functions.html#PushLocalFrame)
 [`PopLocalFrame`]: (https://docs.oracle.com/javase/8/docs/technotes/guides/jni/spec/functions.html#PopLocalFrame)
@@ -45,9 +43,9 @@ References to Java objects of type `J` are stored in a `Local<'jvm, J>` holder. 
 
 Inductive argument that this invariant is maintained:
 
-* Base case -- users can only obtain a `Jvm<'jvm>` value via `Jvm::with`, which takes a closure argument of type `for<'jvm> impl FnMut(&mut Jvm<'jvm>)`. Therefore, this closure cannot assume that `'jvm` will outlive the closure call and all local values cannot escape the closure body.
-* Inductive case -- all operations performed within a `Jvm::with` maintain the invariant. Violating the invariant would require introducing a new JNI local frame, which can happen in two ways:
-    * invoking [`PushLocalFrame`][]: duchess does not expose this operation, and we [assume users do not do this](#assumptions) via some other crate
+* **Base case**: Users can only obtain a `Jvm<'jvm>` value via `Jvm::with`, which takes a closure argument of type `for<'jvm> impl FnMut(&mut Jvm<'jvm>)`. Therefore, this closure cannot assume that `'jvm` will outlive the closure call and all local values cannot escape the closure body.
+* **Inductive case**: All operations performed within a `Jvm::with` maintain the invariant. Violating the invariant would require introducing a new JNI local frame, which can happen in two ways:
+    * invoking [`PushLocalFrame`][]: duchess does not expose this operation, and we [assume users do not do this](#assumptions) via some other crate.
     * calling into Java code which in turn calls back into Rust code via a `native` method: In this case, we would have a stack with Rust code `R1`, then Java code `J`, then a Rust function `R2` that implements a Java native method. `R1` must have invoked `Jvm::with` to obtain a `&mut Jvm<'jvm>`. If `R1` could somehow give this `Jvm<'jvm>` value to `R2`, `R2` could create locals that would outlive its dynamic extent, violating the invariant. However, `R1` to invoke Java code `J`, `R1` had to invoke a duchess method with `&mut Jvm<'jvm>` as argument, which means that it has given the  Java code unique access to the (unique) `Jvm<'jvm>` value, leant out its only reference, and the Java code does not give this value to `R2`.
 
 **Flaw:**
@@ -86,6 +84,21 @@ Every time we create a [`Global`][] value (resp. `Local`), it is created with a 
 ## Threat vectors that cause UB
 
 What follows is a list of specific threat vectors identified by based on the documentation [JNI documentation](https://docs.oracle.com/javase/8/docs/technotes/guides/jni/spec/jniTOC.html) as well as a [checklist of common JNI failures found on IBM documentation](https://www.ibm.com/docs/en/sdk-java-technology/8?topic=jni-checklist).
+
+### [`PushLocalFrame`][] invoked by a mechanism external to Duchess
+
+**Outcome of nonadherence**: UB
+
+Duchess not expose [`PushLocalFrame`][], but it is possible to invoke this method via unsafe code or from other crates (e.g., the [`jni` crate's `push_local_frame` method](https://docs.rs/jni/latest/jni/struct.JNIEnv.html#method.push_local_frame)). This method will cause local variables created within its dynamic scope to be released when [`PopLocalFrame`][] is invoked. The `'jvm` lifetime mechanism used to ensure local variables do not escape their scope could be invalidated by these methods. See [the section on the jvm lifetime](#the-jvm-lifetime-mut-jvmjvm-is-the-innermost-scope-for-local-variables) for more details.
+
+**How duchess avoids this**: Duchess carefully controls use of this method internally. We [explicitly assume](#assumptions) that customers do not invoke this method directly via alternative means.
+
+### Multiple JVMs started in the same process
+**Outcome of nonadherence:** UB
+
+There can only be one JVM per process. If multiple JVMs are started concurrently, crashes or UB can occur.
+
+**How Duchess avoids this:** *Documentation and synchronization*: Within the Duchess library, all JVM accesses are internally synchronized. Duchess will lazily start the JVM if it has not been started already. However, Duchess cannot control the behavior of other libraries (or another major version of the package). Duchess mitigates this with [documentation](../src/jvm.md) recommending customers start the JVM explicitly in main. Future work may improve this with a centralized "`start-jvm`" crate that was shared between `jni`, `duchess` and any other JNI based Rust libraries. Duchess may also add mitigations to prevent multiple major versions of Duchess from being used in the same dependency closure.
 
 ### When you update a Java object in native code, ensure synchronization of access.
 
@@ -228,7 +241,6 @@ Every time we create a global reference, we store it in a `Global` type. The des
 **Outcome of nonadherence:** Memory exhaustion.
 
 **How Duchess avoids this:** We do not expect users to do fine-grained interaction with Java objects in this fashion and we do not provide absolute protection from memory exhaustion. However, we do mitigate the likelihood, as the `Local` type has a destructor that deletes local references. Therefore common usage patterns where a `Local` is created and then dropped within a loop (but not live across loop iterations) would result in intermediate locals being deleted.
-
 
 ### Ensure that you use the isCopy and mode flags correctly. See Copying and pinning.
 
