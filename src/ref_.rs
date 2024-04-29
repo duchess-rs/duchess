@@ -6,6 +6,14 @@ use crate::{cast::Upcast, jvm::CloneIn, plumbing::ObjectPtr, raw::EnvPtr, JavaOb
 
 /// An owned local reference to a non-null Java object of type `T`. The reference will be freed when
 /// dropped. Cannot be shared across threads or [`Jvm::with`] invocations.
+///
+/// Locals cannot cross thread boundaries because they are not [`Send`]`:
+/// ```compile_fail
+/// fn check_send<T: Send>() {}
+/// use duchess::{java, Local};
+/// // Fails: `Local` is not `Send`
+/// check_send::<Local<java::lang::String>>()
+/// ```
 #[derive_where::derive_where(PartialEq, Eq, Hash, Debug)]
 pub struct Local<'jvm, T: JavaObject> {
     env: EnvPtr<'jvm>,
