@@ -41,7 +41,9 @@ coverage-ui-test:
   coverage_dir=$target/{{test_coverage}}
   (cd test-crates && RUSTFLAGS="-C instrument-coverage" LLVM_PROFILE_FILE=$coverage_dir/duchess-%p-%10m.profraw cargo test) || true
 
-coverage-show:
+format := "html"
+
+coverage-show format=format:
   #!/usr/bin/env bash
   set -euxo pipefail
   target={{justfile_directory()}}/target
@@ -61,7 +63,7 @@ coverage-show:
       exit 1
   fi
   rust-cov show --instr-profile $coverage_dir/test-crates.profdata -Xdemangler=rustfilt \
-    --format=html \
+    --format={{format}} \
     --output-dir $target/ui-coverage-report \
     --object test-crates/target/ui/tests/ui/examples/greeting \
     --object test-crates/target/ui/tests/ui/exceptions \
@@ -88,4 +90,4 @@ coverage-show:
   fi
 
 
-coverage: coverage-clean coverage-unit-tests coverage-ui-test coverage-show
+coverage format=format: coverage-clean coverage-unit-tests coverage-ui-test (coverage-show format)
