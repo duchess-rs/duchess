@@ -127,7 +127,7 @@ where
     }
 }
 
-macro_rules! primivite_array {
+macro_rules! primitive_array {
     ($([$rust:ty]: $java_name:literal $java_ty:ident $new_fn:ident $get_fn:ident $set_fn:ident,)*) => {
         $(
             impl JvmOp for &[$rust] {
@@ -211,7 +211,7 @@ macro_rules! primivite_array {
 }
 
 // Bool is represented as u8 in JNI
-primivite_array! {
+primitive_array! {
     [bool]: "boolean" jboolean NewBooleanArray GetBooleanArrayRegion SetBooleanArrayRegion,
     [i8]: "byte" jbyte NewByteArray GetByteArrayRegion SetByteArrayRegion,
     [u16]: "char" jchar NewCharArray GetCharArrayRegion SetCharArrayRegion,

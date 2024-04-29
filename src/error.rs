@@ -53,7 +53,7 @@ fn try_extract_message(exception: &impl AsJRef<Throwable>) -> String {
             .to_rust()
             .execute_with(jvm)
     });
-    message.unwrap_or_else(|_| "<unable to get exception message>".into())
+    message.unwrap_or_else(|err| format!("failed to get message: {}", err))
 }
 
 impl<T> Debug for Error<T>
