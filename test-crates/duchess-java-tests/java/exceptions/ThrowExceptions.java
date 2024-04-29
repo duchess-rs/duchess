@@ -1,6 +1,9 @@
 package exceptions;
 
 public class ThrowExceptions {
+    public static String staticStringNotNull = "notnull";
+    public static String nullString;
+
     public void throwRuntime() {
         throw new RuntimeException("something has gone horribly wrong");
     }

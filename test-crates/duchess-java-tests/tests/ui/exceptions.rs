@@ -10,6 +10,23 @@ duchess::java_package! {
 }
 
 pub fn main() -> duchess::GlobalResult<()> {
+    check_exceptions()?;
+    check_static_fields()?;
+
+    Ok(())
+}
+
+fn check_static_fields() -> duchess::GlobalResult<()> {
+    let result = exceptions::ThrowExceptions::get_static_string_not_null()
+        .global()
+        .to_rust()
+        .execute()?
+        .unwrap();
+    assert_eq!("notnull", result);
+    Ok(())
+}
+
+fn check_exceptions() -> duchess::GlobalResult<()> {
     let thrower = exceptions::ThrowExceptions::new().global().execute()?;
 
     let result = thrower
