@@ -41,6 +41,41 @@ coverage-ui-test:
   coverage_dir=$target/{{test_coverage}}
   (cd test-crates && RUSTFLAGS="-C instrument-coverage" LLVM_PROFILE_FILE=$coverage_dir/duchess-%p-%10m.profraw cargo test) || true
 
+coverage-export:
+  #!/usr/bin/env bash
+  set -euxo pipefail
+  target={{justfile_directory()}}/target
+  coverage_dir=$target/{{test_coverage}}
+  OS="$(uname)"
+  if [[ "$OS" == "Darwin" ]]; then
+    FILE_EXTENSION="dylib"
+  elif [[ "$OS" == "Linux" ]]; then
+    FILE_EXTENSION="so"
+  else
+      echo "Unsupported OS"
+      exit 1
+  fi
+  rust-cov export --instr-profile $coverage_dir/test-crates.profdata -Xdemangler=rustfilt \
+    --format=lcov \
+    --object test-crates/target/ui/greeting \
+       $( \
+      for file in \
+        $( \
+          RUSTFLAGS="-C instrument-coverage" \
+          LLVM_PROFILE_FILE="$target/ignored-%p-%10m.profraw" \
+            cargo test --tests --no-run --message-format=json \
+              | jq -r "select(.profile.test == true) | .filenames[]" \
+              | grep -v dSYM - \
+        ); \
+      do \
+        printf "%s %s " -object $file; \
+      done \
+    ) \
+    --object $target/debug/deps/libduchess_macro-*.$FILE_EXTENSION \
+    --sources {{justfile_directory()}}/src \
+    --sources {{justfile_directory()}}/macro > target/coverage.lcov
+    #--show-instantiations=false \
+
 coverage-show:
   #!/usr/bin/env bash
   set -euxo pipefail

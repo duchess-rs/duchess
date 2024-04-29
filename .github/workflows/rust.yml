@@ -58,7 +58,7 @@ jobs:
       - name: coverage-deps
         run: just coverage-tools
       - name:
-        run: just coverage
+        run: just coverage && just coverage-export
         env:
           NO_OPEN: true
       - name: Upload Coverage Report
@@ -66,3 +66,8 @@ jobs:
         with:
           name: ui-coverage-report
           path: target/ui-coverage-report/
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v4.0.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: target/coverage.lcov
