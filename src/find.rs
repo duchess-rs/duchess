@@ -73,6 +73,7 @@ pub fn find_field<'jvm>(
     class: impl AsRef<java::lang::Class>,
     jni_name: &CStr,
     jni_descriptor: &CStr,
+    // Note: there are no usages currently of `is_statc: false`. See https://github.com/duchess-rs/duchess/issues/85
     is_static: bool,
 ) -> Result<'jvm, FieldPtr> {
     let class = class.as_ref().as_raw();

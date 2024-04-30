@@ -64,6 +64,7 @@ coverage-show:
     --format=html \
     --output-dir $target/ui-coverage-report \
     --object test-crates/target/ui/greeting \
+    --object test-crates/target/ui/exceptions \
        $( \
       for file in \
         $( \
