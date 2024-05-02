@@ -32,31 +32,33 @@ fn main() -> color_eyre::eyre::Result<()> {
     config.out_dir = Path::new("..").join("target").join("ui");
 
     // Make sure we can depend on duchess itself in our tests
-    config.dependencies_crate_manifest_path = Some(Path::new("Cargo.toml").into());
+    config
+        .comment_defaults
+        .base()
+        .set_custom("dependencies", dependencies::DependencyBuilder::default());
 
     let test_name = std::env::var_os("TESTNAME");
 
-    let text = if args.quiet {
-        ui_test::status_emitter::Text::quiet()
-    } else {
-        ui_test::status_emitter::Text::verbose()
-    };
+    let text = status_emitter::Text::from(args.format);
+
+    config.with_args(&args);
 
     run_tests_generic(
         vec![config],
-        args,
-        move |path, _, _| {
-            test_name
-                .as_ref()
-                .and_then(|name| {
-                    Some(path.components().any(|c| {
-                        c.as_os_str()
-                            .to_string_lossy()
-                            .contains(&*name.to_string_lossy())
-                    }))
-                })
-                .unwrap_or(true)
-                && path.extension().map(|ext| ext == "rs").unwrap_or(false)
+        move |path, _| {
+            path.extension().filter(|ext| *ext == "rs")?;
+            Some(
+                test_name
+                    .as_ref()
+                    .and_then(|name| {
+                        Some(path.components().any(|c| {
+                            c.as_os_str()
+                                .to_string_lossy()
+                                .contains(&*name.to_string_lossy())
+                        }))
+                    })
+                    .unwrap_or(true),
+            )
         },
         default_per_file_config,
         (
