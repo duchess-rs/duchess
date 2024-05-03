@@ -57,6 +57,15 @@ where
     }
 }
 
+impl<J> IntoRust<Global<J>> for &J
+where
+    J: JavaObject,
+{
+    fn into_rust<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Global<J>> {
+        Ok(jvm.global(self))
+    }
+}
+
 impl<R, J> IntoRust<R> for Local<'_, J>
 where
     J: JavaObject,
