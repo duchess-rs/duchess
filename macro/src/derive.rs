@@ -264,16 +264,14 @@ impl Driver<'_> {
                     initializers.push_back(quote_spanned!(name.span() =>
                     #obj
                         .#name()
-                        .to_rust()
-                        .execute_with(jvm)?
+                        .to_rust_with(jvm)?
                     ));
                 } else {
                     initializers.push_back(quote_spanned!(name.span() =>
                     #obj
                         .#name()
                         .assert_not_null()
-                        .to_rust()
-                        .execute_with(jvm)?
+                        .to_rust_with(jvm)?
                     ));
                 }
             } else {

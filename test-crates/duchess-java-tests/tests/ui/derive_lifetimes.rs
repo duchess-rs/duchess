@@ -11,7 +11,7 @@ pub fn main() -> duchess::GlobalResult<()> {
     let my_string = String::from("1234");
     let rust = LongWrapper { value: &my_string };
     let java = rust.to_java().assert_not_null().global().execute()?;
-    let and_back = java.to_string().to_rust().execute().unwrap().unwrap();
+    let and_back = java.to_string().to_rust().unwrap().unwrap();
     assert_eq!(rust.value, and_back);
     Ok(())
 }

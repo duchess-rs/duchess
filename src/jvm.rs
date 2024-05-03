@@ -91,11 +91,19 @@ pub trait JvmOp: Copy {
 
     /// Given a JVM op that returns some Java type, convert it to its Rust equivalent
     /// (e.g., from a Java String to a Rust string).
-    fn to_rust<R>(self) -> ToRustOp<Self, R>
+    fn to_rust<R>(self) -> crate::GlobalResult<R>
     where
         for<'jvm> Self::Output<'jvm>: IntoRust<R>,
     {
-        ToRustOp::new(self)
+        ToRustOp::new(self).execute()
+    }
+
+    /// Internal method
+    fn to_rust_with<'jvm, R>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, R>
+    where
+        for<'j> Self::Output<'j>: IntoRust<R>,
+    {
+        ToRustOp::new(self).execute_with(jvm)
     }
 
     /// Execute the jvm op, starting a JVM instance if necessary.
@@ -110,6 +118,7 @@ pub trait JvmOp: Copy {
         Jvm::with(|jvm| self.execute_with(jvm))
     }
 
+    /// Internal method
     fn execute_with<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>>;
 }
 

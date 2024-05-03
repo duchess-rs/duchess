@@ -18,7 +18,7 @@ fn base_greeting(
     _this: &native_greeting::Native,
     name: &java::lang::String,
 ) -> duchess::GlobalResult<String> {
-    let name: String = name.to_rust().execute()?;
+    let name: String = name.to_rust()?;
     Ok(format!("Hello, {name}"))
 }
 
@@ -36,7 +36,6 @@ fn main() -> duchess::GlobalResult<()> {
         .greet("Ferris")
         .assert_not_null()
         .to_rust()
-        .execute()
         .unwrap();
 
     // Final result:

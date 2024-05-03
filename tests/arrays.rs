@@ -9,7 +9,7 @@ macro_rules! test_array {
                 .global()
                 .execute()
                 .unwrap();
-            let and_back = (&*java).to_rust().execute().unwrap();
+            let and_back = (&*java).to_rust().unwrap();
             assert_eq!(test_array, and_back);
         }
     };

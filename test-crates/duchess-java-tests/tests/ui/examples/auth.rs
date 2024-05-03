@@ -71,7 +71,6 @@ pub struct AuthorizeRequest {
     pub context: HashMap<String, String>,
 }
 
-
 #[derive(Debug, duchess::ToJava)]
 #[java(auth.AuthorizeRequest)]
 pub struct AuthorizeRequestWithReferences<'a> {
@@ -108,7 +107,6 @@ impl HttpAuth {
             .assert_not_null()
             .catch::<duchess::java::lang::Throwable>()
             .to_rust()
-            .execute()
             .unwrap()
     }
 
@@ -121,7 +119,6 @@ impl HttpAuth {
             .authorize(authn, authz)
             .catch::<duchess::java::lang::Throwable>()
             .to_rust()
-            .execute()
             .unwrap()
     }
 }

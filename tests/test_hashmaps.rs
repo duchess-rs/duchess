@@ -13,12 +13,6 @@ fn test_hashmap_roundtrip() {
         .execute()
         .unwrap()
         .unwrap();
-    assert_eq!(
-        java.get("a").to_rust().execute().unwrap(),
-        Some("abc".to_string())
-    );
-    assert_eq!(
-        java.get("b").to_rust().execute().unwrap(),
-        Some("cde".to_string())
-    );
+    assert_eq!(java.get("a").to_rust().unwrap(), Some("abc".to_string()));
+    assert_eq!(java.get("b").to_rust().unwrap(), Some("cde".to_string()));
 }

@@ -89,7 +89,6 @@ fn check_exceptions() -> duchess::GlobalResult<()> {
         .to_string()
         .global()
         .to_rust()
-        .execute()
         .expect_err("returns a null pointer");
 
     assert!(matches!(error, duchess::Error::NullDeref));

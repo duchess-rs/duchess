@@ -7,7 +7,7 @@ fn main() -> duchess::GlobalResult<()> {
 
     let n: Global<java::lang::String> = java::lang::String::new(v.to_java()).global().execute()?;
 
-    let n: String = n.to_rust().execute()?;
+    let n: String = n.to_rust()?;
 
     assert_eq!(&n[..], "Hi");
 

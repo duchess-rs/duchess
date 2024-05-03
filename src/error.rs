@@ -45,15 +45,10 @@ pub enum Error<T: AsJRef<Throwable>> {
 }
 
 fn try_extract_message(exception: &impl AsJRef<Throwable>) -> String {
-    let message = Jvm::with(|jvm| {
-        let exception = jvm.local(exception.as_jref()?);
-        exception
-            .to_string()
-            .assert_not_null()
-            .to_rust()
-            .execute_with(jvm)
-    });
-    message.unwrap_or_else(|err| format!("failed to get message: {}", err))
+    let result = || -> crate::GlobalResult<_> {
+        exception.as_jref()?.to_string().assert_not_null().to_rust()
+    };
+    result().unwrap_or_else(|err| format!("failed to get message: {}", err))
 }
 
 impl<T> Debug for Error<T>

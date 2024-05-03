@@ -37,7 +37,7 @@ fn to_java_and_back() {
             .global()
             .execute()
             .unwrap();
-        let and_back = (&*java).to_rust().execute().unwrap();
+        let and_back = (&*java).to_rust().unwrap();
         assert_eq!(example, and_back);
     }
 }
