@@ -9,7 +9,7 @@ macro_rules! test_array {
                 .global()
                 .execute()
                 .unwrap();
-            let and_back: Vec<_> = (&*java).to_rust().unwrap();
+            let and_back: Vec<_> = (&*java).execute().unwrap();
             assert_eq!(test_array, and_back);
         }
     };

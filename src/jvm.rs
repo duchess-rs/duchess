@@ -89,15 +89,6 @@ pub trait JvmOp: Copy {
         TryCatch::new(self)
     }
 
-    /// Given a JVM op that returns some Java type, convert it to its Rust equivalent
-    /// (e.g., from a Java String to a Rust string).
-    fn to_rust<R>(self) -> crate::GlobalResult<R>
-    where
-        for<'jvm> Self::Output<'jvm>: IntoRust<R>,
-    {
-        ToRustOp::new(self).execute()
-    }
-
     /// Internal method
     fn to_rust_with<'jvm, R>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, R>
     where
@@ -113,9 +104,9 @@ pub trait JvmOp: Copy {
     /// you can use [`global()`][`Self::global`] to create a global reference.
     fn execute<R>(self) -> crate::GlobalResult<R>
     where
-        for<'jvm> Self: JvmOp<Output<'jvm> = R>,
+        for<'jvm> Self::Output<'jvm>: IntoRust<R>,
     {
-        Jvm::with(|jvm| self.execute_with(jvm))
+        Jvm::with(|jvm| self.to_rust_with(jvm))
     }
 
     /// Internal method

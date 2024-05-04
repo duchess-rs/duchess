@@ -17,7 +17,7 @@ fn base_greeting(
     _this: &native_greeting::Native,
     name: &java::lang::String,
 ) -> duchess::GlobalResult<String> {
-    let name: String = name.to_rust()?;
+    let name: String = name.execute()?;
     Ok(format!("Hello, {name}"))
 }
 
@@ -29,7 +29,7 @@ fn main() -> duchess::GlobalResult<()> {
     let n: String = native_greeting::Native::new()
         .greet("Ferris")
         .assert_not_null()
-        .to_rust()
+        .execute()
         .unwrap();
 
     assert_eq!(n, "Hello, Ferris, from Java");

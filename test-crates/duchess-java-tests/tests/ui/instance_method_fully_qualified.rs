@@ -6,7 +6,7 @@ pub fn main() -> duchess::GlobalResult<()> {
     let date = java::util::Date::new().global().execute()?;
     let s: String = java::lang::Object::to_string(&date)
         .assert_not_null()
-        .to_rust()?;
+        .execute()?;
     println!("Today's date is {s}");
     Ok(())
 }

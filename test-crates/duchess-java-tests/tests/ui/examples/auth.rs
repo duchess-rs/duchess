@@ -106,7 +106,7 @@ impl HttpAuth {
             .authenticate(request)
             .assert_not_null()
             .catch::<duchess::java::lang::Throwable>()
-            .to_rust()
+            .execute()
             .unwrap()
     }
 
@@ -118,7 +118,7 @@ impl HttpAuth {
         self.0
             .authorize(authn, authz)
             .catch::<duchess::java::lang::Throwable>()
-            .to_rust()
+            .execute()
             .unwrap()
     }
 }

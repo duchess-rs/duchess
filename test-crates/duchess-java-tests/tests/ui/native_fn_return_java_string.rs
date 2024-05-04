@@ -28,7 +28,7 @@ fn main() -> duchess::GlobalResult<()> {
     let n: String = native_greeting::Native::new()
         .greet("Ferris")
         .assert_not_null()
-        .to_rust()
+        .execute()
         .unwrap();
 
     assert_eq!(n, "Ferris, from Java");

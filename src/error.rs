@@ -46,7 +46,7 @@ pub enum Error<T: AsJRef<Throwable>> {
 
 fn try_extract_message(exception: &impl AsJRef<Throwable>) -> String {
     let result = || -> crate::GlobalResult<_> {
-        exception.as_jref()?.to_string().assert_not_null().to_rust()
+        exception.as_jref()?.to_string().assert_not_null().execute()
     };
     result().unwrap_or_else(|err| format!("failed to get message: {}", err))
 }
