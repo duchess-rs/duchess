@@ -16,11 +16,11 @@ duchess::java_package! {
 fn base_greeting(
     _this: &native_greeting::Native,
     name: &java::lang::String,
-) -> duchess::GlobalResult<duchess::Global<java::lang::String>> {
+) -> duchess::Result<duchess::Global<java::lang::String>> {
     name.global().execute()
 }
 
-fn main() -> duchess::GlobalResult<()> {
+fn main() -> duchess::Result<()> {
     duchess::Jvm::builder()
         .link(base_greeting::java_fn())
         .try_launch()?;

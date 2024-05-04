@@ -7,7 +7,7 @@ struct LongWrapper<'a> {
     value: &'a str,
 }
 
-pub fn main() -> duchess::GlobalResult<()> {
+pub fn main() -> duchess::Result<()> {
     let my_string = String::from("1234");
     let rust = LongWrapper { value: &my_string };
     let java = rust.to_java().assert_not_null().global().execute()?;

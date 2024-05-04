@@ -10,7 +10,7 @@ use crate::{
     raw::{self, EnvPtr, JvmPtr, ObjectPtr},
     thread,
     try_catch::TryCatch,
-    AsJRef, Error, Global, GlobalResult, IntoRust, Local, ToJava, TryJDeref,
+    AsJRef, Error, Global, IntoRust, Local, Result, ToJava, TryJDeref,
 };
 
 use std::{
@@ -102,7 +102,7 @@ pub trait JvmOp: Copy {
     /// Typically this is achieved by a call to [`to_rust()`][`Self::to_rust`],
     /// but if you wish to hold on to a reference to a JVM object,
     /// you can use [`global()`][`Self::global`] to create a global reference.
-    fn execute<R>(self) -> crate::GlobalResult<R>
+    fn execute<R>(self) -> crate::Result<R>
     where
         for<'jvm> Self::Output<'jvm>: IntoRust<R>,
     {
@@ -123,7 +123,7 @@ impl IsVoid for () {}
 
 static GLOBAL_JVM: OnceCell<JvmPtr> = OnceCell::new();
 
-fn get_or_default_init_jvm() -> crate::GlobalResult<JvmPtr> {
+fn get_or_default_init_jvm() -> crate::Result<JvmPtr> {
     match GLOBAL_JVM.get() {
         Some(jvm) => Ok(*jvm),
         None => {
@@ -242,14 +242,14 @@ impl<'jvm> Jvm<'jvm> {
         JvmBuilder::new()
     }
 
-    pub fn attach_thread_permanently() -> crate::GlobalResult<()> {
+    pub fn attach_thread_permanently() -> crate::Result<()> {
         thread::attach_permanently(get_or_default_init_jvm()?)?;
         Ok(())
     }
 
     pub fn with<R>(
         op: impl for<'a> FnOnce(&mut Jvm<'a>) -> crate::LocalResult<'a, R>,
-    ) -> crate::GlobalResult<R> {
+    ) -> crate::Result<R> {
         let jvm = get_or_default_init_jvm()?;
         // SAFTEY: we won't deinitialize the JVM while the guard is live
         let mut guard = unsafe { thread::attach(jvm)? };
@@ -355,7 +355,7 @@ impl JvmBuilder {
     }
 
     /// Launch a new JVM, returning [`Error::JvmAlreadyExists`] if one already exists.
-    pub fn try_launch(self) -> GlobalResult<()> {
+    pub fn try_launch(self) -> Result<()> {
         #[cfg(feature = "dylibjvm")]
         if let Some(path) = self.libjvm_path {
             crate::libjvm::libjvm_or_load_at(&path)?;
@@ -367,7 +367,7 @@ impl JvmBuilder {
             // existing JVM.
             let jvm = unsafe { raw::try_create_jvm(self.options.into_iter()) }?;
             already_exists = false;
-            GlobalResult::Ok(jvm)
+            Result::Ok(jvm)
         })?;
 
         if already_exists {
@@ -381,7 +381,7 @@ impl JvmBuilder {
         }
     }
 
-    pub fn launch_or_use_existing(self) -> GlobalResult<()> {
+    pub fn launch_or_use_existing(self) -> Result<()> {
         match self.try_launch() {
             Err(Error::JvmAlreadyExists) => {
                 // Two cases: (1) another thread successfully invoked try_launch() and we'll now get the pointer out of
@@ -390,9 +390,7 @@ impl JvmBuilder {
                 GLOBAL_JVM.get_or_try_init(|| {
                     // SAFETY: we're behind the GLOBAL_JVM lock and we won't race with other threads creating or finding
                     // an existing JVM.
-                    GlobalResult::Ok(
-                        unsafe { raw::existing_jvm() }?.expect("JVM should already exist"),
-                    )
+                    Result::Ok(unsafe { raw::existing_jvm() }?.expect("JVM should already exist"))
                 })?;
                 Ok(())
             }

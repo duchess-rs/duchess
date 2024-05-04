@@ -2,7 +2,7 @@ use std::cell::Cell;
 
 use crate::{
     raw::{EnvPtr, JvmPtr},
-    Error, GlobalResult,
+    Error, Result,
 };
 
 // XX: The current thread-local state will prevent duchess => java => duchess call stacks. We may want to relax this in
@@ -23,8 +23,8 @@ pub enum State {
 
 fn attached_or(
     jvm: JvmPtr,
-    f: impl FnOnce() -> GlobalResult<AttachGuard>,
-) -> GlobalResult<AttachGuard> {
+    f: impl FnOnce() -> Result<AttachGuard>,
+) -> Result<AttachGuard> {
     STATE.with(|state| match state.replace(State::InUse) {
         State::AttachedPermanently(env) => Ok(AttachGuard {
             jvm,
@@ -90,7 +90,7 @@ impl Drop for JniCallbackGuard<'_> {
     }
 }
 
-pub fn attach_permanently(jvm: JvmPtr) -> GlobalResult<AttachGuard> {
+pub fn attach_permanently(jvm: JvmPtr) -> Result<AttachGuard> {
     attached_or(jvm, || {
         Ok(AttachGuard {
             jvm,
@@ -101,7 +101,7 @@ pub fn attach_permanently(jvm: JvmPtr) -> GlobalResult<AttachGuard> {
     })
 }
 
-pub unsafe fn attach<'jvm>(jvm: JvmPtr) -> GlobalResult<AttachGuard> {
+pub unsafe fn attach<'jvm>(jvm: JvmPtr) -> Result<AttachGuard> {
     attached_or(jvm, || {
         Ok(AttachGuard {
             jvm,

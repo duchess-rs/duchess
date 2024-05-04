@@ -14,7 +14,7 @@ fn empty_scala_seq<T: duchess::JavaObject>() -> impl IntoJava<Seq<T>> {
 }
 
 #[test]
-fn test_program_construction() -> duchess::GlobalResult<()> {
+fn test_program_construction() -> duchess::Result<()> {
     duchess::Jvm::with(|jvm| {
         let domains = empty_scala_seq::<ast::Domain>();
         let fields = empty_scala_seq::<ast::Field>();
@@ -42,7 +42,7 @@ fn test_program_construction() -> duchess::GlobalResult<()> {
 }
 
 #[test]
-fn test_carbon_construction() -> duchess::GlobalResult<()> {
+fn test_carbon_construction() -> duchess::Result<()> {
     duchess::Jvm::with(|jvm| {
         let reporter = NoopReporter__::get_module();
         let debug_info = empty_scala_seq::<Tuple2<String, Object>>();
@@ -52,7 +52,7 @@ fn test_carbon_construction() -> duchess::GlobalResult<()> {
 }
 
 #[test]
-fn test_silicon_construction() -> duchess::GlobalResult<()> {
+fn test_silicon_construction() -> duchess::Result<()> {
     duchess::Jvm::with(|jvm| {
         let _silicon = Silicon::new().execute_with(jvm)?;
         Ok(())

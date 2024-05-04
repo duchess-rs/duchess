@@ -261,7 +261,7 @@ where
     }
 }
 
-impl<J, R> ToJavaImpl<J> for crate::GlobalResult<R>
+impl<J, R> ToJavaImpl<J> for crate::Result<R>
 where
     J: Upcast<java::lang::Object>,
     R: ToJavaImpl<J>,

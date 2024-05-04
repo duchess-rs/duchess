@@ -28,7 +28,7 @@ duchess::java_package! {
     class BuildStep { * }
 }
 
-fn main() -> duchess::GlobalResult<()> {
+fn main() -> duchess::Result<()> {
     let logger = log::Logger::new().global().execute()?;
 
     let timestamp = java::util::Date::new();

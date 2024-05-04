@@ -15,7 +15,7 @@ mod our_java {
     pub use java::*;
 }
 
-pub fn main() -> duchess::GlobalResult<()> {
+pub fn main() -> duchess::Result<()> {
     let date = our_java::util::Date::new().global().execute()?;
     let s: String = date.to_string().assert_not_null().execute()?;
     //                   ^^^^^^^^^^^ this is defined on `java.lang.Object`

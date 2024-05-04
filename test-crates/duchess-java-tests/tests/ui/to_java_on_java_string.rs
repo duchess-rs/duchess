@@ -6,7 +6,7 @@ use duchess::java;
 use duchess::prelude::*;
 use duchess::Global;
 
-fn main() -> duchess::GlobalResult<()> {
+fn main() -> duchess::Result<()> {
     let data: Global<java::lang::String> = format!("Hello, Duchess!").global().execute()?;
 
     let hash_code: i32 = data

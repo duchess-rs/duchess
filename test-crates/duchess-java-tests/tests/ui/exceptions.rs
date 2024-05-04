@@ -10,7 +10,7 @@ duchess::java_package! {
     public class DifferentException { * }
 }
 
-pub fn main() -> duchess::GlobalResult<()> {
+pub fn main() -> duchess::Result<()> {
     check_exceptions()?;
     check_static_fields()?;
     catch_exceptions()?;
@@ -18,17 +18,15 @@ pub fn main() -> duchess::GlobalResult<()> {
     Ok(())
 }
 
-fn check_static_fields() -> duchess::GlobalResult<()> {
-    let result = exceptions::ThrowExceptions::get_static_string_not_null()
-        .global()
-        .to_rust()
+fn check_static_fields() -> duchess::Result<()> {
+    let result: String = exceptions::ThrowExceptions::get_static_string_not_null()
         .execute()?
         .unwrap();
     assert_eq!("notnull", result);
     Ok(())
 }
 
-fn catch_exceptions() -> duchess::GlobalResult<()> {
+fn catch_exceptions() -> duchess::Result<()> {
     // Note: perhaps an API issue, I was only able to get catch to work in a non-global context, hence `Jvm::with`
     Jvm::with(|jvm| {
         let thrower = exceptions::ThrowExceptions::new()
@@ -69,7 +67,7 @@ fn catch_exceptions() -> duchess::GlobalResult<()> {
     Ok(())
 }
 
-fn check_exceptions() -> duchess::GlobalResult<()> {
+fn check_exceptions() -> duchess::Result<()> {
     let thrower = exceptions::ThrowExceptions::new().global().execute()?;
 
     let result = thrower

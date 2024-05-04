@@ -28,7 +28,7 @@ duchess::java_package! {
     class BuildStep { * }
 }
 
-fn main() -> duchess::GlobalResult<()> {
+fn main() -> duchess::Result<()> {
     // FIXME: conflict between interface trait (LoggerExt) and class trait (BuilderExt)
 
     let logger = log::Logger::new().global().execute()?;

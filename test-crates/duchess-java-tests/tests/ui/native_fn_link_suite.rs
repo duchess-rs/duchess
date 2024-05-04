@@ -16,7 +16,7 @@ duchess::java_package! {
 fn base_greeting(
     _this: &native_greeting::Native,
     name: &java::lang::String,
-) -> duchess::GlobalResult<String> {
+) -> duchess::Result<String> {
     let name: String = name.execute()?;
     Ok(format!("Hello, {name}"))
 }
@@ -25,7 +25,7 @@ fn native_functions() -> Vec<duchess::JavaFunction> {
     vec![base_greeting::java_fn()]
 }
 
-fn main() -> duchess::GlobalResult<()> {
+fn main() -> duchess::Result<()> {
     duchess::Jvm::builder()
         .link(native_functions())
         .try_launch()?;

@@ -17,12 +17,12 @@ duchess::java_package! {
 fn base_greeting(
     _this: &native_greeting::Native,
     name: &java::lang::String,
-) -> duchess::GlobalResult<String> {
+) -> duchess::Result<String> {
     let name: String = name.execute()?;
     Ok(format!("Hello, {name}"))
 }
 
-fn main() -> duchess::GlobalResult<()> {
+fn main() -> duchess::Result<()> {
     // When creating the JVM, link the native method
     // by calling `link`.
     duchess::Jvm::builder()

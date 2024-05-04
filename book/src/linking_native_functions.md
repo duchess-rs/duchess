@@ -12,7 +12,7 @@ use duchess::prelude::*; // 👈 You'll need this.
 #[java_function(...)]
 fn foo(...) { }
 
-fn main() -> duchess::GlobalResult<()> {
+fn main() -> duchess::Result<()> {
     Jvm::builder()
         .link(foo::java_fn()) // 👈 Note the `::java_fn()`.
         .try_launch()?;
@@ -58,7 +58,7 @@ fn java_functions() -> Vec<duchess::JavaFunction> {
 And finally you can invoke `link()` to link them all at once:
 
 ```rust,ignore
-fn main() -> duchess::GlobalResult<()> {
+fn main() -> duchess::Result<()> {
     Jvm::builder()
         .link(java_functions())
         .try_launch()?;

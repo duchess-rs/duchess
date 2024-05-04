@@ -14,7 +14,7 @@ pub type LocalResult<'jvm, T> = result::Result<T, Error<Local<'jvm, Throwable>>>
 
 /// Result returned by [`crate::Jvm::with()`] that will store any uncaught
 /// exception as a global reference.
-pub type GlobalResult<T> = result::Result<T, Error<Global<Throwable>>>;
+pub type Result<T> = result::Result<T, Error<Global<Throwable>>>;
 
 #[derive(Error)]
 pub enum Error<T: AsJRef<Throwable>> {
@@ -45,9 +45,8 @@ pub enum Error<T: AsJRef<Throwable>> {
 }
 
 fn try_extract_message(exception: &impl AsJRef<Throwable>) -> String {
-    let result = || -> crate::GlobalResult<_> {
-        exception.as_jref()?.to_string().assert_not_null().execute()
-    };
+    let result =
+        || -> crate::Result<_> { exception.as_jref()?.to_string().assert_not_null().execute() };
     result().unwrap_or_else(|err| format!("failed to get message: {}", err))
 }
 

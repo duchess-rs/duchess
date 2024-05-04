@@ -14,12 +14,12 @@ duchess::java_package! {
 fn base_greeting<'n>(
     _this: &'n native_greeting::Native,
     _name: &'n java::lang::String,
-) -> duchess::GlobalResult<duchess::Local<'n, java::lang::String>> {
+) -> duchess::Result<duchess::Local<'n, java::lang::String>> {
     let v = vec!['H' as u8, 'i' as u8];
     java::lang::String::new(v.to_java()).execute() //~ ERROR: trait bound
 }
 
-fn main() -> duchess::GlobalResult<()> {
+fn main() -> duchess::Result<()> {
     duchess::Jvm::builder()
         .link(base_greeting::java_fn())
         .try_launch()?;

@@ -96,7 +96,7 @@ pub enum AuthorizeError {
 }
 
 impl HttpAuth {
-    pub fn new() -> duchess::GlobalResult<Self> {
+    pub fn new() -> duchess::Result<Self> {
         let auth = auth::HttpAuth::new().global().execute()?;
         Ok(Self(auth))
     }
@@ -123,7 +123,7 @@ impl HttpAuth {
     }
 }
 
-fn main() -> duchess::GlobalResult<()> {
+fn main() -> duchess::Result<()> {
     let auth = HttpAuth::new()?;
 
     let request = HttpRequest {

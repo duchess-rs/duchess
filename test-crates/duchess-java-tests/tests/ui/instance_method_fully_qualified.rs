@@ -2,7 +2,7 @@
 use duchess::java;
 use duchess::prelude::*;
 
-pub fn main() -> duchess::GlobalResult<()> {
+pub fn main() -> duchess::Result<()> {
     let date = java::util::Date::new().global().execute()?;
     let s: String = java::lang::Object::to_string(&date)
         .assert_not_null()

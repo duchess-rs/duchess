@@ -14,11 +14,11 @@ duchess::java_package! {
 fn base_greeting<'n>(
     _this: &native_greeting::Native,
     name: &'n java::lang::String,
-) -> duchess::GlobalResult<duchess::Local<'n, java::lang::String>> {
+) -> duchess::Result<duchess::Local<'n, java::lang::String>> {
     name.execute() //~ ERROR: trait bound
 }
 
-fn main() -> duchess::GlobalResult<()> {
+fn main() -> duchess::Result<()> {
     duchess::Jvm::builder()
         .link(base_greeting::java_fn())
         .try_launch()?;
