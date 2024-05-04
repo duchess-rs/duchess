@@ -11,7 +11,7 @@ impl JvmOp for &str {
     fn execute_with<'jvm>(
         self,
         jvm: &mut Jvm<'jvm>,
-    ) -> crate::Result<'jvm, Local<'jvm, JavaString>> {
+    ) -> crate::LocalResult<'jvm, Local<'jvm, JavaString>> {
         let encoded = cesu8::to_java_cesu8(self);
         // SAFETY: cesu8 encodes interior nul bytes as 0xC080
         let c_string = unsafe { CString::from_vec_unchecked(encoded.into_owned()) };
@@ -30,13 +30,13 @@ impl JvmOp for &String {
     fn execute_with<'jvm>(
         self,
         jvm: &mut Jvm<'jvm>,
-    ) -> crate::Result<'jvm, Local<'jvm, JavaString>> {
+    ) -> crate::LocalResult<'jvm, Local<'jvm, JavaString>> {
         <&str as JvmOp>::execute_with(&self, jvm)
     }
 }
 
 impl IntoRust<String> for &JavaString {
-    fn into_rust<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, String> {
+    fn into_rust<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, String> {
         let str_raw = self.as_raw();
 
         let env = jvm.env();

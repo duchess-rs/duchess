@@ -410,7 +410,7 @@ impl ClassInfo {
 
         quote_spanned! {
             self.span =>
-            fn class<'jvm>(jvm: &mut duchess::Jvm<'jvm>) -> duchess::Result<'jvm, duchess::Local<'jvm, java::lang::Class>> {
+            fn class<'jvm>(jvm: &mut duchess::Jvm<'jvm>) -> duchess::LocalResult<'jvm, duchess::Local<'jvm, java::lang::Class>> {
                 static CLASS: duchess::plumbing::once_cell::sync::OnceCell<duchess::Global<java::lang::Class>> = duchess::plumbing::once_cell::sync::OnceCell::new();
                 let global = CLASS.get_or_try_init::<_, duchess::Error<duchess::Local<java::lang::Throwable>>>(|| {
                     let class = duchess::plumbing::find_class(jvm, #jni_class_name)?;
@@ -507,7 +507,7 @@ impl ClassInfo {
                     fn execute_with<'jvm>(
                         self,
                         jvm: &mut duchess::Jvm<'jvm>,
-                    ) -> duchess::Result<'jvm, Self::Output<'jvm>> {
+                    ) -> duchess::LocalResult<'jvm, Self::Output<'jvm>> {
                         #(#prepare_inputs)*
 
                         let class = <#ty as duchess::JavaObject>::class(jvm)?;
@@ -810,7 +810,7 @@ impl ClassInfo {
                 fn execute_with<'jvm>(
                     self,
                     jvm: &mut duchess::Jvm<'jvm>,
-                ) -> duchess::Result<'jvm, Self::Output<'jvm>> {
+                ) -> duchess::LocalResult<'jvm, Self::Output<'jvm>> {
                     let this = self.#this.into_java(jvm)?;
                     let this: & #this_ty = duchess::prelude::AsJRef::as_jref(&this)?;
                     let this = duchess::plumbing::JavaObjectExt::as_raw(this);
@@ -1000,7 +1000,7 @@ impl ClassInfo {
                 fn execute_with<'jvm>(
                     self,
                     jvm: &mut duchess::Jvm<'jvm>,
-                ) -> duchess::Result<'jvm, Self::Output<'jvm>> {
+                ) -> duchess::LocalResult<'jvm, Self::Output<'jvm>> {
                     #(#prepare_inputs)*
 
                     // Cache the method id for this method -- note that we only have one cache
@@ -1128,7 +1128,7 @@ impl ClassInfo {
                 fn execute_with<'jvm>(
                     self,
                     jvm: &mut duchess::Jvm<'jvm>,
-                ) -> duchess::Result<'jvm, Self::Output<'jvm>> {
+                ) -> duchess::LocalResult<'jvm, Self::Output<'jvm>> {
 
                     // Cache the field id for this field -- note that we only have one cache
                     // no matter how many generic monomorphizations there are. This makes sense

@@ -10,7 +10,7 @@ use crate::{java::lang::Throwable, Global, Jvm, JvmOp, Local};
 
 /// Result returned by most Java operations that may contain a local reference
 /// to a thrown exception.
-pub type Result<'jvm, T> = result::Result<T, Error<Local<'jvm, Throwable>>>;
+pub type LocalResult<'jvm, T> = result::Result<T, Error<Local<'jvm, Throwable>>>;
 
 /// Result returned by [`crate::Jvm::with()`] that will store any uncaught
 /// exception as a global reference.

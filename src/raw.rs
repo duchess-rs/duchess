@@ -243,7 +243,7 @@ impl<'jvm> EnvPtr<'jvm> {
         self,
         fn_field: impl FnOnce(&jni_sys::JNINativeInterface_) -> Option<F>,
         call: impl FnOnce(*mut jni_sys::JNIEnv, F) -> T::JniValue,
-    ) -> crate::Result<'jvm, T> {
+    ) -> crate::LocalResult<'jvm, T> {
         let value = self.invoke_unchecked(fn_field, call);
 
         // Even if there was an exception thrown, we still need to free any non-null local ref
@@ -295,7 +295,7 @@ impl<'jvm> EnvPtr<'jvm> {
         self,
         class: ObjectPtr,
         native_methods: &[jni_sys::JNINativeMethod],
-    ) -> crate::Result<'jvm, ()> {
+    ) -> crate::LocalResult<'jvm, ()> {
         let result: jni_sys::jint = self.invoke(
             |f| f.RegisterNatives,
             |env, register_natives| {
@@ -314,7 +314,7 @@ impl<'jvm> EnvPtr<'jvm> {
         }
     }
 
-    pub fn check_exception(self) -> crate::Result<'jvm, ()> {
+    pub fn check_exception(self) -> crate::LocalResult<'jvm, ()> {
         // SAFETY: we don't hold on to the return env ptr
         let thrown = unsafe { self.invoke_unchecked(|env| env.ExceptionOccurred, |env, f| f(env)) };
         if let Some(thrown) = ObjectPtr::new(thrown) {

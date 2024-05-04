@@ -41,7 +41,7 @@ impl<T, J, N> FromRef<J> for JavaArrayObj<T, J, N> {
 }
 
 unsafe impl<T: JavaType> JavaObject for JavaArray<T> {
-    fn class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Local<'jvm, Class>> {
+    fn class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, Local<'jvm, Class>> {
         T::array_class(jvm)
     }
 }
@@ -115,7 +115,10 @@ where
 {
     type Output<'jvm> = jni_sys::jsize;
 
-    fn execute_with<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
+    fn execute_with<'jvm>(
+        self,
+        jvm: &mut Jvm<'jvm>,
+    ) -> crate::LocalResult<'jvm, Self::Output<'jvm>> {
         let this = self.this.execute_with(jvm)?;
         let this = this.as_jref()?.as_raw();
 
@@ -133,7 +136,7 @@ macro_rules! primitive_array {
             impl JvmOp for &[$rust] {
                 type Output<'jvm> = Local<'jvm, JavaArray<$rust>>;
 
-                fn execute_with<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
+                fn execute_with<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, Self::Output<'jvm>> {
                     let Ok(len) = self.len().try_into() else {
                         return Err(Error::SliceTooLong(self.len()))
                     };
@@ -172,7 +175,7 @@ macro_rules! primitive_array {
                 fn to_java_impl<'jvm>(
                     rust: &Self,
                     jvm: &mut Jvm<'jvm>,
-                ) -> crate::Result<'jvm, Option<Local<'jvm, java::Array<$rust>>>> {
+                ) -> crate::LocalResult<'jvm, Option<Local<'jvm, java::Array<$rust>>>> {
                     Ok(Some(rust.execute_with(jvm)?))
                 }
             }
@@ -181,13 +184,13 @@ macro_rules! primitive_array {
                 fn to_java_impl<'jvm>(
                     rust: &Self,
                     jvm: &mut Jvm<'jvm>,
-                ) -> crate::Result<'jvm, Option<Local<'jvm, java::Array<$rust>>>> {
+                ) -> crate::LocalResult<'jvm, Option<Local<'jvm, java::Array<$rust>>>> {
                     Ok(Some(rust.execute_with(jvm)?))
                 }
             }
 
             impl IntoRust<Vec<$rust>> for &JavaArray<$rust> {
-                fn into_rust<'jvm>(self, jvm: &mut Jvm<'jvm>) -> $crate::Result<'jvm, Vec<$rust>> {
+                fn into_rust<'jvm>(self, jvm: &mut Jvm<'jvm>) -> $crate::LocalResult<'jvm, Vec<$rust>> {
                     let len = self.length().execute_with(jvm)?;
                     let mut vec = Vec::<$rust>::with_capacity(len as usize);
 

@@ -32,7 +32,7 @@ where
 {
     type Output<'jvm> = Result<This::Output<'jvm>, Local<'jvm, J>>;
 
-    fn execute_with<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
+    fn execute_with<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, Self::Output<'jvm>> {
         match self.this.execute_with(jvm) {
             Ok(v) => Ok(Ok(v)),
             Err(e) => match e {

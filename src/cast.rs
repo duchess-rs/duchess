@@ -41,7 +41,7 @@ where
 {
     type Output<'jvm> = Result<Local<'jvm, To>, J::Output<'jvm>>;
 
-    fn execute_with<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
+    fn execute_with<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, Self::Output<'jvm>> {
         let instance = self.op.execute_with(jvm)?;
         let instance_raw = instance.try_jderef()?.as_raw();
 
@@ -94,7 +94,7 @@ where
 {
     type Output<'jvm> = Local<'jvm, To>;
 
-    fn execute_with<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
+    fn execute_with<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, Self::Output<'jvm>> {
         let instance = self.op.execute_with(jvm)?;
 
         if cfg!(debug_assertions) {

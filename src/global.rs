@@ -26,7 +26,7 @@ where
     fn execute_with<'jvm>(
         self,
         jvm: &mut crate::Jvm<'jvm>,
-    ) -> crate::Result<'jvm, Self::Output<'jvm>> {
+    ) -> crate::LocalResult<'jvm, Self::Output<'jvm>> {
         let local = self.j.execute_with(jvm)?;
         local.into_global(jvm)
     }
@@ -37,7 +37,7 @@ pub type GlobalVersionOf<'jvm, T> = <T as IntoGlobal<'jvm>>::Output;
 pub trait IntoGlobal<'jvm> {
     type Output;
 
-    fn into_global(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output>;
+    fn into_global(self, jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, Self::Output>;
 }
 
 impl<'jvm, T> IntoGlobal<'jvm> for Local<'jvm, T>
@@ -46,7 +46,7 @@ where
 {
     type Output = Global<T>;
 
-    fn into_global(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output> {
+    fn into_global(self, jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, Self::Output> {
         Ok(jvm.global::<T>(&self))
     }
 }
@@ -57,7 +57,7 @@ where
 {
     type Output = Global<T>;
 
-    fn into_global(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output> {
+    fn into_global(self, jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, Self::Output> {
         Ok(jvm.global::<T>(self))
     }
 }
@@ -68,7 +68,7 @@ where
 {
     type Output = Option<Global<T>>;
 
-    fn into_global(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output> {
+    fn into_global(self, jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, Self::Output> {
         Ok(self.map(|p| jvm.global::<T>(&p)))
     }
 }

@@ -90,7 +90,7 @@ pub trait JvmOp: Copy {
     }
 
     /// Internal method
-    fn to_rust_with<'jvm, R>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, R>
+    fn to_rust_with<'jvm, R>(self, jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, R>
     where
         for<'j> Self::Output<'j>: IntoRust<R>,
     {
@@ -110,7 +110,10 @@ pub trait JvmOp: Copy {
     }
 
     /// Internal method
-    fn execute_with<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>>;
+    fn execute_with<'jvm>(
+        self,
+        jvm: &mut Jvm<'jvm>,
+    ) -> crate::LocalResult<'jvm, Self::Output<'jvm>>;
 }
 
 /// This trait is only implemented for `()`; it allows the `JvmOp::execute` method to only
@@ -245,7 +248,7 @@ impl<'jvm> Jvm<'jvm> {
     }
 
     pub fn with<R>(
-        op: impl for<'a> FnOnce(&mut Jvm<'a>) -> crate::Result<'a, R>,
+        op: impl for<'a> FnOnce(&mut Jvm<'a>) -> crate::LocalResult<'a, R>,
     ) -> crate::GlobalResult<R> {
         let jvm = get_or_default_init_jvm()?;
         // SAFTEY: we won't deinitialize the JVM while the guard is live
@@ -278,7 +281,7 @@ impl<'jvm> Jvm<'jvm> {
     fn register_native_methods(
         &mut self,
         java_functions: &[JavaFunction],
-    ) -> crate::Result<'jvm, ()> {
+    ) -> crate::LocalResult<'jvm, ()> {
         let mut sorted_by_class: HashMap<Local<'_, Class>, Vec<jni_sys::JNINativeMethod>> =
             HashMap::default();
 
@@ -430,7 +433,7 @@ pub unsafe trait JavaObject: 'static + Sized + JavaType + JavaView {
     /// This is needed so that we can cache field and method IDs derived from
     /// reference, as those IDs are only guaranteed to remain stable so long as
     /// the Java class is not collected.
-    fn class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Local<'jvm, Class>>;
+    fn class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, Local<'jvm, Class>>;
 }
 
 pub trait JavaView {
@@ -498,11 +501,11 @@ impl<T: JavaObject> JavaObjectExt for T {
 pub unsafe trait JavaType: 'static {
     /// Returns the Java Class object for a Java array containing elements of
     /// `Self`. All Java types, even scalars can be elements of an array object.
-    fn array_class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Local<'jvm, Class>>;
+    fn array_class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, Local<'jvm, Class>>;
 }
 
 unsafe impl<T: JavaObject> JavaType for T {
-    fn array_class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Local<'jvm, Class>> {
+    fn array_class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, Local<'jvm, Class>> {
         T::class(jvm)?
             .array_type()
             .assert_not_null()
@@ -516,7 +519,7 @@ macro_rules! scalar {
     ($($rust:ty: $array_class:literal,)*) => {
         $(
             unsafe impl JavaType for $rust {
-                fn array_class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Local<'jvm, Class>> {
+                fn array_class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, Local<'jvm, Class>> {
                     // XX: Safety
                     const CLASS_NAME: &CStr = unsafe { CStr::from_bytes_with_nul_unchecked($array_class) };
                     static CLASS: OnceCell<Global<crate::java::lang::Class>> = OnceCell::new();
