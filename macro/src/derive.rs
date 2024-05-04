@@ -258,19 +258,19 @@ impl Driver<'_> {
             if let Some(name) = &field.ident {
                 if name == "this" {
                     // Special case for fields named this
-                    initializers.push_back(quote_spanned!(name.span() => #obj.to_rust_with(jvm)?));
+                    initializers.push_back(quote_spanned!(name.span() => #obj.execute_with(jvm)?));
                 } else if self.is_option(&field.ty) {
                     initializers.push_back(quote_spanned!(name.span() =>
                     #obj
                         .#name()
-                        .to_rust_with(jvm)?
+                        .execute_with(jvm)?
                     ));
                 } else {
                     initializers.push_back(quote_spanned!(name.span() =>
                     #obj
                         .#name()
                         .assert_not_null()
-                        .to_rust_with(jvm)?
+                        .execute_with(jvm)?
                     ));
                 }
             } else {

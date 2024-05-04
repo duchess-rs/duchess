@@ -78,14 +78,6 @@ pub trait JvmOp: Copy {
         TryCatch::new(self)
     }
 
-    /// Internal method
-    fn to_rust_with<'jvm, R>(self, jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, R>
-    where
-        for<'j> Self::Output<'j>: IntoRust<R>,
-    {
-        ToRustOp::new(self).do_jni(jvm)
-    }
-
     /// Execute the jvm op, starting a JVM instance if necessary.
     /// To use this method, the result type cannot be tied to the JVM.
     /// Typically this is achieved by a call to [`to_rust()`][`Self::to_rust`],
@@ -95,9 +87,16 @@ pub trait JvmOp: Copy {
     where
         for<'jvm> Self::Output<'jvm>: IntoRust<R>,
     {
-        Jvm::with(|jvm| self.to_rust_with(jvm))
+        Jvm::with(|jvm| self.execute_with(jvm))
     }
 
+    /// Internal method
+    fn execute_with<'jvm, R>(self, jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, R>
+    where
+        for<'j> Self::Output<'j>: IntoRust<R>,
+    {
+        ToRustOp::new(self).do_jni(jvm)
+    }
     /// Internal method
     fn do_jni<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, Self::Output<'jvm>>;
 }
@@ -490,10 +489,7 @@ pub unsafe trait JavaType: 'static {
 
 unsafe impl<T: JavaObject> JavaType for T {
     fn array_class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, Local<'jvm, Class>> {
-        T::class(jvm)?
-            .array_type()
-            .assert_not_null()
-            .do_jni(jvm)
+        T::class(jvm)?.array_type().assert_not_null().do_jni(jvm)
     }
 }
 
