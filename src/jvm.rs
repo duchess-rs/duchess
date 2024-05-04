@@ -22,6 +22,9 @@ use std::{
 
 use once_cell::sync::OnceCell;
 
+#[cfg(test)]
+mod test;
+
 /// A "jdk op" is a suspended operation that, when executed, will run
 /// on the jvm, producing a value of type `Output`. These ops typically
 /// represent constructor or method calls, and they can be chained
@@ -231,9 +234,12 @@ pub(crate) fn unwrap_global_jvm() -> JvmPtr {
     *GLOBAL_JVM.get().expect("JVM can't be unset")
 }
 
+/// Represents a handle to a running JVM.
+/// You rarely access this explicitly as a duchess user.
 pub struct Jvm<'jvm>(EnvPtr<'jvm>);
 
 impl<'jvm> Jvm<'jvm> {
+    /// Construct
     pub fn builder() -> JvmBuilder {
         JvmBuilder::new()
     }
@@ -243,7 +249,11 @@ impl<'jvm> Jvm<'jvm> {
         Ok(())
     }
 
-    pub fn with<R>(
+    /// Call the callback with access to a `Jvm`.
+    /// This cannot be invoked recursively.
+    /// It is crate-local because it is only usd from within
+    /// the `execute` method on [`JvmOp`][].
+    pub(crate) fn with<R>(
         op: impl for<'a> FnOnce(&mut Jvm<'a>) -> crate::LocalResult<'a, R>,
     ) -> crate::Result<R> {
         let jvm = get_or_default_init_jvm()?;

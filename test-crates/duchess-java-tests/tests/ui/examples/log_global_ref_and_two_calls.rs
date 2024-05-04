@@ -33,14 +33,12 @@ fn main() -> duchess::Result<()> {
 
     let logger = log::Logger::new().execute()?;
 
-    duchess::Jvm::with(|jvm| {
-        let event = log::Event::builder()
-            .with_time(java::util::Date::new())
-            .with_name("foo")
-            .build()
-            .do_jni(jvm)?;
-        logger.add_event(&event).do_jni(jvm)?;
-        logger.add_event(&event).do_jni(jvm)?;
-        Ok(())
-    })
+    let event = log::Event::builder()
+        .with_time(java::util::Date::new())
+        .with_name("foo")
+        .build()
+        .execute()?;
+    logger.add_event(&event).execute()?;
+    logger.add_event(&event).execute()?;
+    Ok(())
 }

@@ -15,46 +15,40 @@ fn empty_scala_seq<T: duchess::JavaObject>() -> impl IntoJava<Seq<T>> {
 
 #[test]
 fn test_program_construction() -> duchess::Result<()> {
-    duchess::Jvm::with(|jvm| {
-        let domains = empty_scala_seq::<ast::Domain>();
-        let fields = empty_scala_seq::<ast::Field>();
-        let functions = empty_scala_seq::<ast::Function>();
-        let predicates = empty_scala_seq::<ast::Predicate>();
-        let methods = empty_scala_seq::<ast::Method>();
-        let extension_member = empty_scala_seq::<ast::ExtensionMember>();
-        let position = ast::NoPosition__::get_module();
-        let info = ast::NoInfo__::get_module();
-        let error_trafo = ast::NoTrafos__::get_module();
-        let _program = ast::Program::new(
-            domains,
-            fields,
-            functions,
-            predicates,
-            methods,
-            extension_member,
-            position,
-            info,
-            error_trafo,
-        )
-        .do_jni(jvm)?;
-        Ok(())
-    })
+    let domains = empty_scala_seq::<ast::Domain>();
+    let fields = empty_scala_seq::<ast::Field>();
+    let functions = empty_scala_seq::<ast::Function>();
+    let predicates = empty_scala_seq::<ast::Predicate>();
+    let methods = empty_scala_seq::<ast::Method>();
+    let extension_member = empty_scala_seq::<ast::ExtensionMember>();
+    let position = ast::NoPosition__::get_module();
+    let info = ast::NoInfo__::get_module();
+    let error_trafo = ast::NoTrafos__::get_module();
+    let _program = ast::Program::new(
+        domains,
+        fields,
+        functions,
+        predicates,
+        methods,
+        extension_member,
+        position,
+        info,
+        error_trafo,
+    )
+    .execute()?;
+    Ok(())
 }
 
 #[test]
 fn test_carbon_construction() -> duchess::Result<()> {
-    duchess::Jvm::with(|jvm| {
-        let reporter = NoopReporter__::get_module();
-        let debug_info = empty_scala_seq::<Tuple2<String, Object>>();
-        let _carbon = CarbonVerifier::new(reporter, debug_info).do_jni(jvm)?;
-        Ok(())
-    })
+    let reporter = NoopReporter__::get_module();
+    let debug_info = empty_scala_seq::<Tuple2<String, Object>>();
+    let _carbon = CarbonVerifier::new(reporter, debug_info).execute()?;
+    Ok(())
 }
 
 #[test]
 fn test_silicon_construction() -> duchess::Result<()> {
-    duchess::Jvm::with(|jvm| {
-        let _silicon = Silicon::new().do_jni(jvm)?;
-        Ok(())
-    })
+    let _silicon = Silicon::new().execute()?;
+    Ok(())
 }

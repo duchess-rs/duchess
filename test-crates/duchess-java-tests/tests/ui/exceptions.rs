@@ -26,43 +26,38 @@ fn check_static_fields() -> duchess::Result<()> {
 }
 
 fn catch_exceptions() -> duchess::Result<()> {
-    // Note: perhaps an API issue, I was only able to get catch to work in a non-global context, hence `Jvm::with`
-    Jvm::with(|jvm| {
-        let thrower = exceptions::ThrowExceptions::new()
-            .execute_with(jvm)
-            .unwrap();
+    let thrower = exceptions::ThrowExceptions::new().execute().unwrap();
 
-        let caught_exception = thrower
-            .throw_runtime()
-            .catch::<java::lang::RuntimeException>()
-            .execute_with(jvm)
-            .unwrap();
-        assert!(
-            // it matches the expected exception type so, outer is Ok, inner is err
-            matches!(&caught_exception, Err(_)),
-            "{:?}",
-            caught_exception
-        );
+    let caught_exception = thrower
+        .throw_runtime()
+        .catch::<java::lang::RuntimeException>()
+        .execute()
+        .unwrap();
+    assert!(
+        // it matches the expected exception type so, outer is Ok, inner is err
+        matches!(&caught_exception, Err(_)),
+        "{:?}",
+        caught_exception
+    );
 
-        let caught_exception = thrower
-            .null_object()
-            .catch::<java::lang::RuntimeException>()
-            .execute_with(jvm)
-            .unwrap()
-            .expect("returns ok!");
+    let caught_exception = thrower
+        .null_object()
+        .catch::<java::lang::RuntimeException>()
+        .execute()
+        .unwrap()
+        .expect("returns ok!");
 
-        // This errors out because `try_extract_exception` calls `Jvm::with`.
-        let caught_exception = thrower
-            .throw_runtime()
-            .catch::<exceptions::DifferentException>()
-            .execute_with(jvm);
-        assert!(matches!(caught_exception, Err(duchess::Error::Thrown(_))));
+    // This errors out because `try_extract_exception` calls `Jvm::with`.
+    let caught_exception = thrower
+        .throw_runtime()
+        .catch::<exceptions::DifferentException>()
+        .execute();
+    assert!(matches!(caught_exception, Err(duchess::Error::Thrown(_))));
 
-        // This is a reproduction of https://github.com/duchess-rs/duchess/issues/142
-        assert_eq!(format!("{:?}", caught_exception), "Err(Java invocation threw: failed to get message: attempted to nest `Jvm::with` calls)");
-        Ok(())
-    })
-    .unwrap();
+    assert_eq!(
+        format!("{:?}", caught_exception),
+        "Err(Java invocation threw: java.lang.RuntimeException: something has gone horribly wrong)"
+    );
     Ok(())
 }
 
