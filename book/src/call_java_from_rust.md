@@ -110,7 +110,7 @@ Another option is to use `Option` types:
 ```rust,ignore
 use com::widgard::{Factory, FactoryExt, Widget};
 let f = Factory::new().execute();
-let j: Option<Global<Widget>> = None;
+let j: Option<Java<Widget>> = None;
 f.consume_widget(j).execute();
 //               ^ like this!
 ```

@@ -2,7 +2,6 @@
 
 #![allow(dead_code)]
 
-use duchess::java;
 use duchess::prelude::*;
 
 fn main() -> duchess::Result<()> {

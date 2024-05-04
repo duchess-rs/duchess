@@ -1,4 +1,4 @@
-use duchess::{java, prelude::*, Global};
+use duchess::prelude::*;
 
 #[test]
 fn to_java_and_back() {
@@ -31,7 +31,7 @@ fn to_java_and_back() {
         // nul byte
         "\u{0000}",
     ] {
-        let java: Global<java::lang::String> = example
+        let java: Java<java::lang::String> = example
             .to_java()
             .assert_not_null()
             .execute()

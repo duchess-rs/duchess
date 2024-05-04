@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use crate::{Global, JavaObject, Jvm, JvmOp, Local};
+use crate::{Java, JavaObject, Jvm, JvmOp, Local};
 
 /// Types that are able to be converted back into a Rust `T`, either because they will produce a Rust primitive `T` or
 /// or because we can convert into them via a JNI call.
@@ -57,11 +57,11 @@ where
     }
 }
 
-impl<J> IntoRust<Global<J>> for &J
+impl<J> IntoRust<Java<J>> for &J
 where
     J: JavaObject,
 {
-    fn into_rust<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, Global<J>> {
+    fn into_rust<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, Java<J>> {
         Ok(jvm.global(self))
     }
 }
@@ -86,7 +86,7 @@ where
     }
 }
 
-impl<R, J> IntoRust<R> for Global<J>
+impl<R, J> IntoRust<R> for Java<J>
 where
     J: JavaObject,
     for<'a> &'a J: IntoRust<R>,
@@ -96,7 +96,7 @@ where
     }
 }
 
-impl<R, J> IntoRust<R> for &Global<J>
+impl<R, J> IntoRust<R> for &Java<J>
 where
     J: JavaObject,
     for<'a> &'a J: IntoRust<R>,

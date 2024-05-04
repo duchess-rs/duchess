@@ -31,7 +31,7 @@ pub use jvm::JavaType;
 pub use jvm::Jvm;
 pub use link::JavaFunction;
 pub use null::Null;
-pub use ref_::{Global, Local};
+pub use ref_::{Java, Local};
 pub use refs::{AsJRef, JDeref, NullJRef, Nullable, TryJDeref};
 pub use try_catch::TryCatch;
 
@@ -39,6 +39,7 @@ pub use prelude::*;
 
 /// Contains traits with methods expected to be invoked by end-users.
 pub mod prelude {
+    pub use crate::java;
     pub use crate::jvm::JvmOp;
     pub use crate::link::JavaFn;
     pub use crate::ops::{
@@ -47,6 +48,7 @@ pub mod prelude {
     };
     pub use crate::refs::{AsJRef, JDeref, TryJDeref};
     pub use crate::to_java::ToJava;
+    pub use crate::Java;
 }
 
 /// Internal module containing non-semver protected

@@ -2,9 +2,9 @@ error[E0308]: mismatched types
   --> $DIR/native_fn_return_local_java_string.rs:18:5
    |
 17 | ) -> duchess::Result<duchess::Local<'n, java::lang::String>> {
-   |      ------------------------------------------------------------- expected `Result<Local<'n, duchess::java::lang::String>, duchess::Error<duchess::Global<Throwable>>>` because of return type
+   |      ------------------------------------------------------------- expected `Result<Local<'n, duchess::java::lang::String>, duchess::Error<duchess::Java<Throwable>>>` because of return type
 18 |     name.execute()
-   |     ^^^^^^^^^^^^^^ expected `Result<Local<'_, String>, ...>`, found `Result<&String, Error<Global<...>>>`
+   |     ^^^^^^^^^^^^^^ expected `Result<Local<'_, String>, ...>`, found `Result<&String, Error<Java<...>>>`
    |
    = note: expected enum `Result<Local<'n, duchess::java::lang::String, >, _>`
               found enum `Result<&duchess::java::lang::String, _>`

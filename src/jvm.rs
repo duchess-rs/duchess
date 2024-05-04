@@ -9,7 +9,7 @@ use crate::{
     raw::{self, EnvPtr, JvmPtr, ObjectPtr},
     thread,
     try_catch::TryCatch,
-    AsJRef, Error, Global, IntoRust, Local, Result, ToJava, TryJDeref,
+    AsJRef, Error, IntoRust, Java, Local, Result, ToJava, TryJDeref,
 };
 
 use std::{
@@ -254,11 +254,11 @@ impl<'jvm> Jvm<'jvm> {
         Local::new(self.0, r)
     }
 
-    pub fn global<R>(&mut self, r: &R) -> Global<R>
+    pub fn global<R>(&mut self, r: &R) -> Java<R>
     where
         R: JavaObject,
     {
-        Global::new(self.0, r)
+        Java::new(self.0, r)
     }
 
     /// Plumbing method that should only be used by generated and internal code.
@@ -509,7 +509,7 @@ macro_rules! scalar {
                 fn array_class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, Local<'jvm, Class>> {
                     // XX: Safety
                     const CLASS_NAME: &CStr = unsafe { CStr::from_bytes_with_nul_unchecked($array_class) };
-                    static CLASS: OnceCell<Global<crate::java::lang::Class>> = OnceCell::new();
+                    static CLASS: OnceCell<Java<crate::java::lang::Class>> = OnceCell::new();
 
                     let global = CLASS.get_or_try_init::<_, crate::Error<Local<Throwable>>>(|| {
                         let class = find_class(jvm, CLASS_NAME)?;

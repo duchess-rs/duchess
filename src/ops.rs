@@ -2,7 +2,7 @@ use crate::jvm::JavaScalar;
 use crate::jvm::Jvm;
 use crate::jvm::JvmOp;
 use crate::AsJRef;
-use crate::Global;
+use crate::Java;
 use crate::JavaObject;
 use crate::Local;
 use crate::Null;
@@ -38,9 +38,9 @@ identity_jvm_op! {
 
     [R: JavaObject] &R,
     [R: JavaObject] &Local<'_, R>,
-    [R: JavaObject] &Global<R>,
+    [R: JavaObject] &Java<R>,
     [R: JavaObject] &Option<Local<'_, R>>,
-    [R: JavaObject] &Option<Global<R>>,
+    [R: JavaObject] &Option<Java<R>>,
 
     [] Null,
 }

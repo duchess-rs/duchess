@@ -6,7 +6,7 @@ use std::{
 use thiserror::Error;
 
 use crate::AsJRef;
-use crate::{java::lang::Throwable, Global, Jvm, JvmOp, Local};
+use crate::{java::lang::Throwable, Java, Jvm, JvmOp, Local};
 
 /// Result returned by most Java operations that may contain a local reference
 /// to a thrown exception.
@@ -14,7 +14,7 @@ pub type LocalResult<'jvm, T> = result::Result<T, Error<Local<'jvm, Throwable>>>
 
 /// Result returned by [`crate::Jvm::with()`] that will store any uncaught
 /// exception as a global reference.
-pub type Result<T> = result::Result<T, Error<Global<Throwable>>>;
+pub type Result<T> = result::Result<T, Error<Java<Throwable>>>;
 
 #[derive(Error)]
 pub enum Error<T: AsJRef<Throwable>> {
@@ -60,7 +60,7 @@ where
 }
 
 impl<'jvm> Error<Local<'jvm, Throwable>> {
-    pub fn into_global(self, jvm: &mut Jvm<'jvm>) -> Error<Global<Throwable>> {
+    pub fn into_global(self, jvm: &mut Jvm<'jvm>) -> Error<Java<Throwable>> {
         match self {
             Error::Thrown(t) => Error::Thrown(jvm.global(&t)),
             Error::SliceTooLong(s) => Error::SliceTooLong(s),

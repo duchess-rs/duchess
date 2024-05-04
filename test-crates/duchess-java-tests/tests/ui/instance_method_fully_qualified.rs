@@ -1,5 +1,4 @@
 //@check-pass
-use duchess::java;
 use duchess::prelude::*;
 
 pub fn main() -> duchess::Result<()> {

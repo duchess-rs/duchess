@@ -1,7 +1,7 @@
 use std::{collections::HashMap, marker::PhantomData};
 
 use crate::{
-    cast::Upcast, from_ref::FromRef, java, jvm::JavaView, Error, Global, Jvm, JvmOp, Local,
+    cast::Upcast, from_ref::FromRef, java, jvm::JavaView, Error, Java, Jvm, JvmOp, Local,
 };
 
 pub trait ToJava {
@@ -194,7 +194,7 @@ where
     }
 }
 
-impl<J> ToJavaImpl<J> for Global<J>
+impl<J> ToJavaImpl<J> for Java<J>
 where
     J: Upcast<java::lang::Object>,
 {

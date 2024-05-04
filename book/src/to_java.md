@@ -30,7 +30,7 @@ let hash_code: i32 =
         .execute()?;                       // Execute the jvmop
 ```
 
-### `Global<java::lang::String>`
+### `Java<java::lang::String>`
 
 Converting a Rust reference to a Java object, such as a `Global` reference, is an identity operation.
 
@@ -39,7 +39,7 @@ use duchess::prelude::*;
 use duchess::java;
 
 // Produce a Global reference from a Rust string
-let data: Global<java::lang::String> =
+let data: Java<java::lang::String> =
     format!("Hello, Duchess!").execute()?;
 
 // Invoke `to_java` on the `Global` reference

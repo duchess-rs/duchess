@@ -1,7 +1,6 @@
 //@run
 use duchess::prelude::*;
-use duchess::Global;
-use duchess::{java, Jvm};
+use duchess::Jvm;
 
 duchess::java_package! {
     package exceptions;

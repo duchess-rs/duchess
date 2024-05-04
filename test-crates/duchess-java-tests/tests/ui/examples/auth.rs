@@ -1,5 +1,5 @@
 //@check-pass
-use duchess::{java, prelude::*, Global};
+use duchess::prelude::*;
 use std::collections::HashMap;
 use thiserror::Error;
 
@@ -19,7 +19,7 @@ duchess::java_package! {
     class AuthorizationExceptionDenied { * }
 }
 
-pub struct HttpAuth(Global<auth::HttpAuth>);
+pub struct HttpAuth(Java<auth::HttpAuth>);
 
 #[derive(Debug, duchess::ToJava)]
 #[java(auth.HttpRequest)]
@@ -36,7 +36,7 @@ pub struct HttpRequest {
 pub struct Authenticated {
     pub account_id: String,
     pub user: String,
-    this: Global<auth::Authenticated>,
+    this: Java<auth::Authenticated>,
 }
 
 #[derive(Debug, Error, duchess::ToRust)]

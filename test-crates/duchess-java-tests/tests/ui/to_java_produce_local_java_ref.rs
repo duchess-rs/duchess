@@ -2,10 +2,10 @@
 
 #![allow(dead_code)]
 
-use duchess::java::lang::String as JavaString;
-use duchess::java::util::ArrayList as JavaList;
 use duchess::prelude::*;
 use duchess::Local;
+use java::lang::String as JavaString;
+use java::util::ArrayList as JavaList;
 
 // Test that `to_java` can accomodate a Rust vector of (local) Java objects
 // and produce a Java list of Java objects.

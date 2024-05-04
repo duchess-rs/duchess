@@ -1,5 +1,5 @@
-use duchess::java::lang::{Object, String};
 use duchess::prelude::*;
+use java::lang::{Object, String};
 use viper::scala::collection::immutable::Seq;
 use viper::scala::collection::mutable::ArrayBuffer;
 use viper::scala::Tuple2;

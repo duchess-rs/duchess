@@ -411,7 +411,7 @@ impl ClassInfo {
         quote_spanned! {
             self.span =>
             fn class<'jvm>(jvm: &mut duchess::Jvm<'jvm>) -> duchess::LocalResult<'jvm, duchess::Local<'jvm, java::lang::Class>> {
-                static CLASS: duchess::plumbing::once_cell::sync::OnceCell<duchess::Global<java::lang::Class>> = duchess::plumbing::once_cell::sync::OnceCell::new();
+                static CLASS: duchess::plumbing::once_cell::sync::OnceCell<duchess::Java<java::lang::Class>> = duchess::plumbing::once_cell::sync::OnceCell::new();
                 let global = CLASS.get_or_try_init::<_, duchess::Error<duchess::Local<java::lang::Throwable>>>(|| {
                     let class = duchess::plumbing::find_class(jvm, #jni_class_name)?;
                     Ok(jvm.global(&class))

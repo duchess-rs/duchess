@@ -1,4 +1,4 @@
-use duchess::{java, Global, JvmOp, ToJava};
+use duchess::{java, Java, JvmOp, ToJava};
 use std::collections::HashMap;
 
 #[test]
@@ -7,7 +7,7 @@ fn test_hashmap_roundtrip() {
     test_map.insert("a".to_string(), "abc".to_string());
     test_map.insert("b".to_string(), "cde".to_string());
 
-    let java: Global<java::util::HashMap<java::lang::String, java::lang::String>> = test_map
+    let java: Java<java::util::HashMap<java::lang::String, java::lang::String>> = test_map
         .to_java::<java::util::HashMap<java::lang::String, java::lang::String>>()
         .execute()
         .unwrap()

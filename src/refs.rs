@@ -1,4 +1,4 @@
-use crate::{cast::Upcast, java::lang::Throwable, Error, Global, JavaObject, Local};
+use crate::{cast::Upcast, java::lang::Throwable, Error, Java, JavaObject, Local};
 
 /// Possibly null reference to a Java object.
 pub trait AsJRef<U> {
@@ -24,8 +24,8 @@ where
 }
 
 /// Reference to a Java object that may or may not be null.
-/// Implemented both by non-null references like `Global<java::lang::Object>`
-/// or `&java::lang::Object` and by maybe-null references like `Option<Global<java::lang::Object>>`.
+/// Implemented both by non-null references like `Java<java::lang::Object>`
+/// or `&java::lang::Object` and by maybe-null references like `Option<Java<java::lang::Object>>`.
 pub trait TryJDeref {
     /// The Java type (e.g., [`java::lang::Object`][`crate::java::lang::Object`]).
     type Java: JavaObject;
@@ -34,7 +34,7 @@ pub trait TryJDeref {
     fn try_jderef(&self) -> Nullable<&Self::Java>;
 }
 
-/// Reference to a Java object that cannot be null (e.g., `Global<java::lang::Object>`).
+/// Reference to a Java object that cannot be null (e.g., `Java<java::lang::Object>`).
 pub trait JDeref: TryJDeref {
     /// Dereference to a plain reference to the java object.
     fn jderef(&self) -> &Self::Java;
@@ -80,7 +80,7 @@ where
     }
 }
 
-impl<T> TryJDeref for Global<T>
+impl<T> TryJDeref for Java<T>
 where
     T: JavaObject,
 {
@@ -91,7 +91,7 @@ where
     }
 }
 
-impl<T> JDeref for Global<T>
+impl<T> JDeref for Java<T>
 where
     T: JavaObject,
 {

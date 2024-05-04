@@ -1,6 +1,6 @@
 //@ run
 
-use duchess::{java, prelude::*};
+use duchess::prelude::*;
 
 duchess::java_package! {
     package native_greeting;
@@ -16,7 +16,7 @@ duchess::java_package! {
 fn base_greeting(
     _this: &native_greeting::Native,
     name: &java::lang::String,
-) -> duchess::Result<duchess::Global<java::lang::String>> {
+) -> duchess::Result<Java<java::lang::String>> {
     name.execute()
 }
 

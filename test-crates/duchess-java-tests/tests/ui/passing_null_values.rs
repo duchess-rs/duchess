@@ -1,7 +1,5 @@
 //@check-pass
-use duchess::java;
 use duchess::prelude::*;
-use duchess::Global;
 
 duchess::java_package! {
     package take_null;
@@ -16,7 +14,7 @@ pub fn main() -> duchess::Result<()> {
     assert!(is_null);
 
     let is_null = take_null
-        .take_null_object(&None::<Global<java::lang::Object>>)
+        .take_null_object(&None::<Java<java::lang::Object>>)
         .execute()?;
     assert!(is_null);
 
