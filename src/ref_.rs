@@ -87,7 +87,7 @@ impl<T: JavaObject> Deref for Local<'_, T> {
 ///
 /// The JVM will not release this object until the Rust reference
 /// is dropped.
-#[derive_where::derive_where(PartialEq, Eq, Hash)]
+#[derive_where::derive_where(PartialEq, Eq, Hash, Debug)]
 pub struct Java<T: JavaObject> {
     obj: ObjectPtr,
     _marker: PhantomData<T>,
