@@ -29,7 +29,7 @@ duchess::java_package! {
 }
 
 fn main() -> duchess::Result<()> {
-    let logger = log::Logger::new().global().execute()?;
+    let logger = log::Logger::new().execute()?;
 
     let timestamp = java::util::Date::new();
     timestamp.set_time(0i64);

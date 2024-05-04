@@ -12,7 +12,6 @@ use duchess::{Global, Local};
 fn produce_from_local_rust_vec(r: &Vec<Local<'_, JavaString>>) {
     let _data: Option<Global<JavaList<JavaString>>> = r
         .to_java::<JavaList<JavaString>>()
-        .global()
         .execute()
         .unwrap();
 }
@@ -22,29 +21,28 @@ fn produce_from_local_rust_vec(r: &Vec<Local<'_, JavaString>>) {
 fn produce_from_global_rust_vec(r: &Vec<Global<JavaString>>) {
     let _data: Option<Global<JavaList<JavaString>>> = r
         .to_java::<JavaList<JavaString>>()
-        .global()
         .execute()
         .unwrap();
 }
 
 // Test that `to_java` can accomodate a global Java object.
 fn produce_from_global_object(r: Global<JavaString>) {
-    let _data: Option<Global<JavaString>> = r.to_java::<JavaString>().global().execute().unwrap();
+    let _data: Option<Global<JavaString>> = r.to_java::<JavaString>().execute().unwrap();
 }
 
 // Test that `to_java` can accomodate a local Java object.
 fn produce_from_local_object(r: Local<'_, JavaString>) {
-    let _data: Option<Global<JavaString>> = r.to_java::<JavaString>().global().execute().unwrap();
+    let _data: Option<Global<JavaString>> = r.to_java::<JavaString>().execute().unwrap();
 }
 
 // Test that `to_java` can accomodate an optional local Java object.
 fn produce_from_optlocal_object(r: Option<Local<'_, JavaString>>) {
-    let _data: Option<Global<JavaString>> = r.to_java::<JavaString>().global().execute().unwrap();
+    let _data: Option<Global<JavaString>> = r.to_java::<JavaString>().execute().unwrap();
 }
 
 // Test that `to_java` can accomodate a ref to an optional local Java object.
 fn produce_from_optlocal_object_ref(r: &Option<Local<'_, JavaString>>) {
-    let _data: Option<Global<JavaString>> = r.to_java::<JavaString>().global().execute().unwrap();
+    let _data: Option<Global<JavaString>> = r.to_java::<JavaString>().execute().unwrap();
 }
 
 fn main() {}

@@ -34,7 +34,6 @@ fn to_java_and_back() {
         let java: Global<java::lang::String> = example
             .to_java()
             .assert_not_null()
-            .global()
             .execute()
             .unwrap();
         let and_back: String = (&*java).execute().unwrap();

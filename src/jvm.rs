@@ -1,7 +1,6 @@
 use crate::{
     cast::{AsUpcast, TryDowncast, Upcast},
     find::find_class,
-    global::{GlobalOp, IntoGlobal},
     into_rust::ToRustOp,
     java::lang::{Class, Throwable},
     link::{IntoJavaFns, JavaFunction},
@@ -70,16 +69,6 @@ pub trait JvmOp: Copy {
         To: JavaObject,
     {
         AsUpcast::new(self)
-    }
-
-    /// Given a JVM op that creates a local reference, convert the local reference
-    /// into a global one. Global JVM references can be held as long as you like
-    /// within
-    fn global(self) -> GlobalOp<Self>
-    where
-        for<'jvm> <Self as JvmOp>::Output<'jvm>: IntoGlobal<'jvm>,
-    {
-        GlobalOp::new(self)
     }
 
     fn catch<J>(self) -> TryCatch<Self, J>

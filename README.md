@@ -25,7 +25,7 @@ logger.addEvent(
 ...could be executed in Rust as follows:
 
 ```rust
-let logger = log::Logger::new().global().execute()?;
+let logger = log::Logger::new().execute()?;
 logger
     .add_event(
         log::Event::builder()

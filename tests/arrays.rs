@@ -6,7 +6,6 @@ macro_rules! test_array {
             let java: Global<java::Array<$type>> = test_array
                 .to_java()
                 .assert_not_null()
-                .global()
                 .execute()
                 .unwrap();
             let and_back: Vec<_> = (&*java).execute().unwrap();

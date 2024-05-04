@@ -10,7 +10,7 @@ duchess::java_package! {
 }
 
 pub fn main() -> duchess::Result<()> {
-    let take_null = take_null::TakeNull::new().global().execute()?;
+    let take_null = take_null::TakeNull::new().execute()?;
 
     let is_null = take_null.take_null_object(duchess::Null).execute()?;
     assert!(is_null);

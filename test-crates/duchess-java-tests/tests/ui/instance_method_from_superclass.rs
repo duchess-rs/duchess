@@ -16,7 +16,7 @@ mod our_java {
 }
 
 pub fn main() -> duchess::Result<()> {
-    let date = our_java::util::Date::new().global().execute()?;
+    let date = our_java::util::Date::new().execute()?;
     let s: String = date.to_string().assert_not_null().execute()?;
     //                   ^^^^^^^^^^^ this is defined on `java.lang.Object`
     println!("Today's date is {s}");

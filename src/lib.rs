@@ -5,7 +5,6 @@ mod cast;
 mod error;
 mod find;
 mod from_ref;
-mod global;
 mod into_rust;
 mod jvm;
 mod libjvm;
@@ -25,7 +24,7 @@ mod try_catch;
 pub mod java;
 
 pub use duchess_macro::{java_function, java_package, ToJava, ToRust};
-pub use error::{Error, Result, LocalResult};
+pub use error::{Error, LocalResult, Result};
 pub use into_rust::IntoRust;
 pub use jvm::JavaObject;
 pub use jvm::JavaType;
@@ -57,7 +56,6 @@ pub mod plumbing {
     pub use crate::cast::Upcast;
     pub use crate::find::{find_class, find_constructor, find_field, find_method};
     pub use crate::from_ref::FromRef;
-    pub use crate::global::GlobalOp;
     pub use crate::jvm::native_function_returning_object;
     pub use crate::jvm::native_function_returning_scalar;
     pub use crate::jvm::JavaObjectExt;

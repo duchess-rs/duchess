@@ -40,7 +40,7 @@ use duchess::java;
 
 // Produce a Global reference from a Rust string
 let data: Global<java::lang::String> =
-    format!("Hello, Duchess!").global().execute()?;
+    format!("Hello, Duchess!").execute()?;
 
 // Invoke `to_java` on the `Global` reference
 let hashCode: i32 =

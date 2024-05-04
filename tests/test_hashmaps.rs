@@ -9,7 +9,6 @@ fn test_hashmap_roundtrip() {
 
     let java: Global<java::util::HashMap<java::lang::String, java::lang::String>> = test_map
         .to_java::<java::util::HashMap<java::lang::String, java::lang::String>>()
-        .global()
         .execute()
         .unwrap()
         .unwrap();

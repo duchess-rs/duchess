@@ -68,7 +68,7 @@ fn catch_exceptions() -> duchess::Result<()> {
 }
 
 fn check_exceptions() -> duchess::Result<()> {
-    let thrower = exceptions::ThrowExceptions::new().global().execute()?;
+    let thrower = exceptions::ThrowExceptions::new().execute()?;
 
     let result = thrower
         .throw_runtime()
@@ -85,7 +85,6 @@ fn check_exceptions() -> duchess::Result<()> {
     let error = thrower
         .null_object()
         .to_string()
-        .global()
         .execute::<Option<String>>()
         .expect_err("returns a null pointer");
 

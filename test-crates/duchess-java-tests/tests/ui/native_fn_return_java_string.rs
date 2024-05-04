@@ -17,7 +17,7 @@ fn base_greeting(
     _this: &native_greeting::Native,
     name: &java::lang::String,
 ) -> duchess::Result<duchess::Global<java::lang::String>> {
-    name.global().execute()
+    name.execute()
 }
 
 fn main() -> duchess::Result<()> {

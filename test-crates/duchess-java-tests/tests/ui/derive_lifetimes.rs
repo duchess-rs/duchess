@@ -10,7 +10,7 @@ struct LongWrapper<'a> {
 pub fn main() -> duchess::Result<()> {
     let my_string = String::from("1234");
     let rust = LongWrapper { value: &my_string };
-    let java = rust.to_java().assert_not_null().global().execute()?;
+    let java = rust.to_java().assert_not_null().execute()?;
     let and_back: String = java.to_string().execute().unwrap().unwrap();
     assert_eq!(rust.value, and_back);
     Ok(())
