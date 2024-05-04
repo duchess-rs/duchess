@@ -78,11 +78,22 @@ pub trait JvmOp: Copy {
         TryCatch::new(self)
     }
 
-    /// Execute the jvm op, starting a JVM instance if necessary.
-    /// To use this method, the result type cannot be tied to the JVM.
-    /// Typically this is achieved by a call to [`to_rust()`][`Self::to_rust`],
-    /// but if you wish to hold on to a reference to a JVM object,
-    /// you can use [`global()`][`Self::global`] to create a global reference.
+    /// Execute on the JVM, starting a JVM instance if necessary.
+    ///
+    /// Depending on the type parameter `R`,
+    /// this method can either return a handle to a Java object
+    /// or a Rust type:
+    ///
+    /// * When `R` is something like [`Java<java::lang::String>`][`Java`],
+    ///   this method will return a handle to a Java object.
+    ///   Note that to account for possible null return values
+    ///   you may need to either invoke `assert_not_null` or else
+    ///   use a result type with an `Option`, e.g.,
+    ///   `Option<Java<java::lang::String>>`.
+    /// * When `R` is a Rust type like [`String`][],
+    ///   this method will convert the Java value into a Rust type.
+    ///   You may need to derive `ToRust` for your Rust type
+    ///   to indicate how the Java object is to be converted.
     fn execute<R>(self) -> crate::Result<R>
     where
         for<'jvm> Self::Output<'jvm>: IntoRust<R>,
