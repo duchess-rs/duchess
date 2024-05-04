@@ -36,7 +36,7 @@ fn test_program_construction() -> duchess::Result<()> {
             info,
             error_trafo,
         )
-        .execute_with(jvm)?;
+        .do_jni(jvm)?;
         Ok(())
     })
 }
@@ -46,7 +46,7 @@ fn test_carbon_construction() -> duchess::Result<()> {
     duchess::Jvm::with(|jvm| {
         let reporter = NoopReporter__::get_module();
         let debug_info = empty_scala_seq::<Tuple2<String, Object>>();
-        let _carbon = CarbonVerifier::new(reporter, debug_info).execute_with(jvm)?;
+        let _carbon = CarbonVerifier::new(reporter, debug_info).do_jni(jvm)?;
         Ok(())
     })
 }
@@ -54,7 +54,7 @@ fn test_carbon_construction() -> duchess::Result<()> {
 #[test]
 fn test_silicon_construction() -> duchess::Result<()> {
     duchess::Jvm::with(|jvm| {
-        let _silicon = Silicon::new().execute_with(jvm)?;
+        let _silicon = Silicon::new().do_jni(jvm)?;
         Ok(())
     })
 }

@@ -8,7 +8,7 @@ use crate::{
 impl JvmOp for &str {
     type Output<'jvm> = Local<'jvm, JavaString>;
 
-    fn execute_with<'jvm>(
+    fn do_jni<'jvm>(
         self,
         jvm: &mut Jvm<'jvm>,
     ) -> crate::LocalResult<'jvm, Local<'jvm, JavaString>> {
@@ -27,11 +27,11 @@ impl JvmOp for &str {
 impl JvmOp for &String {
     type Output<'jvm> = Local<'jvm, JavaString>;
 
-    fn execute_with<'jvm>(
+    fn do_jni<'jvm>(
         self,
         jvm: &mut Jvm<'jvm>,
     ) -> crate::LocalResult<'jvm, Local<'jvm, JavaString>> {
-        <&str as JvmOp>::execute_with(&self, jvm)
+        <&str as JvmOp>::do_jni(&self, jvm)
     }
 }
 

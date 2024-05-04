@@ -13,7 +13,7 @@ fn produce_from_local_rust_vec(r: &Vec<Local<'_, JavaString>>) {
     duchess::Jvm::with(|jvm| {
         let _data: Option<Local<'_, JavaList<JavaString>>> = r
             .to_java::<JavaList<JavaString>>()
-            .execute_with(jvm)
+            .do_jni(jvm)
             .unwrap();
         Ok(())
     })

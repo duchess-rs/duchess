@@ -115,11 +115,8 @@ where
 {
     type Output<'jvm> = jni_sys::jsize;
 
-    fn execute_with<'jvm>(
-        self,
-        jvm: &mut Jvm<'jvm>,
-    ) -> crate::LocalResult<'jvm, Self::Output<'jvm>> {
-        let this = self.this.execute_with(jvm)?;
+    fn do_jni<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, Self::Output<'jvm>> {
+        let this = self.this.do_jni(jvm)?;
         let this = this.as_jref()?.as_raw();
 
         let len = unsafe {
@@ -136,7 +133,7 @@ macro_rules! primitive_array {
             impl JvmOp for &[$rust] {
                 type Output<'jvm> = Local<'jvm, JavaArray<$rust>>;
 
-                fn execute_with<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, Self::Output<'jvm>> {
+                fn do_jni<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, Self::Output<'jvm>> {
                     let Ok(len) = self.len().try_into() else {
                         return Err(Error::SliceTooLong(self.len()))
                     };
@@ -176,7 +173,7 @@ macro_rules! primitive_array {
                     rust: &Self,
                     jvm: &mut Jvm<'jvm>,
                 ) -> crate::LocalResult<'jvm, Option<Local<'jvm, java::Array<$rust>>>> {
-                    Ok(Some(rust.execute_with(jvm)?))
+                    Ok(Some(rust.do_jni(jvm)?))
                 }
             }
 
@@ -185,13 +182,13 @@ macro_rules! primitive_array {
                     rust: &Self,
                     jvm: &mut Jvm<'jvm>,
                 ) -> crate::LocalResult<'jvm, Option<Local<'jvm, java::Array<$rust>>>> {
-                    Ok(Some(rust.execute_with(jvm)?))
+                    Ok(Some(rust.do_jni(jvm)?))
                 }
             }
 
             impl IntoRust<Vec<$rust>> for &JavaArray<$rust> {
                 fn into_rust<'jvm>(self, jvm: &mut Jvm<'jvm>) -> $crate::LocalResult<'jvm, Vec<$rust>> {
-                    let len = self.length().execute_with(jvm)?;
+                    let len = self.length().do_jni(jvm)?;
                     let mut vec = Vec::<$rust>::with_capacity(len as usize);
 
                     unsafe {

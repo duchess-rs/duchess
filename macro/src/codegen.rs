@@ -504,7 +504,7 @@ impl ClassInfo {
                 {
                     type Output<'jvm> = duchess::Local<'jvm, #ty>;
 
-                    fn execute_with<'jvm>(
+                    fn do_jni<'jvm>(
                         self,
                         jvm: &mut duchess::Jvm<'jvm>,
                     ) -> duchess::LocalResult<'jvm, Self::Output<'jvm>> {
@@ -807,7 +807,7 @@ impl ClassInfo {
             {
                 type Output<'jvm> = #output_ty;
 
-                fn execute_with<'jvm>(
+                fn do_jni<'jvm>(
                     self,
                     jvm: &mut duchess::Jvm<'jvm>,
                 ) -> duchess::LocalResult<'jvm, Self::Output<'jvm>> {
@@ -997,7 +997,7 @@ impl ClassInfo {
             {
                 type Output<'jvm> = #output_ty;
 
-                fn execute_with<'jvm>(
+                fn do_jni<'jvm>(
                     self,
                     jvm: &mut duchess::Jvm<'jvm>,
                 ) -> duchess::LocalResult<'jvm, Self::Output<'jvm>> {
@@ -1125,7 +1125,7 @@ impl ClassInfo {
             {
                 type Output<'jvm> = #output_ty;
 
-                fn execute_with<'jvm>(
+                fn do_jni<'jvm>(
                     self,
                     jvm: &mut duchess::Jvm<'jvm>,
                 ) -> duchess::LocalResult<'jvm, Self::Output<'jvm>> {
@@ -1228,7 +1228,7 @@ impl ClassInfo {
             .zip(input_types)
             .map(|(input_name, input_ty)| match input_ty.to_non_repeating() {
                 NonRepeatingType::Scalar(_) => quote_spanned!(self.span =>
-                    let #input_name = self.#input_name.execute_with(jvm)?;
+                    let #input_name = self.#input_name.do_jni(jvm)?;
                 ),
                 NonRepeatingType::Ref(_) => quote_spanned!(self.span =>
                     let #input_name = self.#input_name.into_java(jvm)?;

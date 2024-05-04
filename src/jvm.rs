@@ -83,7 +83,7 @@ pub trait JvmOp: Copy {
     where
         for<'j> Self::Output<'j>: IntoRust<R>,
     {
-        ToRustOp::new(self).execute_with(jvm)
+        ToRustOp::new(self).do_jni(jvm)
     }
 
     /// Execute the jvm op, starting a JVM instance if necessary.
@@ -99,10 +99,7 @@ pub trait JvmOp: Copy {
     }
 
     /// Internal method
-    fn execute_with<'jvm>(
-        self,
-        jvm: &mut Jvm<'jvm>,
-    ) -> crate::LocalResult<'jvm, Self::Output<'jvm>>;
+    fn do_jni<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, Self::Output<'jvm>>;
 }
 
 /// This trait is only implemented for `()`; it allows the `JvmOp::execute` method to only
@@ -146,7 +143,7 @@ where
     let result = match std::panic::catch_unwind(AssertUnwindSafe(|| op())) {
         Ok(result) => {
             let mut jvm = Jvm(env);
-            let obj = result.to_java().execute_with(&mut jvm);
+            let obj = result.to_java().do_jni(&mut jvm);
             match obj {
                 Ok(Some(p)) => p.into_raw().as_ptr(),
                 Ok(None) => std::ptr::null_mut(),
@@ -496,7 +493,7 @@ unsafe impl<T: JavaObject> JavaType for T {
         T::class(jvm)?
             .array_type()
             .assert_not_null()
-            .execute_with(jvm)
+            .do_jni(jvm)
     }
 }
 

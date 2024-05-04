@@ -60,7 +60,7 @@ where
 {
     type Output<'jvm> = Option<Local<'jvm, J>>;
 
-    fn execute_with<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, Self::Output<'jvm>> {
+    fn do_jni<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, Self::Output<'jvm>> {
         R::to_java_impl(self.rust, jvm)
     }
 }
@@ -89,9 +89,9 @@ where
         jvm: &mut Jvm<'jvm>,
     ) -> crate::LocalResult<'jvm, Option<Local<'jvm, java::util::HashMap<JK, JV>>>> {
         let jmap: Local<'jvm, java::util::HashMap<JK, JV>> =
-            java::util::HashMap::new().execute_with(jvm)?;
+            java::util::HashMap::new().do_jni(jvm)?;
         for (key, value) in rust {
-            jmap.put(key.to_java(), value.to_java()).execute_with(jvm)?;
+            jmap.put(key.to_java(), value.to_java()).do_jni(jvm)?;
         }
         Ok(Some(jmap))
     }
@@ -112,7 +112,7 @@ where
             rust.to_java::<java::util::HashMap<JK, JV>>()
                 .assert_not_null()
                 .upcast()
-                .execute_with(jvm)?,
+                .do_jni(jvm)?,
         ))
     }
 }
@@ -127,9 +127,9 @@ where
         jvm: &mut Jvm<'jvm>,
     ) -> crate::LocalResult<'jvm, Option<Local<'jvm, java::util::ArrayList<JE>>>> {
         let jvec: Local<'jvm, java::util::ArrayList<JE>> =
-            java::util::ArrayList::new().execute_with(jvm)?;
+            java::util::ArrayList::new().do_jni(jvm)?;
         for element in rust {
-            jvec.add(element.to_java()).execute_with(jvm)?;
+            jvec.add(element.to_java()).do_jni(jvm)?;
         }
         Ok(Some(jvec))
     }
@@ -148,7 +148,7 @@ where
             rust.to_java::<java::util::ArrayList<JE>>()
                 .assert_not_null()
                 .upcast()
-                .execute_with(jvm)?,
+                .do_jni(jvm)?,
         ))
     }
 }
@@ -167,7 +167,7 @@ impl ToJavaImpl<java::lang::String> for str {
         rust: &Self,
         jvm: &mut Jvm<'jvm>,
     ) -> crate::LocalResult<'jvm, Option<Local<'jvm, java::lang::String>>> {
-        let jstr = rust.execute_with(jvm)?;
+        let jstr = rust.do_jni(jvm)?;
         Ok(Some(jstr))
     }
 }

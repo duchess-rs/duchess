@@ -32,14 +32,14 @@ fn main() -> duchess::Result<()> {
     // FIXME: conflict between interface trait (LoggerExt) and class trait (BuilderExt)
 
     duchess::Jvm::with(|jvm| {
-        let logger = log::Logger::new().execute_with(jvm)?;
+        let logger = log::Logger::new().do_jni(jvm)?;
         let event = log::Event::builder()
             .with_time(java::util::Date::new())
             .with_name("foo")
             .build()
-            .execute_with(jvm)?;
-        logger.add_event(&event).execute_with(jvm)?;
-        logger.add_event(&event).execute_with(jvm)?;
+            .do_jni(jvm)?;
+        logger.add_event(&event).do_jni(jvm)?;
+        logger.add_event(&event).do_jni(jvm)?;
         Ok(())
     })
 }

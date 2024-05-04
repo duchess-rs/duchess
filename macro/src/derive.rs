@@ -144,7 +144,7 @@ impl Driver<'_> {
             fn into_rust<'jvm>(self, jvm: &mut duchess::Jvm<'jvm>) -> duchess::LocalResult<'jvm, #self_ty #ty_generics> {
                 use duchess::prelude::*;
                 #(
-                    if let Ok(variant) = self.try_downcast::<#child_class_names>().execute_with(jvm)? {
+                    if let Ok(variant) = self.try_downcast::<#child_class_names>().do_jni(jvm)? {
                         Ok(#child_to_rust)
                     } else
                 )*
@@ -207,7 +207,7 @@ impl Driver<'_> {
             impl #impl_generics duchess::JvmOp for & #self_ty #ty_generics #where_clause {
                 type Output<'jvm> = duchess::Local<'jvm, #root_class_name>;
 
-                fn execute_with<'jvm>(self, jvm: &mut duchess::Jvm<'jvm>) -> duchess::LocalResult<'jvm, Self::Output<'jvm>> {
+                fn do_jni<'jvm>(self, jvm: &mut duchess::Jvm<'jvm>) -> duchess::LocalResult<'jvm, Self::Output<'jvm>> {
                     use duchess::prelude::*;
                     match self {
                         #(#to_java_bodies),*
@@ -217,7 +217,7 @@ impl Driver<'_> {
 
             impl #impl_generics duchess::plumbing::ToJavaImpl<#root_class_name> for #self_ty #ty_generics #where_clause {
                 fn to_java_impl<'jvm>(rust: &Self, jvm: &mut duchess::Jvm<'jvm>) -> duchess::LocalResult<'jvm, ::core::option::Option<duchess::Local<'jvm, #root_class_name>>> {
-                    Ok(Some(duchess::JvmOp::execute_with(rust, jvm)?))
+                    Ok(Some(duchess::JvmOp::do_jni(rust, jvm)?))
                 }
             }
         ))
@@ -310,7 +310,7 @@ impl Driver<'_> {
             let pattern = variant.pat();
             return Ok(quote_spanned!(self.span() =>
                 #pattern => {
-                    #binding .jderef().upcast().execute_with(jvm)
+                    #binding .jderef().upcast().do_jni(jvm)
                 }
             ));
         }
@@ -395,7 +395,7 @@ impl Driver<'_> {
         let pattern = variant.pat();
         Ok(quote_spanned!(self.span() =>
             #pattern => {
-                #class_name :: #method_name ( #(#args),* ) .upcast().execute_with(jvm)
+                #class_name :: #method_name ( #(#args),* ) .upcast().do_jni(jvm)
             }
         ))
     }

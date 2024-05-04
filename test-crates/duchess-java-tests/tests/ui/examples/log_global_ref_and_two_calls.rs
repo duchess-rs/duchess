@@ -38,9 +38,9 @@ fn main() -> duchess::Result<()> {
             .with_time(java::util::Date::new())
             .with_name("foo")
             .build()
-            .execute_with(jvm)?;
-        logger.add_event(&event).execute_with(jvm)?;
-        logger.add_event(&event).execute_with(jvm)?;
+            .do_jni(jvm)?;
+        logger.add_event(&event).do_jni(jvm)?;
+        logger.add_event(&event).do_jni(jvm)?;
         Ok(())
     })
 }
