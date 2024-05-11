@@ -2,10 +2,9 @@
 
 #![allow(dead_code)]
 
-use duchess::java;
 use duchess::prelude::*;
 
-fn main() -> duchess::GlobalResult<()> {
+fn main() -> duchess::Result<()> {
     let data = format!("Hello, Duchess!");
     let hash_code: i32 = data
         .to_java::<java::lang::String>() // Returns a `JvmOp` producing a `java::lang::String`

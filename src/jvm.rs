@@ -1,7 +1,6 @@
 use crate::{
     cast::{AsUpcast, TryDowncast, Upcast},
     find::find_class,
-    global::{GlobalOp, IntoGlobal},
     into_rust::ToRustOp,
     java::lang::{Class, Throwable},
     link::{IntoJavaFns, JavaFunction},
@@ -10,7 +9,7 @@ use crate::{
     raw::{self, EnvPtr, JvmPtr, ObjectPtr},
     thread,
     try_catch::TryCatch,
-    AsJRef, Error, Global, GlobalResult, IntoRust, Local, ToJava, TryJDeref,
+    AsJRef, Error, IntoRust, Java, Local, Result, ToJava, TryJDeref,
 };
 
 use std::{
@@ -22,6 +21,9 @@ use std::{
 };
 
 use once_cell::sync::OnceCell;
+
+#[cfg(test)]
+mod test;
 
 /// A "jdk op" is a suspended operation that, when executed, will run
 /// on the jvm, producing a value of type `Output`. These ops typically
@@ -72,16 +74,6 @@ pub trait JvmOp: Copy {
         AsUpcast::new(self)
     }
 
-    /// Given a JVM op that creates a local reference, convert the local reference
-    /// into a global one. Global JVM references can be held as long as you like
-    /// within
-    fn global(self) -> GlobalOp<Self>
-    where
-        for<'jvm> <Self as JvmOp>::Output<'jvm>: IntoGlobal<'jvm>,
-    {
-        GlobalOp::new(self)
-    }
-
     fn catch<J>(self) -> TryCatch<Self, J>
     where
         J: Upcast<Throwable>,
@@ -89,28 +81,38 @@ pub trait JvmOp: Copy {
         TryCatch::new(self)
     }
 
-    /// Given a JVM op that returns some Java type, convert it to its Rust equivalent
-    /// (e.g., from a Java String to a Rust string).
-    fn to_rust<R>(self) -> ToRustOp<Self, R>
+    /// Execute on the JVM, starting a JVM instance if necessary.
+    ///
+    /// Depending on the type parameter `R`,
+    /// this method can either return a handle to a Java object
+    /// or a Rust type:
+    ///
+    /// * When `R` is something like [`Java<java::lang::String>`][`Java`],
+    ///   this method will return a handle to a Java object.
+    ///   Note that to account for possible null return values
+    ///   you may need to either invoke `assert_not_null` or else
+    ///   use a result type with an `Option`, e.g.,
+    ///   `Option<Java<java::lang::String>>`.
+    /// * When `R` is a Rust type like [`String`][],
+    ///   this method will convert the Java value into a Rust type.
+    ///   You may need to derive `ToRust` for your Rust type
+    ///   to indicate how the Java object is to be converted.
+    fn execute<R>(self) -> crate::Result<R>
     where
         for<'jvm> Self::Output<'jvm>: IntoRust<R>,
-    {
-        ToRustOp::new(self)
-    }
-
-    /// Execute the jvm op, starting a JVM instance if necessary.
-    /// To use this method, the result type cannot be tied to the JVM.
-    /// Typically this is achieved by a call to [`to_rust()`][`Self::to_rust`],
-    /// but if you wish to hold on to a reference to a JVM object,
-    /// you can use [`global()`][`Self::global`] to create a global reference.
-    fn execute<R>(self) -> crate::GlobalResult<R>
-    where
-        for<'jvm> Self: JvmOp<Output<'jvm> = R>,
     {
         Jvm::with(|jvm| self.execute_with(jvm))
     }
 
-    fn execute_with<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>>;
+    /// Internal method
+    fn execute_with<'jvm, R>(self, jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, R>
+    where
+        for<'j> Self::Output<'j>: IntoRust<R>,
+    {
+        ToRustOp::new(self).do_jni(jvm)
+    }
+    /// Internal method
+    fn do_jni<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, Self::Output<'jvm>>;
 }
 
 /// This trait is only implemented for `()`; it allows the `JvmOp::execute` method to only
@@ -120,7 +122,7 @@ impl IsVoid for () {}
 
 static GLOBAL_JVM: OnceCell<JvmPtr> = OnceCell::new();
 
-fn get_or_default_init_jvm() -> crate::GlobalResult<JvmPtr> {
+fn get_or_default_init_jvm() -> crate::Result<JvmPtr> {
     match GLOBAL_JVM.get() {
         Some(jvm) => Ok(*jvm),
         None => {
@@ -154,7 +156,7 @@ where
     let result = match std::panic::catch_unwind(AssertUnwindSafe(|| op())) {
         Ok(result) => {
             let mut jvm = Jvm(env);
-            let obj = result.to_java().execute_with(&mut jvm);
+            let obj = result.to_java().do_jni(&mut jvm);
             match obj {
                 Ok(Some(p)) => p.into_raw().as_ptr(),
                 Ok(None) => std::ptr::null_mut(),
@@ -232,21 +234,28 @@ pub(crate) fn unwrap_global_jvm() -> JvmPtr {
     *GLOBAL_JVM.get().expect("JVM can't be unset")
 }
 
+/// Represents a handle to a running JVM.
+/// You rarely access this explicitly as a duchess user.
 pub struct Jvm<'jvm>(EnvPtr<'jvm>);
 
 impl<'jvm> Jvm<'jvm> {
+    /// Construct
     pub fn builder() -> JvmBuilder {
         JvmBuilder::new()
     }
 
-    pub fn attach_thread_permanently() -> crate::GlobalResult<()> {
+    pub fn attach_thread_permanently() -> crate::Result<()> {
         thread::attach_permanently(get_or_default_init_jvm()?)?;
         Ok(())
     }
 
-    pub fn with<R>(
-        op: impl for<'a> FnOnce(&mut Jvm<'a>) -> crate::Result<'a, R>,
-    ) -> crate::GlobalResult<R> {
+    /// Call the callback with access to a `Jvm`.
+    /// This cannot be invoked recursively.
+    /// It is crate-local because it is only usd from within
+    /// the `execute` method on [`JvmOp`][].
+    pub(crate) fn with<R>(
+        op: impl for<'a> FnOnce(&mut Jvm<'a>) -> crate::LocalResult<'a, R>,
+    ) -> crate::Result<R> {
         let jvm = get_or_default_init_jvm()?;
         // SAFTEY: we won't deinitialize the JVM while the guard is live
         let mut guard = unsafe { thread::attach(jvm)? };
@@ -262,11 +271,11 @@ impl<'jvm> Jvm<'jvm> {
         Local::new(self.0, r)
     }
 
-    pub fn global<R>(&mut self, r: &R) -> Global<R>
+    pub fn global<R>(&mut self, r: &R) -> Java<R>
     where
         R: JavaObject,
     {
-        Global::new(self.0, r)
+        Java::new(self.0, r)
     }
 
     /// Plumbing method that should only be used by generated and internal code.
@@ -278,7 +287,7 @@ impl<'jvm> Jvm<'jvm> {
     fn register_native_methods(
         &mut self,
         java_functions: &[JavaFunction],
-    ) -> crate::Result<'jvm, ()> {
+    ) -> crate::LocalResult<'jvm, ()> {
         let mut sorted_by_class: HashMap<Local<'_, Class>, Vec<jni_sys::JNINativeMethod>> =
             HashMap::default();
 
@@ -352,7 +361,7 @@ impl JvmBuilder {
     }
 
     /// Launch a new JVM, returning [`Error::JvmAlreadyExists`] if one already exists.
-    pub fn try_launch(self) -> GlobalResult<()> {
+    pub fn try_launch(self) -> Result<()> {
         #[cfg(feature = "dylibjvm")]
         if let Some(path) = self.libjvm_path {
             crate::libjvm::libjvm_or_load_at(&path)?;
@@ -364,7 +373,7 @@ impl JvmBuilder {
             // existing JVM.
             let jvm = unsafe { raw::try_create_jvm(self.options.into_iter()) }?;
             already_exists = false;
-            GlobalResult::Ok(jvm)
+            Result::Ok(jvm)
         })?;
 
         if already_exists {
@@ -378,7 +387,7 @@ impl JvmBuilder {
         }
     }
 
-    pub fn launch_or_use_existing(self) -> GlobalResult<()> {
+    pub fn launch_or_use_existing(self) -> Result<()> {
         match self.try_launch() {
             Err(Error::JvmAlreadyExists) => {
                 // Two cases: (1) another thread successfully invoked try_launch() and we'll now get the pointer out of
@@ -387,9 +396,7 @@ impl JvmBuilder {
                 GLOBAL_JVM.get_or_try_init(|| {
                     // SAFETY: we're behind the GLOBAL_JVM lock and we won't race with other threads creating or finding
                     // an existing JVM.
-                    GlobalResult::Ok(
-                        unsafe { raw::existing_jvm() }?.expect("JVM should already exist"),
-                    )
+                    Result::Ok(unsafe { raw::existing_jvm() }?.expect("JVM should already exist"))
                 })?;
                 Ok(())
             }
@@ -430,7 +437,7 @@ pub unsafe trait JavaObject: 'static + Sized + JavaType + JavaView {
     /// This is needed so that we can cache field and method IDs derived from
     /// reference, as those IDs are only guaranteed to remain stable so long as
     /// the Java class is not collected.
-    fn class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Local<'jvm, Class>>;
+    fn class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, Local<'jvm, Class>>;
 }
 
 pub trait JavaView {
@@ -498,15 +505,12 @@ impl<T: JavaObject> JavaObjectExt for T {
 pub unsafe trait JavaType: 'static {
     /// Returns the Java Class object for a Java array containing elements of
     /// `Self`. All Java types, even scalars can be elements of an array object.
-    fn array_class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Local<'jvm, Class>>;
+    fn array_class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, Local<'jvm, Class>>;
 }
 
 unsafe impl<T: JavaObject> JavaType for T {
-    fn array_class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Local<'jvm, Class>> {
-        T::class(jvm)?
-            .array_type()
-            .assert_not_null()
-            .execute_with(jvm)
+    fn array_class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, Local<'jvm, Class>> {
+        T::class(jvm)?.array_type().assert_not_null().do_jni(jvm)
     }
 }
 
@@ -516,10 +520,10 @@ macro_rules! scalar {
     ($($rust:ty: $array_class:literal,)*) => {
         $(
             unsafe impl JavaType for $rust {
-                fn array_class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Local<'jvm, Class>> {
+                fn array_class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, Local<'jvm, Class>> {
                     // XX: Safety
                     const CLASS_NAME: &CStr = unsafe { CStr::from_bytes_with_nul_unchecked($array_class) };
-                    static CLASS: OnceCell<Global<crate::java::lang::Class>> = OnceCell::new();
+                    static CLASS: OnceCell<Java<crate::java::lang::Class>> = OnceCell::new();
 
                     let global = CLASS.get_or_try_init::<_, crate::Error<Local<Throwable>>>(|| {
                         let class = find_class(jvm, CLASS_NAME)?;

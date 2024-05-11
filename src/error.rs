@@ -6,15 +6,15 @@ use std::{
 use thiserror::Error;
 
 use crate::AsJRef;
-use crate::{java::lang::Throwable, Global, Jvm, JvmOp, Local};
+use crate::{java::lang::Throwable, Java, Jvm, JvmOp, Local};
 
 /// Result returned by most Java operations that may contain a local reference
 /// to a thrown exception.
-pub type Result<'jvm, T> = result::Result<T, Error<Local<'jvm, Throwable>>>;
+pub type LocalResult<'jvm, T> = result::Result<T, Error<Local<'jvm, Throwable>>>;
 
 /// Result returned by [`crate::Jvm::with()`] that will store any uncaught
 /// exception as a global reference.
-pub type GlobalResult<T> = result::Result<T, Error<Global<Throwable>>>;
+pub type Result<T> = result::Result<T, Error<Java<Throwable>>>;
 
 #[derive(Error)]
 pub enum Error<T: AsJRef<Throwable>> {
@@ -45,15 +45,9 @@ pub enum Error<T: AsJRef<Throwable>> {
 }
 
 fn try_extract_message(exception: &impl AsJRef<Throwable>) -> String {
-    let message = Jvm::with(|jvm| {
-        let exception = jvm.local(exception.as_jref()?);
-        exception
-            .to_string()
-            .assert_not_null()
-            .to_rust()
-            .execute_with(jvm)
-    });
-    message.unwrap_or_else(|err| format!("failed to get message: {}", err))
+    let result =
+        || -> crate::Result<_> { exception.as_jref()?.to_string().assert_not_null().execute() };
+    result().unwrap_or_else(|err| format!("failed to get message: {}", err))
 }
 
 impl<T> Debug for Error<T>
@@ -66,7 +60,7 @@ where
 }
 
 impl<'jvm> Error<Local<'jvm, Throwable>> {
-    pub fn into_global(self, jvm: &mut Jvm<'jvm>) -> Error<Global<Throwable>> {
+    pub fn into_global(self, jvm: &mut Jvm<'jvm>) -> Error<Java<Throwable>> {
         match self {
             Error::Thrown(t) => Error::Thrown(jvm.global(&t)),
             Error::SliceTooLong(s) => Error::SliceTooLong(s),

@@ -1,6 +1,6 @@
 //@ run
 
-use duchess::{java, prelude::*};
+use duchess::prelude::*;
 
 duchess::java_package! {
     package native_greeting;
@@ -16,11 +16,11 @@ duchess::java_package! {
 fn base_greeting(
     _this: &native_greeting::Native,
     name: &java::lang::String,
-) -> duchess::GlobalResult<duchess::Global<java::lang::String>> {
-    name.global().execute()
+) -> duchess::Result<Java<java::lang::String>> {
+    name.execute()
 }
 
-fn main() -> duchess::GlobalResult<()> {
+fn main() -> duchess::Result<()> {
     duchess::Jvm::builder()
         .link(base_greeting::java_fn())
         .try_launch()?;
@@ -28,7 +28,6 @@ fn main() -> duchess::GlobalResult<()> {
     let n: String = native_greeting::Native::new()
         .greet("Ferris")
         .assert_not_null()
-        .to_rust()
         .execute()
         .unwrap();
 

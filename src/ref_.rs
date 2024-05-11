@@ -83,14 +83,17 @@ impl<T: JavaObject> Deref for Local<'_, T> {
     }
 }
 
-/// An owned global reference to a non-null Java object of type `T`. The reference will be freed when dropped.
-#[derive_where::derive_where(PartialEq, Eq, Hash)]
-pub struct Global<T: JavaObject> {
+/// An owned reference to a non-null Java object of type `T`.
+///
+/// The JVM will not release this object until the Rust reference
+/// is dropped.
+#[derive_where::derive_where(PartialEq, Eq, Hash, Debug)]
+pub struct Java<T: JavaObject> {
     obj: ObjectPtr,
     _marker: PhantomData<T>,
 }
 
-impl<T: JavaObject> Global<T> {
+impl<T: JavaObject> Java<T> {
     /// Convert an existing global reference pointed to by `obj` into an owned `Global`.
     ///
     /// # Safety
@@ -116,7 +119,7 @@ impl<T: JavaObject> Global<T> {
     }
 }
 
-impl<T: JavaObject> Drop for Global<T> {
+impl<T: JavaObject> Drop for Java<T> {
     fn drop(&mut self) {
         let jvm = crate::jvm::unwrap_global_jvm();
 
@@ -148,10 +151,10 @@ impl<T: JavaObject> Drop for Global<T> {
 }
 
 // SAFETY: The JNI promises only global refs are shareable across threads
-unsafe impl<T: JavaObject> Send for Global<T> {}
-unsafe impl<T: JavaObject> Sync for Global<T> {}
+unsafe impl<T: JavaObject> Send for Java<T> {}
+unsafe impl<T: JavaObject> Sync for Java<T> {}
 
-impl<T: JavaObject> Deref for Global<T> {
+impl<T: JavaObject> Deref for Java<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -183,7 +186,7 @@ impl<'a, R: JavaObject> Local<'a, R> {
     }
 }
 
-impl<R, S> AsRef<S> for Global<R>
+impl<R, S> AsRef<S> for Java<R>
 where
     R: Upcast<S>,
     S: JavaObject + 'static,
@@ -194,14 +197,14 @@ where
     }
 }
 
-impl<R: JavaObject> Global<R> {
-    pub fn upcast<S>(self) -> Global<S>
+impl<R: JavaObject> Java<R> {
+    pub fn upcast<S>(self) -> Java<S>
     where
         R: Upcast<S>,
         S: JavaObject + 'static,
     {
         // SAFETY: From the Upcast trait contract, we know R is also an instance of S
-        let upcast = unsafe { Global::<S>::from_raw(self.obj) };
+        let upcast = unsafe { Java::<S>::from_raw(self.obj) };
         upcast
     }
 }
@@ -215,7 +218,7 @@ where
     }
 }
 
-impl<'jvm, T> CloneIn<'jvm> for Global<T>
+impl<'jvm, T> CloneIn<'jvm> for Java<T>
 where
     T: JavaObject,
 {

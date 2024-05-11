@@ -1,4 +1,4 @@
-use duchess::Jvm;
+use duchess::prelude::*;
 use std::{sync, thread};
 
 #[test]
@@ -10,7 +10,7 @@ fn race_multiple_threads_to_launch_jvm() {
             let barrier = sync::Arc::clone(&barrier);
             scope.spawn(move || {
                 barrier.wait();
-                Jvm::with(|_jvm| Ok(())).unwrap();
+                java::lang::Object::new().execute().unwrap();
             });
         }
     });

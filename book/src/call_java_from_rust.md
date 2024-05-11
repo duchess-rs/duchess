@@ -81,14 +81,17 @@ pub mod com {
 Once you've created the Java package, you can create java objects and invoke their methods. This should mostly just work as you would expect, with one twist. Invoking a Java method doesn't immediately cause it to execute. Instead, like an iterator or an async function, it returns a `JvmOp`, which is like a suspended JVM operation that is *ready* to execute. To actually cause the method to execute, you call `execute`.
 
 ```rust,ignore
-// We need to use `FactoryExt` to call methods on factory:
-use com::widgard::{Factory, FactoryExt};
+use duchess::prelude::*;
+use com::widgard::Factory;
 
 // Constructors are `Type::new`...
-let f = Factory::new().execute();
+let f: Java<Factory> = Factory::new().execute();
 
 // ...method names are converted to snake-case...    
-let w = f.produce_widget().execute();
+let w: Java<Option<Widget>> = f.produce_widget().execute();
+
+// ...use `assert_not_null` to assert that return values are not null...
+let w: Java<Widget> = f.produce_widget().assert_not_null().execute();
 
 // ...references to Java objects are passed with `&`.
 f.consume_widget(&w).execute();
@@ -99,7 +102,7 @@ f.consume_widget(&w).execute();
 If you want to pass a null value as a parameter, you can use `duchess::Null`:
 
 ```rust,ignore
-use com::widgard::{Factory, FactoryExt};
+use com::widgard::Factory;
 let f = Factory::new().execute();
 f.consume_widget(duchess::Null).execute();
 //               ^^^^^^^^^^^^^ like this!
@@ -108,9 +111,9 @@ f.consume_widget(duchess::Null).execute();
 Another option is to use `Option` types:
 
 ```rust,ignore
-use com::widgard::{Factory, FactoryExt, Widget};
+use com::widgard::{Factory, Widget};
 let f = Factory::new().execute();
-let j: Option<Global<Widget>> = None;
+let j: Option<Java<Widget>> = None;
 f.consume_widget(j).execute();
 //               ^ like this!
 ```
@@ -124,26 +127,14 @@ Note that to call methods on the JVM, we first had to start it. You do that via 
 Because jvm-ops are lazy, you can also chain them together:
 
 ```rust,ignore
-use com::widgard::{Factory, FactoryExt};
+use com::widgard::Factory;
 
-let f = Factory::new().execute();
+let f: Java<Factory> = Factory::new().execute();
 
 // Consume and produce the widget in one step:
 f.consume_widget(f.produce_widget()).execute();
 ```
 
-In fact, using the `inspect` combinator, we can go further:
-
-```rust,ignore
-use com::widgard::{Factory, FactoryExt};
-
-duchess::Jvm::with(|jvm| {
-    Factory::new()
-        .inspect(|f| f.consume_widget(f.produce_widget()))
-        .execute_with(jvm);
-})
-```
-
-At the moment, combining steps is equivalent to invoking them individually. However, the plan is for it to become more efficient by reducing the number of times we invoke JNI methods. 
+In terms of efficiency, combining steps is currently equivalent to invoking them individually. However, the plan is for it to become more efficient by reducing the number of times we invoke JNI methods. 
 
 

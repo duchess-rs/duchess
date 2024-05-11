@@ -28,19 +28,17 @@ duchess::java_package! {
     class BuildStep { * }
 }
 
-fn main() -> duchess::GlobalResult<()> {
+fn main() -> duchess::Result<()> {
     // FIXME: conflict between interface trait (LoggerExt) and class trait (BuilderExt)
 
-    let logger = log::Logger::new().global().execute()?;
+    let logger = log::Logger::new().execute()?;
 
-    duchess::Jvm::with(|jvm| {
-        let event = log::Event::builder()
-            .with_time(java::util::Date::new())
-            .with_name("foo")
-            .build()
-            .execute_with(jvm)?;
-        logger.add_event(&event).execute_with(jvm)?;
-        logger.add_event(&event).execute_with(jvm)?;
-        Ok(())
-    })
+    let event = log::Event::builder()
+        .with_time(java::util::Date::new())
+        .with_name("foo")
+        .build()
+        .execute()?;
+    logger.add_event(&event).execute()?;
+    logger.add_event(&event).execute()?;
+    Ok(())
 }

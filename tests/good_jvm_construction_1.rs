@@ -1,8 +1,8 @@
-use duchess::Jvm;
+use duchess::prelude::*;
 
 #[test]
 fn test_jvm_construction() {
-    Jvm::with(|_jvm| Ok(())).unwrap();
-    Jvm::with(|_jvm| Ok(())).unwrap();
-    Jvm::with(|_jvm| Ok(())).unwrap();
+    java::lang::Object::new().execute().unwrap();
+    java::lang::Object::new().execute().unwrap();
+    java::lang::Object::new().execute().unwrap();
 }

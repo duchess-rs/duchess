@@ -22,7 +22,7 @@ impl Object {
 ```
 
 This method will be invoked when people have a variable `o: &Object`
-or `o: Global<Object>` and they write `o.to_string()`.
+or `o: Java<Object>` and they write `o.to_string()`.
 But it won't support our example of `java_list.get(0).to_string()`,
 because `java_list.get(0)` returns a [`JvmOp`], not an `Object`. 
 So, to define a method on `Object`,

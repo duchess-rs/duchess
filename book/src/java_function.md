@@ -33,7 +33,7 @@ If the underlying Java function returns a scalar value, your Rust function must 
 
 Otherwise, if the underlying Java function returns an object of type `J`, the value returned from your function will be converted to `J` by invoking the [`to_java`](./to_java.md) method. This means your functon can return:
 
-* a reference to a Java object of type `J` (e.g., `Global<J>`) 
+* a reference to a Java object of type `J` (e.g., `Java<J>`) 
 * a Rust value that can be converted to `J` via `to_java::<J>`
 
 ## Linking your native function into the JVM

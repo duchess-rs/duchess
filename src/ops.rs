@@ -2,7 +2,7 @@ use crate::jvm::JavaScalar;
 use crate::jvm::Jvm;
 use crate::jvm::JvmOp;
 use crate::AsJRef;
-use crate::Global;
+use crate::Java;
 use crate::JavaObject;
 use crate::Local;
 use crate::Null;
@@ -13,7 +13,7 @@ macro_rules! identity_jvm_op {
             impl<$($param)*> JvmOp for $t {
                 type Output<'jvm> = Self;
 
-                fn execute_with<'jvm>(self, _jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
+                fn do_jni<'jvm>(self, _jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, Self::Output<'jvm>> {
                     Ok(self)
                 }
             }
@@ -38,9 +38,9 @@ identity_jvm_op! {
 
     [R: JavaObject] &R,
     [R: JavaObject] &Local<'_, R>,
-    [R: JavaObject] &Global<R>,
+    [R: JavaObject] &Java<R>,
     [R: JavaObject] &Option<Local<'_, R>>,
-    [R: JavaObject] &Option<Global<R>>,
+    [R: JavaObject] &Option<Java<R>>,
 
     [] Null,
 }
@@ -63,7 +63,7 @@ identity_jvm_op! {
 pub trait IntoJava<T: JavaObject>: Copy {
     type Output<'jvm>: AsJRef<T>;
 
-    fn into_java<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>>;
+    fn into_java<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, Self::Output<'jvm>>;
 }
 
 impl<J, T> IntoJava<T> for J
@@ -74,8 +74,8 @@ where
 {
     type Output<'jvm> = <J as JvmOp>::Output<'jvm>;
 
-    fn into_java<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
-        self.execute_with(jvm)
+    fn into_java<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, Self::Output<'jvm>> {
+        self.do_jni(jvm)
     }
 }
 

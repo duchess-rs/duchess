@@ -283,7 +283,7 @@ impl Signature {
 
     /// Returns the Rust type that represents this Java type -- e.g., for `Object`,
     /// returns `java::lang::Object`. Note that this is not the type of a *reference* to this
-    /// java type (which would be e.g. `Global<java::lang::Object>`).
+    /// java type (which would be e.g. `Java<java::lang::Object>`).
     pub fn java_ty(&mut self, ty: &Type) -> syn::Result<TokenStream> {
         match &ty.to_non_repeating() {
             NonRepeatingType::Ref(ty) => self.java_ref_ty(ty),

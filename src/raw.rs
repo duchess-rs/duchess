@@ -13,7 +13,7 @@ use std::{
 
 use jni_sys::jvalue;
 
-use crate::{jvm::JavaObjectExt, Error, GlobalResult, JavaObject, Local};
+use crate::{jvm::JavaObjectExt, Error, JavaObject, Local};
 
 const VERSION: jni_sys::jint = jni_sys::JNI_VERSION_1_8;
 
@@ -24,7 +24,7 @@ const VERSION: jni_sys::jint = jni_sys::JNI_VERSION_1_8;
 /// # Safety
 ///
 /// Caller must ensure that no two threads race to call this fn or [`try_create_jvm()`].
-pub(crate) unsafe fn existing_jvm() -> GlobalResult<Option<JvmPtr>> {
+pub(crate) unsafe fn existing_jvm() -> crate::Result<Option<JvmPtr>> {
     let libjvm = crate::libjvm::libjvm_or_load()?;
 
     let mut jvms = [std::ptr::null_mut::<jni_sys::JavaVM>()];
@@ -64,7 +64,7 @@ pub(crate) unsafe fn existing_jvm() -> GlobalResult<Option<JvmPtr>> {
 /// Caller must ensure that no two threads race to call this fn or [`jvm()`].
 pub(crate) unsafe fn try_create_jvm<'a>(
     options: impl IntoIterator<Item = String>,
-) -> GlobalResult<JvmPtr> {
+) -> crate::Result<JvmPtr> {
     let libjvm = crate::libjvm::libjvm_or_load()?;
 
     let options = options
@@ -134,7 +134,7 @@ impl JvmPtr {
     ///
     /// The caller must ensure that the `'jvm` lifetime will not live past when the current thread is detached from the
     /// JVM.
-    pub(crate) unsafe fn env<'jvm>(self) -> GlobalResult<Option<EnvPtr<'jvm>>> {
+    pub(crate) unsafe fn env<'jvm>(self) -> crate::Result<Option<EnvPtr<'jvm>>> {
         let mut env_ptr = std::ptr::null_mut::<ffi::c_void>();
         match fn_table_call(
             self.0,
@@ -156,7 +156,7 @@ impl JvmPtr {
     ///
     /// The caller must ensure that the `'jvm` lifetime will not live past when the current thread is detached from the
     /// JVM.
-    pub(crate) unsafe fn attach_thread<'jvm>(self) -> GlobalResult<EnvPtr<'jvm>> {
+    pub(crate) unsafe fn attach_thread<'jvm>(self) -> crate::Result<EnvPtr<'jvm>> {
         let mut env_ptr = std::ptr::null_mut::<ffi::c_void>();
         match fn_table_call(
             self.0,
@@ -181,7 +181,7 @@ impl JvmPtr {
     /// # Safety
     ///
     /// The caller must ensure that no local refs from the current thread are accessible.
-    pub(crate) unsafe fn detach_thread(self) -> GlobalResult<()> {
+    pub(crate) unsafe fn detach_thread(self) -> crate::Result<()> {
         match fn_table_call(self.0, |jvm| jvm.DetachCurrentThread, |jvm, f| f(jvm)) {
             jni_sys::JNI_OK => Ok(()),
             code => Err(Error::JvmInternal(format!(
@@ -243,7 +243,7 @@ impl<'jvm> EnvPtr<'jvm> {
         self,
         fn_field: impl FnOnce(&jni_sys::JNINativeInterface_) -> Option<F>,
         call: impl FnOnce(*mut jni_sys::JNIEnv, F) -> T::JniValue,
-    ) -> crate::Result<'jvm, T> {
+    ) -> crate::LocalResult<'jvm, T> {
         let value = self.invoke_unchecked(fn_field, call);
 
         // Even if there was an exception thrown, we still need to free any non-null local ref
@@ -295,7 +295,7 @@ impl<'jvm> EnvPtr<'jvm> {
         self,
         class: ObjectPtr,
         native_methods: &[jni_sys::JNINativeMethod],
-    ) -> crate::Result<'jvm, ()> {
+    ) -> crate::LocalResult<'jvm, ()> {
         let result: jni_sys::jint = self.invoke(
             |f| f.RegisterNatives,
             |env, register_natives| {
@@ -314,7 +314,7 @@ impl<'jvm> EnvPtr<'jvm> {
         }
     }
 
-    pub fn check_exception(self) -> crate::Result<'jvm, ()> {
+    pub fn check_exception(self) -> crate::LocalResult<'jvm, ()> {
         // SAFETY: we don't hold on to the return env ptr
         let thrown = unsafe { self.invoke_unchecked(|env| env.ExceptionOccurred, |env, f| f(env)) };
         if let Some(thrown) = ObjectPtr::new(thrown) {

@@ -39,12 +39,11 @@ use me::ferris::ClassWithNativeMethod;
 // where `J` is the Java type.
 #[duchess::native(me.ferris.ClassWithNativeMethod::compute)]
 fn compute(
-    jvm: &mut jvm<'_>,
     this: &ClassWithNativeMethod,
     object: &java::lang::Object,
 ) -> impl IntoJava<java::lang::String> {
     // in here you can call back to JVM too
-    let data = this.data().execute_with(jvm);
+    let data = this.data().execute();
     format!("Hello from Rust {data}")
 }
 ```

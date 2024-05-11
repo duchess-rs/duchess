@@ -1,7 +1,7 @@
 use std::{collections::HashMap, marker::PhantomData};
 
 use crate::{
-    cast::Upcast, from_ref::FromRef, java, jvm::JavaView, Error, Global, Jvm, JvmOp, Local,
+    cast::Upcast, from_ref::FromRef, java, jvm::JavaView, Error, Java, Jvm, JvmOp, Local,
 };
 
 pub trait ToJava {
@@ -25,7 +25,7 @@ where
     fn to_java_impl<'jvm>(
         rust: &Self,
         jvm: &mut Jvm<'jvm>,
-    ) -> crate::Result<'jvm, Option<Local<'jvm, J>>>;
+    ) -> crate::LocalResult<'jvm, Option<Local<'jvm, J>>>;
 }
 
 impl<R: ?Sized> ToJava for R {
@@ -60,7 +60,7 @@ where
 {
     type Output<'jvm> = Option<Local<'jvm, J>>;
 
-    fn execute_with<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::Result<'jvm, Self::Output<'jvm>> {
+    fn do_jni<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, Self::Output<'jvm>> {
         R::to_java_impl(self.rust, jvm)
     }
 }
@@ -87,11 +87,11 @@ where
     fn to_java_impl<'jvm>(
         rust: &Self,
         jvm: &mut Jvm<'jvm>,
-    ) -> crate::Result<'jvm, Option<Local<'jvm, java::util::HashMap<JK, JV>>>> {
+    ) -> crate::LocalResult<'jvm, Option<Local<'jvm, java::util::HashMap<JK, JV>>>> {
         let jmap: Local<'jvm, java::util::HashMap<JK, JV>> =
-            java::util::HashMap::new().execute_with(jvm)?;
+            java::util::HashMap::new().do_jni(jvm)?;
         for (key, value) in rust {
-            jmap.put(key.to_java(), value.to_java()).execute_with(jvm)?;
+            jmap.put(key.to_java(), value.to_java()).do_jni(jvm)?;
         }
         Ok(Some(jmap))
     }
@@ -107,12 +107,12 @@ where
     fn to_java_impl<'jvm>(
         rust: &Self,
         jvm: &mut Jvm<'jvm>,
-    ) -> crate::Result<'jvm, Option<Local<'jvm, java::util::Map<JK, JV>>>> {
+    ) -> crate::LocalResult<'jvm, Option<Local<'jvm, java::util::Map<JK, JV>>>> {
         Ok(Some(
             rust.to_java::<java::util::HashMap<JK, JV>>()
                 .assert_not_null()
                 .upcast()
-                .execute_with(jvm)?,
+                .do_jni(jvm)?,
         ))
     }
 }
@@ -125,11 +125,11 @@ where
     fn to_java_impl<'jvm>(
         rust: &Self,
         jvm: &mut Jvm<'jvm>,
-    ) -> crate::Result<'jvm, Option<Local<'jvm, java::util::ArrayList<JE>>>> {
+    ) -> crate::LocalResult<'jvm, Option<Local<'jvm, java::util::ArrayList<JE>>>> {
         let jvec: Local<'jvm, java::util::ArrayList<JE>> =
-            java::util::ArrayList::new().execute_with(jvm)?;
+            java::util::ArrayList::new().do_jni(jvm)?;
         for element in rust {
-            jvec.add(element.to_java()).execute_with(jvm)?;
+            jvec.add(element.to_java()).do_jni(jvm)?;
         }
         Ok(Some(jvec))
     }
@@ -143,12 +143,12 @@ where
     fn to_java_impl<'jvm>(
         rust: &Self,
         jvm: &mut Jvm<'jvm>,
-    ) -> crate::Result<'jvm, Option<Local<'jvm, java::util::List<JE>>>> {
+    ) -> crate::LocalResult<'jvm, Option<Local<'jvm, java::util::List<JE>>>> {
         Ok(Some(
             rust.to_java::<java::util::ArrayList<JE>>()
                 .assert_not_null()
                 .upcast()
-                .execute_with(jvm)?,
+                .do_jni(jvm)?,
         ))
     }
 }
@@ -157,7 +157,7 @@ impl ToJavaImpl<java::lang::String> for String {
     fn to_java_impl<'jvm>(
         rust: &Self,
         jvm: &mut Jvm<'jvm>,
-    ) -> crate::Result<'jvm, Option<Local<'jvm, java::lang::String>>> {
+    ) -> crate::LocalResult<'jvm, Option<Local<'jvm, java::lang::String>>> {
         str::to_java_impl(rust, jvm)
     }
 }
@@ -166,8 +166,8 @@ impl ToJavaImpl<java::lang::String> for str {
     fn to_java_impl<'jvm>(
         rust: &Self,
         jvm: &mut Jvm<'jvm>,
-    ) -> crate::Result<'jvm, Option<Local<'jvm, java::lang::String>>> {
-        let jstr = rust.execute_with(jvm)?;
+    ) -> crate::LocalResult<'jvm, Option<Local<'jvm, java::lang::String>>> {
+        let jstr = rust.do_jni(jvm)?;
         Ok(Some(jstr))
     }
 }
@@ -176,7 +176,7 @@ impl ToJavaImpl<java::Array<i8>> for Vec<u8> {
     fn to_java_impl<'jvm>(
         rust: &Self,
         jvm: &mut Jvm<'jvm>,
-    ) -> crate::Result<'jvm, Option<Local<'jvm, java::Array<i8>>>> {
+    ) -> crate::LocalResult<'jvm, Option<Local<'jvm, java::Array<i8>>>> {
         let this: &Vec<i8> = unsafe { std::mem::transmute(rust) };
         ToJavaImpl::to_java_impl(this, jvm)
     }
@@ -189,19 +189,19 @@ where
     fn to_java_impl<'jvm>(
         rust: &Self,
         jvm: &mut Jvm<'jvm>,
-    ) -> crate::Result<'jvm, Option<Local<'jvm, J>>> {
+    ) -> crate::LocalResult<'jvm, Option<Local<'jvm, J>>> {
         Ok(Some(jvm.local(rust)))
     }
 }
 
-impl<J> ToJavaImpl<J> for Global<J>
+impl<J> ToJavaImpl<J> for Java<J>
 where
     J: Upcast<java::lang::Object>,
 {
     fn to_java_impl<'jvm>(
         rust: &Self,
         jvm: &mut Jvm<'jvm>,
-    ) -> crate::Result<'jvm, Option<Local<'jvm, J>>> {
+    ) -> crate::LocalResult<'jvm, Option<Local<'jvm, J>>> {
         Ok(Some(jvm.local(rust)))
     }
 }
@@ -214,7 +214,7 @@ where
     fn to_java_impl<'jvm>(
         rust: &Self,
         jvm: &mut Jvm<'jvm>,
-    ) -> crate::Result<'jvm, Option<Local<'jvm, J>>> {
+    ) -> crate::LocalResult<'jvm, Option<Local<'jvm, J>>> {
         R::to_java_impl(rust, jvm)
     }
 }
@@ -227,7 +227,7 @@ where
     fn to_java_impl<'jvm>(
         rust: &Self,
         jvm: &mut Jvm<'jvm>,
-    ) -> crate::Result<'jvm, Option<Local<'jvm, J>>> {
+    ) -> crate::LocalResult<'jvm, Option<Local<'jvm, J>>> {
         match rust {
             None => Ok(None),
             Some(r) => R::to_java_impl(r, jvm),
@@ -235,7 +235,7 @@ where
     }
 }
 
-impl<J, R> ToJavaImpl<J> for crate::Result<'_, R>
+impl<J, R> ToJavaImpl<J> for crate::LocalResult<'_, R>
 where
     J: Upcast<java::lang::Object>,
     R: ToJavaImpl<J>,
@@ -243,7 +243,7 @@ where
     fn to_java_impl<'jvm>(
         rust: &Self,
         jvm: &mut Jvm<'jvm>,
-    ) -> crate::Result<'jvm, Option<Local<'jvm, J>>> {
+    ) -> crate::LocalResult<'jvm, Option<Local<'jvm, J>>> {
         match rust {
             Ok(r) => R::to_java_impl(r, jvm),
             Err(e) => match e {
@@ -261,7 +261,7 @@ where
     }
 }
 
-impl<J, R> ToJavaImpl<J> for crate::GlobalResult<R>
+impl<J, R> ToJavaImpl<J> for crate::Result<R>
 where
     J: Upcast<java::lang::Object>,
     R: ToJavaImpl<J>,
@@ -269,7 +269,7 @@ where
     fn to_java_impl<'jvm>(
         rust: &Self,
         jvm: &mut Jvm<'jvm>,
-    ) -> crate::Result<'jvm, Option<Local<'jvm, J>>> {
+    ) -> crate::LocalResult<'jvm, Option<Local<'jvm, J>>> {
         match rust {
             Ok(r) => R::to_java_impl(r, jvm),
             Err(e) => match e {

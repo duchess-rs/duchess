@@ -1,4 +1,4 @@
-use crate::GlobalResult;
+use crate::Result;
 
 /// Virtual table for top-level libjvm functions that create or get JVMs.
 #[allow(non_snake_case)]
@@ -28,7 +28,7 @@ mod dynlib {
     static LIBJVM: OnceCell<Libjvm> = OnceCell::new();
 
     #[allow(non_snake_case)]
-    fn load_libjvm_at(path: &Path) -> GlobalResult<Libjvm> {
+    fn load_libjvm_at(path: &Path) -> Result<Libjvm> {
         (|| {
             let lib = unsafe { Library::new(path) }?;
             let JNI_CreateJavaVM = *unsafe { lib.get(b"JNI_CreateJavaVM\0") }?;
@@ -42,7 +42,7 @@ mod dynlib {
         .map_err(|e: libloading::Error| Error::UnableToLoadLibjvm(Box::new(e)))
     }
 
-    pub(crate) fn libjvm_or_load() -> GlobalResult<&'static Libjvm> {
+    pub(crate) fn libjvm_or_load() -> Result<&'static Libjvm> {
         LIBJVM.get_or_try_init(|| {
             let path: PathBuf = [
                 &java_locator::locate_jvm_dyn_library()
@@ -56,7 +56,7 @@ mod dynlib {
         })
     }
 
-    pub(crate) fn libjvm_or_load_at(path: &Path) -> GlobalResult<&'static Libjvm> {
+    pub(crate) fn libjvm_or_load_at(path: &Path) -> Result<&'static Libjvm> {
         LIBJVM.get_or_try_init(|| load_libjvm_at(path))
     }
 }
@@ -65,7 +65,7 @@ mod dynlib {
 pub(crate) use dynlib::{libjvm_or_load, libjvm_or_load_at};
 
 #[cfg(not(feature = "dylibjvm"))]
-pub(crate) fn libjvm_or_load() -> GlobalResult<&'static Libjvm> {
+pub(crate) fn libjvm_or_load() -> Result<&'static Libjvm> {
     static LIBJVM: Libjvm = Libjvm {
         JNI_CreateJavaVM: jni_sys::JNI_CreateJavaVM,
         JNI_GetCreatedJavaVMs: jni_sys::JNI_GetCreatedJavaVMs,

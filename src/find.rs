@@ -4,13 +4,13 @@ use crate::{
     java,
     jvm::JavaObjectExt,
     raw::{FieldPtr, MethodPtr},
-    Jvm, Local, Result,
+    Jvm, Local, LocalResult,
 };
 
 pub fn find_class<'jvm>(
     jvm: &mut Jvm<'jvm>,
     jni_name: &CStr,
-) -> Result<'jvm, Local<'jvm, java::lang::Class>> {
+) -> LocalResult<'jvm, Local<'jvm, java::lang::Class>> {
     let class: Option<Local<java::lang::Class>> = unsafe {
         // SAFETY: jni_name is a valid pointer to a nul-terminated byte string
         jvm.env()
@@ -31,7 +31,7 @@ pub fn find_method<'jvm>(
     jni_name: &CStr,
     jni_descriptor: &CStr,
     is_static: bool,
-) -> Result<'jvm, MethodPtr> {
+) -> LocalResult<'jvm, MethodPtr> {
     let class = class.as_ref().as_raw();
 
     let env = jvm.env();
@@ -75,7 +75,7 @@ pub fn find_field<'jvm>(
     jni_descriptor: &CStr,
     // Note: there are no usages currently of `is_statc: false`. See https://github.com/duchess-rs/duchess/issues/85
     is_static: bool,
-) -> Result<'jvm, FieldPtr> {
+) -> LocalResult<'jvm, FieldPtr> {
     let class = class.as_ref().as_raw();
 
     let env = jvm.env();
@@ -116,7 +116,7 @@ pub fn find_constructor<'jvm>(
     jvm: &mut Jvm<'jvm>,
     class: impl AsRef<java::lang::Class>,
     jni_descriptor: &CStr,
-) -> Result<'jvm, MethodPtr> {
+) -> LocalResult<'jvm, MethodPtr> {
     const METHOD_NAME: &CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"<init>\0") };
     find_method(jvm, class, METHOD_NAME, jni_descriptor, false)
 }

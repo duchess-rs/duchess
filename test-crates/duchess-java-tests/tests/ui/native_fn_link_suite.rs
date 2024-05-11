@@ -16,8 +16,8 @@ duchess::java_package! {
 fn base_greeting(
     _this: &native_greeting::Native,
     name: &java::lang::String,
-) -> duchess::GlobalResult<String> {
-    let name: String = name.to_rust().execute()?;
+) -> duchess::Result<String> {
+    let name: String = name.execute()?;
     Ok(format!("Hello, {name}"))
 }
 
@@ -25,7 +25,7 @@ fn native_functions() -> Vec<duchess::JavaFunction> {
     vec![base_greeting::java_fn()]
 }
 
-fn main() -> duchess::GlobalResult<()> {
+fn main() -> duchess::Result<()> {
     duchess::Jvm::builder()
         .link(native_functions())
         .try_launch()?;
@@ -33,7 +33,6 @@ fn main() -> duchess::GlobalResult<()> {
     let n: String = native_greeting::Native::new()
         .greet("Ferris")
         .assert_not_null()
-        .to_rust()
         .execute()
         .unwrap();
 

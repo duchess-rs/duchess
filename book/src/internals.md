@@ -38,7 +38,7 @@ Whenever we invoke a JNI method, or execute a construct, it creates a new local 
 
 ### `Global` Java objects
 
-The `jdk` object offers a method to create a Global reference a Java object. Global references can outlive the current frame. They are represented by a `Global<MyObject>` type, which is a newtype'd `sys::jobject` as well that represents a global handle. This type has a `Drop` impl which deletes the global reference and supports `Deref` in the same way as `Local`.
+The `jdk` object offers a method to create a Global reference a Java object. Global references can outlive the current frame. They are represented by a `Java<MyObject>` type, which is a newtype'd `sys::jobject` as well that represents a global handle. This type has a `Drop` impl which deletes the global reference and supports `Deref` in the same way as `Local`.
 
 ### null
 

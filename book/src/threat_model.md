@@ -39,7 +39,7 @@ This section introduces invariants maintained by Duchess using Rust's type syste
 
 ### The `'jvm` lifetime `&mut Jvm<'jvm>` is the innermost scope for local variables
 
-References to Java objects of type `J` are stored in a `Local<'jvm, J>` holder. Local references can come from the arguments to native functions or from `JvmOp::execute_with` calls. `execute_with` calls use the `'jvm`' lifetime found on the `Jvm<'jvm>` argument. This allows the `Local` to be used freely within that scope. It is therefore important that `'jvm` be constrained to the **innermost** valid scope.
+References to Java objects of type `J` are stored in a `Local<'jvm, J>` holder. Local references can come from the arguments to native functions or from `JvmOp::do_jni` calls. `do_jni` calls use the `'jvm`' lifetime found on the `Jvm<'jvm>` argument. This allows the `Local` to be used freely within that scope. It is therefore important that `'jvm` be constrained to the **innermost** valid scope.
 
 Inductive argument that this invariant is maintained:
 
@@ -123,7 +123,7 @@ Duchess caches method and field IDs in various places. In all cases, the id is d
 
 ### Local references are tied to the lifetime of a JNI method call
 
-The [JNI manual documents](https://docs.oracle.com/javase/8/docs/technotes/guides/jni/spec/design.html#referencing_java_objects) that local references are "valid for the duration of a native method call. Once the method returns, these references will be automatically out of scope." In Duchess, each newly created local reference is assigned to a `Local<'jvm, T>`. This type carries a lifetime (`'jvm`) that derives from the `duchess::Jvm<'jvm>` argument provided to the `JvmOp::execute_with` method. Therefore, the local cannot escape the `'jvm` lifetime on the `Jvm<'jvm>` value; duchess [maintains an invariant that `'jvm` is the innermost JNI local scope](#the-jvm-lifetime-mut-jvmjvm-is-the-innermost-scope-for-local-variables).
+The [JNI manual documents](https://docs.oracle.com/javase/8/docs/technotes/guides/jni/spec/design.html#referencing_java_objects) that local references are "valid for the duration of a native method call. Once the method returns, these references will be automatically out of scope." In Duchess, each newly created local reference is assigned to a `Local<'jvm, T>`. This type carries a lifetime (`'jvm`) that derives from the `duchess::Jvm<'jvm>` argument provided to the `JvmOp::do_jni` method. Therefore, the local cannot escape the `'jvm` lifetime on the `Jvm<'jvm>` value; duchess [maintains an invariant that `'jvm` is the innermost JNI local scope](#the-jvm-lifetime-mut-jvmjvm-is-the-innermost-scope-for-local-variables).
 
 ### Local references cannot be saved in global variables.
 

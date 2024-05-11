@@ -22,11 +22,11 @@ where
 {
     type Output<'jvm> = Local<'jvm, T>;
 
-    fn execute_with<'jvm>(
+    fn do_jni<'jvm>(
         self,
         jvm: &mut crate::Jvm<'jvm>,
-    ) -> crate::Result<'jvm, Self::Output<'jvm>> {
-        let j = self.j.execute_with(jvm)?;
+    ) -> crate::LocalResult<'jvm, Self::Output<'jvm>> {
+        let j = self.j.do_jni(jvm)?;
         j.ok_or(Error::NullDeref)
     }
 }

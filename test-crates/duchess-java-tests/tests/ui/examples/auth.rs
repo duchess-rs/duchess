@@ -1,5 +1,5 @@
 //@check-pass
-use duchess::{java, prelude::*, Global};
+use duchess::prelude::*;
 use std::collections::HashMap;
 use thiserror::Error;
 
@@ -19,7 +19,7 @@ duchess::java_package! {
     class AuthorizationExceptionDenied { * }
 }
 
-pub struct HttpAuth(Global<auth::HttpAuth>);
+pub struct HttpAuth(Java<auth::HttpAuth>);
 
 #[derive(Debug, duchess::ToJava)]
 #[java(auth.HttpRequest)]
@@ -36,7 +36,7 @@ pub struct HttpRequest {
 pub struct Authenticated {
     pub account_id: String,
     pub user: String,
-    this: Global<auth::Authenticated>,
+    this: Java<auth::Authenticated>,
 }
 
 #[derive(Debug, Error, duchess::ToRust)]
@@ -71,7 +71,6 @@ pub struct AuthorizeRequest {
     pub context: HashMap<String, String>,
 }
 
-
 #[derive(Debug, duchess::ToJava)]
 #[java(auth.AuthorizeRequest)]
 pub struct AuthorizeRequestWithReferences<'a> {
@@ -97,8 +96,8 @@ pub enum AuthorizeError {
 }
 
 impl HttpAuth {
-    pub fn new() -> duchess::GlobalResult<Self> {
-        let auth = auth::HttpAuth::new().global().execute()?;
+    pub fn new() -> duchess::Result<Self> {
+        let auth = auth::HttpAuth::new().execute()?;
         Ok(Self(auth))
     }
 
@@ -107,7 +106,6 @@ impl HttpAuth {
             .authenticate(request)
             .assert_not_null()
             .catch::<duchess::java::lang::Throwable>()
-            .to_rust()
             .execute()
             .unwrap()
     }
@@ -120,13 +118,12 @@ impl HttpAuth {
         self.0
             .authorize(authn, authz)
             .catch::<duchess::java::lang::Throwable>()
-            .to_rust()
             .execute()
             .unwrap()
     }
 }
 
-fn main() -> duchess::GlobalResult<()> {
+fn main() -> duchess::Result<()> {
     let auth = HttpAuth::new()?;
 
     let request = HttpRequest {

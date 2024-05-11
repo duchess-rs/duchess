@@ -1,15 +1,14 @@
-use duchess::{java, Global, JvmOp, ToJava};
+use duchess::{java, Java, JvmOp, ToJava};
 
 macro_rules! test_array {
     ($type: ty, $item: expr) => {
         for test_array in [vec![$item], vec![], vec![$item, $item, $item]] {
-            let java: Global<java::Array<$type>> = test_array
+            let java: Java<java::Array<$type>> = test_array
                 .to_java()
                 .assert_not_null()
-                .global()
                 .execute()
                 .unwrap();
-            let and_back = (&*java).to_rust().execute().unwrap();
+            let and_back: Vec<_> = (&*java).execute().unwrap();
             assert_eq!(test_array, and_back);
         }
     };
