@@ -439,14 +439,14 @@ impl ClassInfo {
 
         let java_class_generics = self.class_generic_names();
 
-        let jni_descriptor = jni_c_str(constructor.descriptor(), self.span);
+        let jni_descriptor = jni_c_str(constructor.descriptor(&self.into()), self.span);
 
         // Code to convert each input appropriately
         let prepare_inputs = self.prepare_inputs(&input_names, &constructor.argument_tys);
 
         // for debugging JVM invocation failures
         let name = Literal::string(&self.name.to_string());
-        let descriptor = Literal::string(&constructor.descriptor());
+        let descriptor = Literal::string(&constructor.descriptor(&self.into()));
 
         let output = quote_spanned!(self.span =>
             pub fn new(
@@ -719,7 +719,7 @@ impl ClassInfo {
             None => None,
         };
 
-        let jni_descriptor = jni_c_str(&method.descriptor(), self.span);
+        let jni_descriptor = jni_c_str(&method.descriptor(&self.into()), self.span);
 
         // Code to convert each input appropriately
         let prepare_inputs = self.prepare_inputs(&input_names, &method.argument_tys);
@@ -920,7 +920,7 @@ impl ClassInfo {
             None => None,
         };
 
-        let jni_descriptor = jni_c_str(&method.descriptor(), self.span);
+        let jni_descriptor = jni_c_str(&method.descriptor(&self.into()), self.span);
 
         // Code to convert each input appropriately
         let prepare_inputs = self.prepare_inputs(&input_names, &method.argument_tys);
@@ -1085,7 +1085,7 @@ impl ClassInfo {
         let jni_field_fn = sig.jni_static_field_get_fn(&field.ty)?;
 
         let jni_field = jni_c_str(&*field.name, self.span);
-        let jni_descriptor = jni_c_str(&field.ty.descriptor(), self.span);
+        let jni_descriptor = jni_c_str(&field.ty.descriptor(&self.into()), self.span);
 
         let rust_field_name =
             Id::from(format!("get_{}", field.name.to_snake_case())).to_ident(self.span);
@@ -1237,10 +1237,6 @@ impl ClassInfo {
             })
             .collect()
     }
-}
-
-trait GenericExt {
-    fn to_where_clause(&self, span: Span) -> TokenStream;
 }
 
 fn jni_c_str(contents: impl Into<String>, span: Span) -> TokenStream {

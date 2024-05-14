@@ -1,4 +1,4 @@
- use std::{iter::once, sync::Arc};
+use std::{iter::once, sync::Arc};
 
 use proc_macro2::{Ident, Literal, TokenStream};
 use quote::quote_spanned;
@@ -86,7 +86,8 @@ pub fn java_function(selector: MethodSelector, input: syn::ItemFn) -> syn::Resul
 
     let rust_this_ty = driver.convert_ty(&class_info.this_ref().into())?;
     let method_name_literal = Literal::string(&selector.method_name());
-    let signature_literal = Literal::string(&driver.method_info.descriptor());
+    let signature_literal =
+        Literal::string(&driver.method_info.descriptor(&class_info.as_ref().into()));
 
     let tokens = quote_spanned!(span =>
         // Declare a function with no-mangle linkage as expected by Java.
