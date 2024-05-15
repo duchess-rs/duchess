@@ -1,6 +1,8 @@
 package generics;
 
 import java.util.HashMap;
+import java.util.TreeSet;
+import java.util.Comparator;
 
 public class MapLike<TT extends MapKey> {
     public MapLike() {
@@ -13,9 +15,17 @@ public class MapLike<TT extends MapKey> {
         storage.put(key, value);
     }
 
+    // Note: although Java supports shadowing generics, Duchess currently does not.
+    public <T extends MapKey> void methodGeneric(T key, Object value) {
+        storage.put((TT) key, value);
+    }
+
     public String toString() {
         StringBuilder sb = new StringBuilder();
-        for (TT key : storage.keySet()) {
+        TreeSet<TT> sortedKeys = new TreeSet<TT>();
+sortedKeys.addAll(storage.keySet());
+
+        for (TT key : sortedKeys) {
             sb.append(key + "=" + storage.get(key) + "\n");
         }
         return sb.toString();
