@@ -173,7 +173,7 @@ impl ClassInfo {
         }
     }
 
-    pub fn generics_scope(&self) -> GenericsScope {
+    pub fn generics_scope(&self) -> GenericsScope<'_> {
         GenericsScope::Generics(&self.generics, &GenericsScope::Empty)
     }
 }
