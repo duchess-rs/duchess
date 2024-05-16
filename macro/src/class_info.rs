@@ -172,6 +172,10 @@ impl ClassInfo {
             | (Privacy::Default, ClassKind::Class) => false,
         }
     }
+
+    pub fn generics_scope(&self) -> GenericsScope<'_> {
+        GenericsScope::Generics(&self.generics, &GenericsScope::Empty)
+    }
 }
 
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
@@ -280,12 +284,18 @@ impl Constructor {
         }
     }
 
-    pub fn descriptor(&self) -> String {
+    /// Returns the JVM descriptor script for the constructor.
+    ///
+    /// # Parameters
+    ///
+    /// * `ctx` is the generics scope of the class.
+    pub fn descriptor(&self, ctx: &GenericsScope<'_>) -> String {
+        let ctx = &ctx.nest(&self.generics);
         format!(
             "({})V",
             self.argument_tys
                 .iter()
-                .map(|a| a.descriptor())
+                .map(|a| a.descriptor(ctx))
                 .collect::<String>()
         )
     }
@@ -317,16 +327,22 @@ impl Method {
         }
     }
 
-    pub fn descriptor(&self) -> String {
+    /// Returns the JVM descriptor for the method.
+    ///
+    /// # Parameters
+    ///
+    /// * `ctx` is the generics scope of the class.
+    pub fn descriptor(&self, ctx: &GenericsScope<'_>) -> String {
+        let ctx = &ctx.nest(&self.generics);
         format!(
             "({}){}",
             self.argument_tys
                 .iter()
-                .map(|a| a.descriptor())
+                .map(|a| a.descriptor(ctx))
                 .collect::<String>(),
             self.return_ty
                 .as_ref()
-                .map(|r| r.descriptor())
+                .map(|r| r.descriptor(ctx))
                 .unwrap_or_else(|| format!("V")),
         )
     }
@@ -424,8 +440,39 @@ impl Type {
         }
     }
 
-    pub fn descriptor(&self) -> String {
-        self.to_non_repeating().descriptor()
+    /// Returns the JVM descriptor for this type, suitable for embedding a method descriptor.
+    ///
+    /// # Parameters
+    ///
+    /// * `ctx` is the generics scope where the type appears.
+    pub fn descriptor(&self, ctx: &GenericsScope<'_>) -> String {
+        self.to_non_repeating().descriptor(ctx)
+    }
+}
+
+/// Track generics currently in scope
+///
+/// In order to resolve descriptors for methods containing `<X extends Y>`, we need to know how `T` was declared.
+pub enum GenericsScope<'a> {
+    Empty,
+    Generics(&'a [Generic], &'a GenericsScope<'a>),
+}
+
+impl<'a> GenericsScope<'a> {
+    /// Find a generic within this scope by name
+    fn find(&self, ty: &Id) -> Option<&Generic> {
+        match self {
+            GenericsScope::Empty => None,
+            GenericsScope::Generics(g, inner) => g.iter().find(|g| &g.id == ty).or(inner.find(ty)),
+        }
+    }
+
+    /// Add an additional layer to this scope (e.g. combining generics from a class with generics from a method)
+    ///
+    /// The newly provided generics are higher priority than the inner generics (but
+    /// I don't think we can have namespace collisions here in Java anyway)
+    fn nest(&'a self, generics: &'a [Generic]) -> GenericsScope<'a> {
+        GenericsScope::Generics(generics, self)
     }
 }
 
@@ -437,18 +484,27 @@ pub enum NonRepeatingType {
 }
 
 impl NonRepeatingType {
-    pub fn descriptor(&self) -> String {
+    /// Returns the JVM descriptor for this type, suitable for embedding a method descriptor.
+    ///
+    /// # Parameters
+    ///
+    /// * `ctx` is the generics scope where the type appears.
+    pub fn descriptor(&self, ctx: &GenericsScope<'_>) -> String {
         match self {
             NonRepeatingType::Ref(r) => match r {
                 RefType::Class(c) => format!("L{};", c.name.to_jni_name()),
-                RefType::Array(r) => format!("[{}", r.descriptor()),
+                RefType::Array(r) => format!("[{}", r.descriptor(ctx)),
 
-                // FIXME(#42): The descriptor actually depends on how the type
-                // parameter was declared!
-                RefType::TypeParameter(_)
-                | RefType::Extends(_)
-                | RefType::Super(_)
-                | RefType::Wildcard => format!("Ljava/lang/Object;"),
+                RefType::TypeParameter(id) => {
+                    let generic = ctx.find(id).expect("generic did not exist.");
+                    match generic.extends.get(0) {
+                        Some(c) => format!("L{};", c.name.to_jni_name()),
+                        _ => format!("Ljava/lang/Object;"),
+                    }
+                }
+                RefType::Extends(_) | RefType::Super(_) | RefType::Wildcard => {
+                    format!("Ljava/lang/Object;")
+                }
             },
             NonRepeatingType::Scalar(s) => match s {
                 ScalarType::Int => format!("I"),
