@@ -280,7 +280,12 @@ impl Constructor {
         }
     }
 
-    pub fn descriptor(&self, ctx: &GenericsScope) -> String {
+    /// Returns the JVM descriptor script for the constructor.
+    ///
+    /// # Parameters
+    ///
+    /// * `ctx` is the generics scope of the class.
+    pub fn descriptor(&self, ctx: &GenericsScope<'_>) -> String {
         let ctx = &ctx.nest(&self.generics);
         format!(
             "({})V",
@@ -318,7 +323,12 @@ impl Method {
         }
     }
 
-    pub fn descriptor(&self, ctx: &GenericsScope) -> String {
+    /// Returns the JVM descriptor for the method.
+    ///
+    /// # Parameters
+    ///
+    /// * `ctx` is the generics scope of the class.
+    pub fn descriptor(&self, ctx: &GenericsScope<'_>) -> String {
         let ctx = &ctx.nest(&self.generics);
         format!(
             "({}){}",
@@ -426,7 +436,12 @@ impl Type {
         }
     }
 
-    pub fn descriptor(&self, ctx: &GenericsScope) -> String {
+    /// Returns the JVM descriptor for this type, suitable for embedding a method descriptor.
+    ///
+    /// # Parameters
+    ///
+    /// * `ctx` is the generics scope where the type appears.
+    pub fn descriptor(&self, ctx: &GenericsScope<'_>) -> String {
         self.to_non_repeating().descriptor(ctx)
     }
 }
@@ -471,7 +486,12 @@ pub enum NonRepeatingType {
 }
 
 impl NonRepeatingType {
-    pub fn descriptor(&self, ctx: &GenericsScope) -> String {
+    /// Returns the JVM descriptor for this type, suitable for embedding a method descriptor.
+    ///
+    /// # Parameters
+    ///
+    /// * `ctx` is the generics scope where the type appears.
+    pub fn descriptor(&self, ctx: &GenericsScope<'_>) -> String {
         match self {
             NonRepeatingType::Ref(r) => match r {
                 RefType::Class(c) => format!("L{};", c.name.to_jni_name()),
