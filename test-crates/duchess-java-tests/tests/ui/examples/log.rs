@@ -32,7 +32,7 @@ fn main() -> duchess::Result<()> {
     let logger = log::Logger::new().execute()?;
 
     let timestamp = java::util::Date::new();
-    timestamp.set_time(0i64);
+    timestamp.set_time(0i64).execute().unwrap();
 
     logger
         .add_event(

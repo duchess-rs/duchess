@@ -33,6 +33,7 @@ mod test;
 /// *Eventual goal:* Each call to `execute` represents a single crossing
 /// over into the JVM, so the more you can chain together your jvm-ops,
 /// the better.
+#[must_use = "JvmOps do nothing unless you call `.execute()"]
 pub trait JvmOp: Copy {
     type Output<'jvm>;
 
