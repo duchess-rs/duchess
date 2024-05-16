@@ -172,6 +172,10 @@ impl ClassInfo {
             | (Privacy::Default, ClassKind::Class) => false,
         }
     }
+
+    pub fn generics_scope(&self) -> GenericsScope {
+        GenericsScope::Generics(&self.generics, &GenericsScope::Empty)
+    }
 }
 
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
@@ -472,12 +476,6 @@ impl<'a> GenericsScope<'a> {
     }
 }
 
-impl<'a> From<&'a ClassInfo> for GenericsScope<'a> {
-    fn from(value: &'a ClassInfo) -> Self {
-        Self::Generics(&value.generics, &GenericsScope::Empty)
-    }
-}
-
 /// A variant of type
 #[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
 pub enum NonRepeatingType {
@@ -497,8 +495,6 @@ impl NonRepeatingType {
                 RefType::Class(c) => format!("L{};", c.name.to_jni_name()),
                 RefType::Array(r) => format!("[{}", r.descriptor(ctx)),
 
-                // FIXME(#42): The descriptor actually depends on how the type
-                // parameter was declared!
                 RefType::TypeParameter(id) => {
                     let generic = ctx.find(id).expect("generic did not exist.");
                     match generic.extends.get(0) {
