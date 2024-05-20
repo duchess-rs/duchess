@@ -89,3 +89,7 @@ coverage-show:
 
 
 coverage: coverage-clean coverage-unit-tests coverage-ui-test coverage-show
+
+publish:
+  cd macro && cargo publish
+  cargo publish
