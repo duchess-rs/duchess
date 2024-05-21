@@ -21,5 +21,10 @@ pub fn main() -> duchess::Result<()> {
     let is_null = take_null.take_null_string(duchess::Null).execute()?;
     assert!(is_null);
 
+    let is_null = take_null
+        .take_null_string(&None::<Java<java::lang::String>>)
+        .execute()?;
+    assert!(is_null);
+
     Ok(())
 }
