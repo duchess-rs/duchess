@@ -1,0 +1,10 @@
+warning: unused import: `java`
+ --> tests/ui/examples/generics.rs:2:15
+  |
+2 | use duchess::{java, prelude::*};
+  |               ^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: 1 warning emitted
+

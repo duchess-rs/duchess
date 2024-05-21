@@ -1,0 +1,18 @@
+warning: unused import: `duchess::Jvm`
+ --> tests/ui/exceptions.rs:3:5
+  |
+3 | use duchess::Jvm;
+  |     ^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused variable: `caught_exception`
+  --> tests/ui/exceptions.rs:43:9
+   |
+43 |     let caught_exception = thrower
+   |         ^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_caught_exception`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+warning: 2 warnings emitted
+
