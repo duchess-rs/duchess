@@ -1,4 +1,4 @@
-//@check-pass
+//@run
 use duchess::prelude::*;
 use std::collections::HashMap;
 use thiserror::Error;

@@ -1,4 +1,4 @@
-//@ check-pass
+//@run
 
 #![allow(dead_code)]
 

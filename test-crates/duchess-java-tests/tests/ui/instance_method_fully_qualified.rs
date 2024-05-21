@@ -1,4 +1,4 @@
-//@check-pass
+//@run
 use duchess::prelude::*;
 
 pub fn main() -> duchess::Result<()> {

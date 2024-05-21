@@ -1,4 +1,4 @@
-//@check-pass
+//@run
 use duchess::prelude::*;
 
 // Generate our own version of java.util.Date that
