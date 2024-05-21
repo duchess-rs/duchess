@@ -38,7 +38,7 @@ jobs:
         git switch -c $BRANCH
         git push -u origin $BRANCH
     - name: Create Pull Request
-      run: gh pr create -B master --title 'Automatic bless' --body ''
+      run: gh pr create -B main --title 'Automatic bless' --body ''
     env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         DUCHESS_BLESS: 1
