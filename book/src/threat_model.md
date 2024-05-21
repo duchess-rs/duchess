@@ -1,7 +1,5 @@
 # Threat model
 
-![Status: Experimental](https://img.shields.io/badge/Status-WIP-yellow)
-
 This page analyzes Duchess's use of the JNI APIs to explain how it guarantees memory safety. Sections:
 
 * [Assumptions](#assumptions): requirements for safe usage of Duchess which Duchess itself cannot enforce.
@@ -13,9 +11,9 @@ This page analyzes Duchess's use of the JNI APIs to explain how it guarantees me
 
 We assume three things
 
-1. The Java `.class` files that are present at build time have the same type signatures and public interfaces as the class files that will be present at runtime.
-2. The user [does not attempt to start the JVM via some other crate](#multiple-jvms-started-in-the-same-process) in parallel with using duchess methods
-3. The user [does not use](#pushlocalframe-invoked-by-a-mechanism-external-to-duchess) the JNI [`PushLocalFrame`][] method to introduce "local variable frames" within the context of `Jvm::with` call.
+1. The user [does not attempt to start the JVM via some other crate](#multiple-jvms-started-in-the-same-process) in parallel with using duchess methods
+2. The user [does not use](#pushlocalframe-invoked-by-a-mechanism-external-to-duchess) the JNI [`PushLocalFrame`][] method to introduce "local variable frames" within the context of `Jvm::with` call.
+3. The Java `.class` files that are present at build time have the same type signatures and public interfaces as the class files that will be present at runtime. Although there are no known memory-safety vulnerabilities stemming from failure to maintain this invariant, failing to provide matching classfiles will result in failures at runtime.
 
 [`PushLocalFrame`]: (https://docs.oracle.com/javase/8/docs/technotes/guides/jni/spec/functions.html#PushLocalFrame)
 [`PopLocalFrame`]: (https://docs.oracle.com/javase/8/docs/technotes/guides/jni/spec/functions.html#PopLocalFrame)
@@ -253,3 +251,11 @@ Every time we create a global reference, we store it in a `Global` type. The des
 **Outcome of nonadherence:** Memory leak
 
 **How Duchess avoids this:** Unclear what this exactly means, to be honest, but we make no special effort to prevent it. However, memory leaks are largely unlikely in Duchess due to having a destructor on `Global`.
+
+### Mismatch of `.class` files
+Duchess cannot guarantee that the `.class` files used during compilation match the classfiles at runtime.
+
+**How Duchess avoids this**
+Duchess will load JNI methods at runtime using their method descriptor. The method descriptor fully captures arguments and return type of a method, (with the exception of generics). If a correct classfile has not been provided, this will result in a safe runtime error. In the case of generics, we operate on pointers instead and do not directly transmute memory returned from the JVM. These values are only useful when interacting with the JVM. Since we are operating on pointers and interacting with the JVM, there is no avenue to create memory unsafety.
+
+**Outcome of nonadherence:** Errors returned from `.execute()`
