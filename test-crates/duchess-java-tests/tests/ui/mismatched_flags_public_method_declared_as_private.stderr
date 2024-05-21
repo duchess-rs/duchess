@@ -1,5 +1,5 @@
 error: error in class `flags.Flags`: member declared as `private` but it is `public` in Java, which appears in method `publicMethod()`
- --> $DIR/mismatched_flags_public_method_declared_as_private.rs:4:5
+ --> tests/ui/mismatched_flags_public_method_declared_as_private.rs:4:5
   |
 4 |     public class flags.Flags {
   |     ^^^^^^

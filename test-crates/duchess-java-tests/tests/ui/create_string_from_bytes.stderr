@@ -1,0 +1,10 @@
+warning: unused import: `IntoJava`
+ --> tests/ui/create_string_from_bytes.rs:3:27
+  |
+3 | use duchess::{prelude::*, IntoJava};
+  |                           ^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: 1 warning emitted
+

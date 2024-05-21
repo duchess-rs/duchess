@@ -1,17 +1,21 @@
-error[E0308]: mismatched types
-   --> $DIR/native_fn_return_fresh_java_string.rs:19:5
+error[E0277]: the trait bound `for<'a> &'a duchess::java::lang::String: IntoRust<Local<'_, duchess::java::lang::String>>` is not satisfied
+   --> tests/ui/native_fn_return_fresh_java_string.rs:19:42
     |
 19  |     java::lang::String::new(v.to_java()).execute()
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ one type is more general than the other
+    |                                          ^^^^^^^ the trait `for<'a> IntoRust<Local<'_, duchess::java::lang::String>>` is not implemented for `&'a duchess::java::lang::String`, which is required by `for<'jvm> Local<'jvm, duchess::java::lang::String>: IntoRust<_>`
     |
-    = note: expected struct `Local<'jvm, _>`
-               found struct `Local<'_, _>`
-note: the lifetime requirement is introduced here
-   --> /home/nmatsakis/versioned/duchess/src/jvm.rs:108:31
+    = help: the trait `IntoRust<std::string::String>` is implemented for `&duchess::java::lang::String`
+    = help: for that trait implementation, expected `std::string::String`, found `Local<'_, duchess::java::lang::String>`
+    = note: required for `Local<'jvm, duchess::java::lang::String>` to implement `for<'jvm> IntoRust<Local<'_, duchess::java::lang::String>>`
+note: required by a bound in `execute`
+   --> /home/ubuntu/crates/duchess/src/jvm.rs:103:39
     |
-108 |         for<'jvm> Self: JvmOp<Output<'jvm> = R>,
-    |                               ^^^^^^^^^^^^^^^^
+101 |     fn execute<R>(self) -> crate::Result<R>
+    |        ------- required by a bound in this associated function
+102 |     where
+103 |         for<'jvm> Self::Output<'jvm>: IntoRust<R>,
+    |                                       ^^^^^^^^^^^ required by this bound in `JvmOp::execute`
 
 error: aborting due to 1 previous error
 
-For more information about this error, try `rustc --explain E0308`.
+For more information about this error, try `rustc --explain E0277`.
