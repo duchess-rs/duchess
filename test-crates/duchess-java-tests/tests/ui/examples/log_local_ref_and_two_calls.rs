@@ -1,4 +1,4 @@
-//@check-pass
+//@run
 use duchess::{java, prelude::*};
 
 duchess::java_package! {
