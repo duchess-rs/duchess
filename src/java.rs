@@ -328,6 +328,22 @@ mod auto {
             // public int compareTo(java.lang.Object);
         }
 
+        package java.lang.management;
+
+        public interface java.lang.management.MemoryManagerMXBean {
+            public abstract java.lang.String getName();
+            public abstract boolean isValid();
+            public abstract java.lang.String[] getMemoryPoolNames();
+        }
+
+        interface GarbageCollectorMXBean extends java.lang.management.MemoryManagerMXBean {
+            public long getCollectionCount();
+            public long getCollectionTime();
+        }
+
+        public class ManagementFactory {
+            public static java.util.List<java.lang.management.GarbageCollectorMXBean> getGarbageCollectorMXBeans();
+        }
     }
 }
 
