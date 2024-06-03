@@ -343,6 +343,7 @@ mod auto {
 
         public class ManagementFactory {
             public static java.util.List<java.lang.management.GarbageCollectorMXBean> getGarbageCollectorMXBeans();
+            public static java.util.List<java.lang.management.MemoryPoolMXBean> getMemoryPoolMXBeans();
             public static java.lang.management.MemoryMXBean getMemoryMXBean();
         }
 
@@ -353,7 +354,15 @@ mod auto {
             public abstract boolean isVerbose();
             public abstract void setVerbose(boolean);
             public abstract void gc();
-          }
+        }
+
+        public interface java.lang.management.MemoryPoolMXBean {
+            public abstract java.lang.String getName();
+            public abstract java.lang.management.MemoryType getType();
+            public abstract java.lang.management.MemoryUsage getUsage();
+            public abstract java.lang.management.MemoryUsage getCollectionUsage();
+            public abstract java.lang.management.MemoryUsage getPeakUsage();
+        }
 
         public class java.lang.management.MemoryUsage {
             private final long init;
