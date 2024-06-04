@@ -1,4 +1,7 @@
-# 0.2 (May 17th 2024)
+# 0.2.1 (June 4th, 2024)
+* Add `JMX` APIs to Java prelude. These allow querying the current memory usage of the JVM.
+
+# 0.2 (May 17th, 2024)
 This release contains several breaking changes to be aware of:
 1. The public API has been simplfied: Duchess references are now "global" references by default. The `to_rust`, `global`, and `execute` combinators have all been merged. You now invoke `execute` and then the result depends on the return value: returning a `Java<T>` will create a global reference (matching the previous behavior of `global`), and returning a Rust value like `String` will invoke the "to rust" conversion (like `to_rust` used to do). For context and examples of upgrading see https://github.com/duchess-rs/duchess/pull/147.
 
