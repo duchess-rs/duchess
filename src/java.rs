@@ -328,6 +328,67 @@ mod auto {
             // public int compareTo(java.lang.Object);
         }
 
+        package java.lang.management;
+
+        public interface java.lang.management.MemoryManagerMXBean {
+            public abstract java.lang.String getName();
+            public abstract boolean isValid();
+            public abstract java.lang.String[] getMemoryPoolNames();
+        }
+
+        interface GarbageCollectorMXBean extends java.lang.management.MemoryManagerMXBean {
+            public long getCollectionCount();
+            public long getCollectionTime();
+        }
+
+        public class ManagementFactory {
+            public static java.util.List<java.lang.management.GarbageCollectorMXBean> getGarbageCollectorMXBeans();
+            public static java.util.List<java.lang.management.MemoryPoolMXBean> getMemoryPoolMXBeans();
+            public static java.lang.management.MemoryMXBean getMemoryMXBean();
+        }
+
+        public interface java.lang.management.MemoryMXBean {
+            public abstract int getObjectPendingFinalizationCount();
+            public abstract java.lang.management.MemoryUsage getHeapMemoryUsage();
+            public abstract java.lang.management.MemoryUsage getNonHeapMemoryUsage();
+            public abstract boolean isVerbose();
+            public abstract void setVerbose(boolean);
+            public abstract void gc();
+        }
+
+        public interface java.lang.management.MemoryPoolMXBean {
+            public abstract java.lang.String getName();
+            public abstract java.lang.management.MemoryType getType();
+            public abstract java.lang.management.MemoryUsage getUsage();
+            public abstract java.lang.management.MemoryUsage getCollectionUsage();
+            public abstract java.lang.management.MemoryUsage getPeakUsage();
+        }
+
+        public class java.lang.management.MemoryUsage {
+            private final long init;
+            private final long used;
+            private final long committed;
+            private final long max;
+            public java.lang.management.MemoryUsage(long, long, long, long);
+            public long getInit();
+            public long getUsed();
+            public long getCommitted();
+            public long getMax();
+            public java.lang.String toString();
+        }
+
+        public final class java.lang.management.MemoryType {
+            public static final java.lang.management.MemoryType HEAP;
+            public static final java.lang.management.MemoryType NON_HEAP;
+            private final java.lang.String description;
+            private static final java.lang.management.MemoryType[] $VALUES;
+            public static java.lang.management.MemoryType[] values();
+            public static java.lang.management.MemoryType valueOf(java.lang.String);
+            private java.lang.management.MemoryType(java.lang.String);
+            public java.lang.String toString();
+            private static java.lang.management.MemoryType[] $values();
+            static {};
+          }
     }
 }
 
