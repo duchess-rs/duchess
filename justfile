@@ -89,3 +89,8 @@ coverage-show:
 
 
 coverage: coverage-clean coverage-unit-tests coverage-ui-test coverage-show
+
+publish:
+  git describe --exact-match --tags HEAD || (echo "You must publish a tagged release. Checkout the tag before publishing" && exit 1)
+  cd macro && cargo publish
+  cargo publish
