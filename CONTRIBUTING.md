@@ -7,7 +7,7 @@ Tests are split into two parts:
 
 You can run both of these with `just test` (see [just](https://github.com/casey/just)) for more information. Just is not required to contribute but may save you a small amount of time.
 
-The [UI tests](test-crates) are currently tested against [Rust 1.76.0](test-crates/rust-toolchain.toml).
+The [UI tests](test-crates) are currently tested against Rust 1.79.0
 
 ### Debugging
 Duchess looks for the `DUCHESS_DEBUG` environment variable during proc-macro expansion. When this variable is set, if it is `true` or `1`, **all** generated code will be formatted and dumped to a directory. Clickable links are printed to stderr:
