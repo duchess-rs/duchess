@@ -4,7 +4,7 @@ duchess::java_package! {
 
     package scala;
     class AnyVal { * }
-    class Function1 {}
+    interface Function1 {}
     class Tuple2<T1, T2> {}
     class Option<A> {}
     class Some<A> extends scala.Option<A> {}
@@ -37,7 +37,7 @@ duchess::java_package! {
     class "NoTrafos$" implements viper.silver.ast.ErrorTrafo {
         public static viper.silver.ast."NoTrafos$" "MODULE$";
     }
-    class ExtensionMember {}
+    interface ExtensionMember {}
     class Field {}
     class Function {}
     class Int {}
@@ -68,7 +68,7 @@ duchess::java_package! {
     interface Position {}
 
     package viper.silver.frontend;
-    class SilFrontend {}
+    interface SilFrontend {}
 
     package viper.silver.reporter;
     interface Reporter {}
