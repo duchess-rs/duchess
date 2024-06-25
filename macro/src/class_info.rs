@@ -712,6 +712,16 @@ impl DotId {
         self.split().1
     }
 
+    /// returns the package in JNI format
+    /// https://docs.oracle.com/en/java/javase/17/docs/specs/jni/design.html
+    pub fn packge_jni_format(&self) -> String {
+        self.split().0
+            .iter()
+            .map(|id| id.data.replace("_", "_1"))
+            .collect::<Vec<_>>()
+            .join("_")
+    }
+
     /// Split and return the (package name, class name) pair.
     pub fn split(&self) -> (&[Id], &Id) {
         let (name, package) = self.ids.split_last().unwrap();

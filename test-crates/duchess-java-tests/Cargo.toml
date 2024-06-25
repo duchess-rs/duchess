@@ -10,7 +10,7 @@ thiserror = "1.0.40"
 [dev-dependencies]
 ui_test = "0.23"
 
-[build_dependencies]
+[build-dependencies]
 walkdir = "2.3"
 
 [[test]]

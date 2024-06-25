@@ -186,10 +186,11 @@ impl Driver<'_> {
         // * If the native method is overloaded (but only if it is), then the symbol name should include
         //   the descriptor.
         let class_name = self.selector.class_name();
-        let (package, class) = class_name.split();
+        let class = class_name.class_name();
+        let package = class_name.packge_jni_format();
         let method_name = self.selector.method_name();
         let symbol_name: String = once("Java")
-            .chain(package.iter().map(|id| &id[..]))
+            .chain(once(&package[..]))
             .chain(once(&class[..]))
             .chain(once(&method_name[..]))
             .collect::<Vec<_>>()

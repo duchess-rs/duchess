@@ -1,0 +1,25 @@
+#!/bin/bash
+
+# When ui_test runs the given binary, it passes the the binary the path to the test case
+# java expects to be given the path to the class file in Java package format
+#
+# For example, ui_test will call the java application as:
+# `java test/java_ui/java_test/JavaTestClass.java`
+#
+# but java expects to be invoked as
+# `java test.java_ui.java_test.JavaTestClass`
+#
+# This wrapper script converts the given path into the expected java format
+
+# Get the input path from the command line argument
+input_path="$1"
+
+# Replace slashes with dots
+package_name="${input_path//\//.}"
+
+# remove .java extension and first 2 parts of class path
+package_name="${package_name%.java}"
+package_name="${package_name//tests./}"
+package_name="${package_name//java_ui./}"
+
+java $package_name
