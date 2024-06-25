@@ -1,4 +1,4 @@
-error: error in class `exceptions.DifferentException`: class `exceptions.DifferentException` should be type `Class`
+error: error in class `exceptions.DifferentException`: class `exceptions.DifferentException` should be type `class`
  --> tests/ui/interface_class_mismatch_reflected.rs:4:5
   |
 4 |     public interface DifferentException { * }

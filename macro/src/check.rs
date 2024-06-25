@@ -41,8 +41,9 @@ impl ClassInfo {
 
         if self.kind != info.kind {
             push_error_message(format!(
-                "class `{}` should be type `{:?}`",
-                self.name, info.kind
+                "class `{}` should be type `{}`",
+                self.name,
+                format!("{:?}", info.kind).to_lowercase()
             ));
         }
 
