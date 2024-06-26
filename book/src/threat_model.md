@@ -6,7 +6,7 @@ This page analyzes Duchess's use of the JNI APIs to explain how it guarantees me
 
 * [Assumptions](#assumptions): requirements for safe usage of Duchess which Duchess itself cannot enforce.
 * [Code invariants](#code-invariants): invariants that Duchess maintains
-* [Threat vectors that cause UB](#threat-vectors-that-cause-ub): ways to create undefined behavior using JNI, and how duchess prevents them (references code invariants and assumptions)
+* [Threat vectors that cause UB](#threat-vectors-that-cause-ub): ways to create undefined behavior using JNI, and how Duchess prevents them (references code invariants and assumptions)
 * [Threat vectors that do not cause UB](#threat-vectors-that-do-not-cause-ub): suboptimal uses of the JNI that do not create UB; duchess prevents some of these but not all (references code invariants and assumptions)
 
 ## Assumptions
@@ -45,7 +45,7 @@ Inductive argument that this invariant is maintained:
 
 * **Base case**: Users can only obtain a `Jvm<'jvm>` value via `Jvm::with`, which takes a closure argument of type `for<'jvm> impl FnMut(&mut Jvm<'jvm>)`. Therefore, this closure cannot assume that `'jvm` will outlive the closure call and all local values cannot escape the closure body.
 * **Inductive case**: All operations performed within a `Jvm::with` maintain the invariant. Violating the invariant would require introducing a new JNI local frame, which can happen in two ways:
-    * invoking [`PushLocalFrame`][]: duchess does not expose this operation, and we [assume users do not do this](#assumptions) via some other crate.
+    * invoking [`PushLocalFrame`][]: Duchess does not expose this operation, and we [assume users do not do this](#assumptions) via some other crate.
     * calling into Java code which in turn calls back into Rust code via a `native` method: In this case, we would have a stack with Rust code `R1`, then Java code `J`, then a Rust function `R2` that implements a Java native method. `R1` must have invoked `Jvm::with` to obtain a `&mut Jvm<'jvm>`. If `R1` could somehow give this `Jvm<'jvm>` value to `R2`, `R2` could create locals that would outlive its dynamic extent, violating the invariant. However, `R1` to invoke Java code `J`, `R1` had to invoke a duchess method with `&mut Jvm<'jvm>` as argument, which means that it has given the  Java code unique access to the (unique) `Jvm<'jvm>` value, leant out its only reference, and the Java code does not give this value to `R2`.
 
 **Flaw:**
@@ -91,7 +91,7 @@ What follows is a list of specific threat vectors identified by based on the doc
 
 Duchess not expose [`PushLocalFrame`][], but it is possible to invoke this method via unsafe code or from other crates (e.g., the [`jni` crate's `push_local_frame` method](https://docs.rs/jni/latest/jni/struct.JNIEnv.html#method.push_local_frame)). This method will cause local variables created within its dynamic scope to be released when [`PopLocalFrame`][] is invoked. The `'jvm` lifetime mechanism used to ensure local variables do not escape their scope could be invalidated by these methods. See [the section on the jvm lifetime](#the-jvm-lifetime-mut-jvmjvm-is-the-innermost-scope-for-local-variables) for more details.
 
-**How duchess avoids this**: Duchess carefully controls use of this method internally. We [explicitly assume](#assumptions) that customers do not invoke this method directly via alternative means.
+**How Duchess avoids this**: Duchess carefully controls use of this method internally. We [explicitly assume](#assumptions) that customers do not invoke this method directly via alternative means.
 
 ### Multiple JVMs started in the same process
 **Outcome of nonadherence:** UB
@@ -157,7 +157,7 @@ The [JNI manual documents](https://docs.oracle.com/javase/8/docs/technotes/guide
 
 ### Clear exceptions before invoking other JNI calls
 
-> After an exception has been raised, the native code must first clear the exception before making other JNI calls. 
+> After an exception has been raised, the native code must first clear the exception before making other JNI calls.
 
 [Citation.](https://docs.oracle.com/en/java/javase/17/docs/specs/jni/design.html#exception-handling)
 
