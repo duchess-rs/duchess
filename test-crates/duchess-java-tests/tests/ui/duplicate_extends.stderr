@@ -1,8 +1,14 @@
+error: error in class `log.Builder`: declared interface `java.lang.Object` not found in the reflected superclasses ()
+ --> tests/ui/duplicate_extends.rs:4:5
+  |
+4 |     public class log.Builder extends java.lang.Object, java.lang.Object {}
+  |     ^^^^^^
+
 error: error in class `log.Builder`: duplicate reference in 'extends' to 'java.lang.Object'
  --> tests/ui/duplicate_extends.rs:4:5
   |
 4 |     public class log.Builder extends java.lang.Object, java.lang.Object {}
   |     ^^^^^^
 
-error: aborting due to 1 previous error
+error: aborting due to 2 previous errors
 
