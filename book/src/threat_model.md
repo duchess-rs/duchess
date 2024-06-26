@@ -98,7 +98,7 @@ Duchess not expose [`PushLocalFrame`][], but it is possible to invoke this metho
 
 There can only be one JVM per process. If multiple JVMs are started concurrently, crashes or UB can occur.
 
-**How Duchess avoids this:** *Documentation and synchronization*: Within the Duchess library, all JVM accesses are internally synchronized. Duchess will lazily start the JVM if it has not been started already. However, Duchess cannot control the behavior of other libraries (or another major version of the package). Duchess mitigates this with [documentation](../src/jvm.md) recommending customers start the JVM explicitly in main. Future work may improve this with a centralized "`start-jvm`" crate that was shared between `jni`, `duchess` and any other JNI based Rust libraries. Duchess may also add mitigations to prevent multiple major versions of Duchess from being used in the same dependency closure.
+**How Duchess avoids this:** *Documentation and synchronization*: Within the Duchess library, all JVM accesses are internally synchronized. Duchess will lazily start the JVM if it has not been started already. However, Duchess cannot control the behavior of other libraries (or another major version of the package). Duchess mitigates this with [documentation](../src/jvm.md) recommending customers start the JVM explicitly in main. Future work may improve this with a centralized "`start-jvm`" crate that is shared between `jni`, `duchess` and any other JNI based Rust libraries. Duchess may also add mitigations to prevent multiple major versions of Duchess from being used in the same dependency closure.
 
 ### When you update a Java object in native code, ensure synchronization of access.
 
