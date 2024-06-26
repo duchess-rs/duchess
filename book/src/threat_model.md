@@ -91,14 +91,14 @@ What follows is a list of specific threat vectors identified by based on the doc
 
 Duchess not expose [`PushLocalFrame`][], but it is possible to invoke this method via unsafe code or from other crates (e.g., the [`jni` crate's `push_local_frame` method](https://docs.rs/jni/latest/jni/struct.JNIEnv.html#method.push_local_frame)). This method will cause local variables created within its dynamic scope to be released when [`PopLocalFrame`][] is invoked. The `'jvm` lifetime mechanism used to ensure local variables do not escape their scope could be invalidated by these methods. See [the section on the jvm lifetime](#the-jvm-lifetime-mut-jvmjvm-is-the-innermost-scope-for-local-variables) for more details.
 
-**How Duchess avoids this**: Duchess carefully controls use of this method internally. We [explicitly assume](#assumptions) that customers do not invoke this method directly via alternative means.
+**How Duchess avoids this**: Duchess carefully controls use of this method internally. We [explicitly assume](#assumptions) that users do not invoke this method directly via alternative means.
 
 ### Multiple JVMs started in the same process
 **Outcome of nonadherence:** UB
 
 There can only be one JVM per process. If multiple JVMs are started concurrently, crashes or UB can occur.
 
-**How Duchess avoids this:** *Documentation and synchronization*: Within the Duchess library, all JVM accesses are internally synchronized. Duchess will lazily start the JVM if it has not been started already. However, Duchess cannot control the behavior of other libraries (or another major version of the package). Duchess mitigates this with [documentation](../src/jvm.md) recommending customers start the JVM explicitly in main. Future work may improve this with a centralized "`start-jvm`" crate that is shared between `jni`, `duchess` and any other JNI based Rust libraries. Duchess may also add mitigations to prevent multiple major versions of Duchess from being used in the same dependency closure.
+**How Duchess avoids this:** *Documentation and synchronization*: Within the Duchess library, all JVM accesses are internally synchronized. Duchess will lazily start the JVM if it has not been started already. However, Duchess cannot control the behavior of other libraries (or another major version of the package). Duchess mitigates this with [documentation](../src/jvm.md) recommending users start the JVM explicitly in main. Future work may improve this with a centralized "`start-jvm`" crate that is shared between `jni`, `duchess` and any other JNI based Rust libraries. Duchess may also add mitigations to prevent multiple major versions of Duchess from being used in the same dependency closure.
 
 ### When you update a Java object in native code, ensure synchronization of access.
 
