@@ -56,10 +56,10 @@ It is theoretically possible to do something like this...
     * stash the `jvm1` somewhere in thread-local data using unsafe code
     * `Jvm::with(|jvm2| ...)`
         * invoke jvm code that calls back into Rust
-            * from inside that call, recover the `Jvm<'jvm1>`, alocate a new `Local` with it, and store the result back (unsafely)
+            * from inside that call, recover the `Jvm<'jvm1>`, allocate a new `Local` with it, and store the result back (unsafely)
     * recover the pair of `jvm1` and the object that was created
 
-...it is difficult to write the code that would do this and it requires unsafe code, but that unsafe code doesn't seem to be doing anything that should not *theoretically* work. Avoiding this is difficult, but if we focus on `execute`, we can make it so that users never directly get their ands on a `Jvm` and make this safe.
+...it is difficult to write the code that would do this and it requires unsafe code, but that unsafe code doesn't seem to be doing anything that should not *theoretically* work. Avoiding this is difficult, but if we focus on `execute`, we can make it so that users never directly get their hands on a `Jvm` and make this safe.
 
 ### All references to `impl JavaObject` types are JNI local or global references
 
@@ -204,7 +204,7 @@ The [JNI manual documents](https://docs.oracle.com/javase/8/docs/technotes/guide
 
 **Outcome of nonadherence:** Asynchronous exceptions won't be detected.
 
-**How Duchess avoids this:** We check this flag at every interaction with the JVM but not other times; it is possible for Rust code to execute for arbitrary amounts of time without checkin the flag. Asynchronous exceptions are not recommended in modern code and the outcome of not checking is not undefined behavior.
+**How Duchess avoids this:** We check this flag at every interaction with the JVM but not other times; it is possible for Rust code to execute for arbitrary amounts of time without checking the flag. Asynchronous exceptions are not recommended in modern code and the outcome of not checking is not undefined behavior.
 
 ### Local variable capacity
 
