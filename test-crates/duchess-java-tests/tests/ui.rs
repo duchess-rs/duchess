@@ -1,5 +1,5 @@
-use std::path::Path;
 use diagnostics::Diagnostics;
+use std::path::Path;
 use ui_test::*;
 
 fn run_rust_tests(text: status_emitter::Text) -> color_eyre::eyre::Result<()> {
@@ -72,11 +72,15 @@ fn run_rust_tests(text: status_emitter::Text) -> color_eyre::eyre::Result<()> {
 fn run_java_tests(text: status_emitter::Text) -> color_eyre::eyre::Result<()> {
     let test_name = std::env::var_os("TESTNAME");
 
-    let mut java = CommandBuilder::cmd("src/java_wrapper");
+    let mut java = CommandBuilder::cmd("../target/debug/java_wrapper");
     java.envs = vec![
-        ("LD_LIBRARY_PATH".into(), Some("../target/ui/tests/ui/".into())),
-        ("CLASSPATH".into(), Some("../target/tests/java_ui".into()))
+        (
+            "LD_LIBRARY_PATH".into(),
+            Some("../target/ui/tests/ui/".into()),
+        ),
+        ("CLASSPATH".into(), Some("../target/tests/java_ui".into())),
     ];
+    java.args = vec!["-Djava.library.path=../target/ui/tests/ui/".into()];
 
     let java_config = Config {
         host: Some("host".to_string()),
@@ -97,13 +101,11 @@ fn run_java_tests(text: status_emitter::Text) -> color_eyre::eyre::Result<()> {
         filter_exact: false,
         comment_defaults: ui_test::per_test_config::Comments::default(),
         custom_comments: Default::default(),
-        diagnostic_extractor: |_path: &Path, diagnostic_msg: &[u8]| {
-            Diagnostics {
-                rendered: diagnostic_msg.to_vec(),
-                messages: vec![],
-                messages_from_unknown_file_or_line: vec![]
-            }
-        }
+        diagnostic_extractor: |_path: &Path, diagnostic_msg: &[u8]| Diagnostics {
+            rendered: diagnostic_msg.to_vec(),
+            messages: vec![],
+            messages_from_unknown_file_or_line: vec![],
+        },
     };
 
     run_tests_generic(
@@ -123,8 +125,7 @@ fn run_java_tests(text: status_emitter::Text) -> color_eyre::eyre::Result<()> {
                     .unwrap_or(true),
             )
         },
-        |_c: &mut Config, _p: &Path, _f: &[u8]| {
-        },
+        |_c: &mut Config, _p: &Path, _f: &[u8]| {},
         (
             text,
             ui_test::status_emitter::Gha::<true> {

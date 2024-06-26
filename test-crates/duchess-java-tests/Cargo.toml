@@ -13,6 +13,10 @@ ui_test = "0.23"
 [build-dependencies]
 walkdir = "2.3"
 
+[[bin]]
+name = "java_wrapper"
+path = "src/java_wrapper.rs"
+
 [[test]]
 name = "ui"
 harness = false
