@@ -720,7 +720,7 @@ impl DotId {
 
     /// returns the package in JNI format with _'s escaped with _1
     /// https://docs.oracle.com/en/java/javase/17/docs/specs/jni/design.html
-    pub fn to_jni_packge(&self) -> String {
+    pub fn to_jni_package(&self) -> String {
         self.split()
             .0
             .iter()
