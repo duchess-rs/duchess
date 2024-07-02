@@ -118,6 +118,8 @@ f.consume_widget(j).execute();
 //               ^ like this!
 ```
 
+See [tests](https://github.com/duchess-rs/duchess/blob/main/test-crates/duchess-java-tests/tests/ui/passing_null_values.rs) for more examples.
+
 ## Launching the JVM
 
 Note that to call methods on the JVM, we first had to start it. You do that via `duchess::Jvm::with`. This method will launch a JVM if it hasn't already started and attach it to the current thread. OpenJDK only supports one JVM per process, so the JVM is global. You can learn more about launching a JVM (including how to set options like the classpath) in the [JVM chapter of the reference](./jvm.md).
