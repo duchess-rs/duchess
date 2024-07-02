@@ -39,6 +39,14 @@ impl ClassInfo {
             ));
         };
 
+        if self.kind != info.kind {
+            push_error_message(format!(
+                "class `{}` should be type `{}`",
+                self.name,
+                format!("{:?}", info.kind).to_lowercase()
+            ));
+        }
+
         // We always allow people to elide generics, in which case
         // they are mirroring the "erased" version of the class.
         //

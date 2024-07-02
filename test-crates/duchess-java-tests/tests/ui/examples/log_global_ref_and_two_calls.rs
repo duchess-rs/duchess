@@ -23,9 +23,9 @@ duchess::java_package! {
 
     class Event { * }
     class Logger { * }
-    class NameStep { * }
-    class TimeStep { * }
-    class BuildStep { * }
+    interface NameStep { * }
+    interface TimeStep { * }
+    interface BuildStep { * }
 }
 
 fn main() -> duchess::Result<()> {

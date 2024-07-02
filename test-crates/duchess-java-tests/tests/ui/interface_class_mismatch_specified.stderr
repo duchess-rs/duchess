@@ -1,0 +1,8 @@
+error: error in class `exceptions.ThrowExceptions`: class `exceptions.ThrowExceptions` should be type `class`
+ --> tests/ui/interface_class_mismatch_specified.rs:4:5
+  |
+4 |     public interface ThrowExceptions { }
+  |     ^^^^^^
+
+error: aborting due to 1 previous error
+
