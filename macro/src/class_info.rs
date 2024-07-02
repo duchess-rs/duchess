@@ -708,8 +708,25 @@ impl DotId {
         self.split().1 == s
     }
 
+    /// returns the class name in JNI format with _'s escaped with _1
+    /// https://docs.oracle.com/en/java/javase/17/docs/specs/jni/design.html
+    pub fn to_jni_class_name(&self) -> Id {
+        self.split().1.data.replace("_", "_1").into()
+    }
+
     pub fn class_name(&self) -> &Id {
         self.split().1
+    }
+
+    /// returns the package in JNI format with _'s escaped with _1
+    /// https://docs.oracle.com/en/java/javase/17/docs/specs/jni/design.html
+    pub fn to_jni_package(&self) -> String {
+        self.split()
+            .0
+            .iter()
+            .map(|id| id.data.replace("_", "_1"))
+            .collect::<Vec<_>>()
+            .join("_")
     }
 
     /// Split and return the (package name, class name) pair.

@@ -63,8 +63,8 @@ coverage-show:
   rust-cov show --instr-profile $coverage_dir/test-crates.profdata -Xdemangler=rustfilt \
     --format=html \
     --output-dir $target/ui-coverage-report \
-    --object test-crates/target/ui/tests/ui/examples/greeting \
-    --object test-crates/target/ui/tests/ui/exceptions \
+    --object test-crates/target/tests/rust-to-java/examples/greeting \
+    --object test-crates/target/tests/rust-to-java/exceptions \
        $( \
       for file in \
         $( \

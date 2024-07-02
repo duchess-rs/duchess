@@ -185,11 +185,37 @@ impl Driver<'_> {
         //
         // * If the native method is overloaded (but only if it is), then the symbol name should include
         //   the descriptor.
+        //
+        // In the JNI format design document, there are 3 escape characters. _1, _2, and _3
+        // https://docs.oracle.com/en/java/javase/17/docs/specs/jni/design.html
+        //
+        // Duchess currently supports _1, to escape underscores that appear in the class name
+        // or in the package name. _2 and _3 are exclusively used to convey type information
+        // for overloaded functions and are not needed at this time.
+        //
+        // Below are some examples of native functions that would require _2 and _3 escape characters
+        // ```
+        // // JavaCanCallRustJavaFunction.java
+        // package test;
+        //
+        // public class JavaCanCallRustJavaFunction {
+        //     public static native String baseGreeting(String name);
+        //     public static native String baseGreeting(String[] name);
+        //     public static native String baseGreeting(Object name);
+        // }
+        // ```
+        //
+        // The above java functions would map to the following C function signatures
+        //
+        // jstring Java_test_JavaCanCallRustJavaFunction_baseGreeting_f__ILjava_lang_String_2(jstring name) { ... }
+        // jstring Java_test_JavaCanCallRustJavaFunction_baseGreeting_f__ILjava_lang_Object_2(jstring name) { ... }
+        // jstring Java_test_JavaCanCallRustJavaFunction_baseGreeting_f__I_3java_lang_String_2(jstring name) { ... }
         let class_name = self.selector.class_name();
-        let (package, class) = class_name.split();
-        let method_name = self.selector.method_name();
+        let class = class_name.to_jni_class_name();
+        let package = class_name.to_jni_package();
+        let method_name = self.selector.method_name().replace("_", "_1");
         let symbol_name: String = once("Java")
-            .chain(package.iter().map(|id| &id[..]))
+            .chain(once(&package[..]))
             .chain(once(&class[..]))
             .chain(once(&method_name[..]))
             .collect::<Vec<_>>()
