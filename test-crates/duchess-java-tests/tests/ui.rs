@@ -2,14 +2,16 @@ use diagnostics::Diagnostics;
 use std::path::Path;
 use ui_test::*;
 
-fn run_rust_tests(text: status_emitter::Text) -> color_eyre::eyre::Result<()> {
-    std::env::set_var("CLASSPATH", "../target/java");
-
+fn run_rust_tests(
+    test_group_name: &str,
+    test_path: &Path,
+    per_file_file_config: impl Fn(&mut Config, &Path, &[u8]) + Sync,
+) -> color_eyre::eyre::Result<()> {
     // Tests can be blessed with `DUCHESS_BLESS=1``
     let bless = std::env::var("DUCHESS_BLESS").is_ok();
 
     let mut config = Config {
-        ..Config::rustc(Path::new("tests").join("ui"))
+        ..Config::rustc(test_path)
     };
 
     if std::env::var("RUSTFLAGS")
@@ -28,9 +30,7 @@ fn run_rust_tests(text: status_emitter::Text) -> color_eyre::eyre::Result<()> {
         config.output_conflict_handling = OutputConflictHandling::Ignore;
     }
 
-    // Place the build artifacts in the `../target/ui` directory instead of in the
-    // crate root.
-    config.out_dir = Path::new("..").join("target").join("ui");
+    config.out_dir = Path::new("..").join("target");
 
     // Make sure we can depend on duchess itself in our tests
     config
@@ -59,40 +59,43 @@ fn run_rust_tests(text: status_emitter::Text) -> color_eyre::eyre::Result<()> {
                     .unwrap_or(true),
             )
         },
-        default_per_file_config,
+        per_file_file_config,
         (
-            text,
+            status_emitter::Text::from(args.format),
             ui_test::status_emitter::Gha::<true> {
-                name: "ui tests".into(),
+                name: test_group_name.to_string(),
             },
         ),
     )
 }
 
-fn run_java_tests(text: status_emitter::Text) -> color_eyre::eyre::Result<()> {
+fn run_java_tests(test_group_name: &str) -> color_eyre::eyre::Result<()> {
     let test_name = std::env::var_os("TESTNAME");
 
     let mut java = CommandBuilder::cmd("../target/debug/java_wrapper");
     java.envs = vec![
         (
             "LD_LIBRARY_PATH".into(),
-            Some("../target/ui/tests/ui/".into()),
+            Some("../target/tests/java-to-rust/rust-libraries".into()),
         ),
-        ("CLASSPATH".into(), Some("../target/tests/java_ui".into())),
+        (
+            "CLASSPATH".into(),
+            Some("../target/tests/java-to-rust/java".into()),
+        ),
     ];
-    java.args = vec!["-Djava.library.path=../target/ui/tests/ui/".into()];
+    java.args = vec!["-Djava.library.path=../target/tests/java-to-rust/rust-libraries".into()];
 
     let java_config = Config {
         host: Some("host".to_string()),
         target: None,
-        root_dir: Path::new("tests").join("java_ui"),
+        root_dir: Path::new("tests").join("java-to-rust/java"),
         program: java,
         output_conflict_handling: OutputConflictHandling::Ignore,
         bless_command: None,
         out_dir: std::env::var_os("CARGO_TARGET_DIR")
             .map(std::path::PathBuf::from)
             .unwrap_or_else(|| std::env::current_dir().unwrap().join("target"))
-            .join("java_ui"),
+            .join("tests/java-to-rust/java"),
         skip_files: Vec::new(),
         filter_files: Vec::new(),
         threads: None,
@@ -127,21 +130,40 @@ fn run_java_tests(text: status_emitter::Text) -> color_eyre::eyre::Result<()> {
         },
         |_c: &mut Config, _p: &Path, _f: &[u8]| {},
         (
-            text,
+            status_emitter::Text::from(Args::test()?.format),
             ui_test::status_emitter::Gha::<true> {
-                name: "java ui tests".into(),
+                name: test_group_name.to_string(),
             },
         ),
     )
 }
 
 fn main() -> color_eyre::eyre::Result<()> {
-    let args = Args::test()?;
+    std::env::set_var("CLASSPATH", "../target/java");
+    run_rust_tests(
+        "rust ui tests",
+        &Path::new("tests").join("rust-to-java"),
+        default_per_file_config,
+    )?;
 
-    run_rust_tests(status_emitter::Text::from(args.format))?;
+    // rust classes in rust-to-java/rust-libraries are rust files that
+    // are compiled into shared object libraries which are loaded by java tests
+    let library_per_file_config =
+        |config: &mut Config, _path: &Path, _file_contents: &[u8]| -> () {
+            config.program.args.push("--crate-type=cdylib".into());
+            config.program.envs.push((
+                "CLASSPATH".into(),
+                Some("../target/tests/java-to-rust/java".into()),
+            ));
+        };
 
-    // java tests must run after rust tests
-    // the java tests assume the rust tests will compile
-    // any shared libraries needed for the java tests
-    run_java_tests(status_emitter::Text::from(args.format))
+    std::env::set_var("CLASSPATH", "../target/rust-to-java/java");
+    run_rust_tests(
+        "compile rust libraries for java tests",
+        &Path::new("tests").join("java-to-rust/rust-libraries"),
+        library_per_file_config,
+    )?;
+
+    // run java tests that depend on the above libraries
+    run_java_tests("java ui tests")
 }

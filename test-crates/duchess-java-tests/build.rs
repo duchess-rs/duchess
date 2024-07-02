@@ -10,11 +10,11 @@ const TARGET_PATH: &str = "../target";
 
 fn main() -> std::io::Result<()> {
     // Rerun java build if any source file changes, but then we'll check each file individually below
-    let java_source_paths = vec!["java", "tests/java_ui"];
+    let java_source_paths = vec!["java", "tests/java-to-rust/java"];
     for source_path in java_source_paths.iter() {
         println!("cargo:rerun-if-changed={}", source_path);
     }
-    println!("cargo:rustc-env=CLASSPATH=target/java:target/tests/java_ui");
+    println!("cargo:rustc-env=CLASSPATH=target/java:target/tests/java-to-rust/java");
 
     let target_dir = Path::new(TARGET_PATH);
 

@@ -1,6 +1,4 @@
-//@compile-flags: --crate-type cdylib
 //@check-pass
-//@rustc-env: CLASSPATH=../target/tests/java_ui
 
 use duchess::prelude::*;
 

@@ -20,7 +20,7 @@ fn main() {
     let path_to_java_file = args.pop().unwrap();
 
     let path_converted_to_package_fmt = Path::new(&path_to_java_file)
-        .strip_prefix("tests/java_ui")
+        .strip_prefix("tests/java-to-rust/java")
         .unwrap()
         .with_extension("")
         .iter()

@@ -212,7 +212,7 @@ impl Driver<'_> {
         // jstring Java_test_JavaCanCallRustJavaFunction_baseGreeting_f__I_3java_lang_String_2(jstring name) { ... }
         let class_name = self.selector.class_name();
         let class = class_name.to_jni_class_name();
-        let package = class_name.to_jni_packge();
+        let package = class_name.to_jni_package();
         let method_name = self.selector.method_name().replace("_", "_1");
         let symbol_name: String = once("Java")
             .chain(once(&package[..]))
