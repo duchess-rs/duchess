@@ -14,11 +14,12 @@ impl RootMap {
             ci.check(self, reflector, &mut |e| errors.push(e))?;
         }
 
-        // FIXME: support multiple errors
-        if let Some(e) = errors.pop() {
-            Err(e)
-        } else {
-            Ok(())
+        match errors.into_iter().reduce(|mut error, next| {
+            error.combine(next);
+            error
+        }) {
+            Some(e) => Err(e),
+            None => Ok(()),
         }
     }
 }
