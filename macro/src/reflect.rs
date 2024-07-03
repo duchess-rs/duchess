@@ -74,7 +74,16 @@ impl JavaPackage {
                 ClassDecl::Reflected(c) => {
                     let dot_id = self.make_absolute_dot_id(c.span, &c.name)?;
                     let info = reflector.reflect(&dot_id, c.span)?;
-                    (dot_id, info.clone())
+
+                    // We copy over the span and kind for proper error specification and error checking
+                    (
+                        dot_id,
+                        Arc::new(ClassInfo {
+                            span: c.span,
+                            kind: c.kind,
+                            ..(*info).clone()
+                        }),
+                    )
                 }
                 ClassDecl::Specified(c) => {
                     let dot_id = self.make_absolute_dot_id(c.span, &c.name)?;

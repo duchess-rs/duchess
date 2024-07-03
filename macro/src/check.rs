@@ -14,11 +14,12 @@ impl RootMap {
             ci.check(self, reflector, &mut |e| errors.push(e))?;
         }
 
-        // FIXME: support multiple errors
-        if let Some(e) = errors.pop() {
-            Err(e)
-        } else {
-            Ok(())
+        match errors.into_iter().reduce(|mut error, next| {
+            error.combine(next);
+            error
+        }) {
+            Some(e) => Err(e),
+            None => Ok(()),
         }
     }
 }
@@ -38,6 +39,14 @@ impl ClassInfo {
                 format!("error in class `{}`: {m}", self.name),
             ));
         };
+
+        if self.kind != info.kind {
+            push_error_message(format!(
+                "class `{}` should be type `{}`",
+                self.name,
+                format!("{:?}", info.kind).to_lowercase()
+            ));
+        }
 
         // We always allow people to elide generics, in which case
         // they are mirroring the "erased" version of the class.
