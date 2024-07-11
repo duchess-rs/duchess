@@ -9,6 +9,12 @@ You can run both of these with `just test` (see [just](https://github.com/casey/
 
 The [UI tests](test-crates) are currently tested against Rust 1.79.0
 
+To run a single test set the TESTNAME environment variable. For example:
+
+```
+TESTNAME=log_global_ref_and_chained_calls just test
+```
+
 ### Debugging
 Duchess looks for the `DUCHESS_DEBUG` environment variable during proc-macro expansion. When this variable is set, if it is `true` or `1`, **all** generated code will be formatted and dumped to a directory. Clickable links are printed to stderr:
 
