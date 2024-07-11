@@ -1,10 +1,12 @@
 use diagnostics::Diagnostics;
+use std::ffi::OsString;
 use std::path::Path;
 use ui_test::*;
 
 fn run_rust_tests(
     test_group_name: &str,
     test_path: &Path,
+    test_name_filter: Option<&OsString>,
     per_file_file_config: impl Fn(&mut Config, &Path, &[u8]) + Sync,
 ) -> color_eyre::eyre::Result<()> {
     // Tests can be blessed with `DUCHESS_BLESS=1``
@@ -38,8 +40,6 @@ fn run_rust_tests(
         .base()
         .set_custom("dependencies", dependencies::DependencyBuilder::default());
 
-    let test_name = std::env::var_os("TESTNAME");
-
     config.with_args(&args);
 
     run_tests_generic(
@@ -47,8 +47,7 @@ fn run_rust_tests(
         move |path, _| {
             path.extension().filter(|ext| *ext == "rs")?;
             Some(
-                test_name
-                    .as_ref()
+                test_name_filter
                     .and_then(|name| {
                         Some(path.components().any(|c| {
                             c.as_os_str()
@@ -69,9 +68,10 @@ fn run_rust_tests(
     )
 }
 
-fn run_java_tests(test_group_name: &str) -> color_eyre::eyre::Result<()> {
-    let test_name = std::env::var_os("TESTNAME");
-
+fn run_java_tests(
+    test_group_name: &str,
+    test_name_filter: Option<&OsString>,
+) -> color_eyre::eyre::Result<()> {
     let mut java = CommandBuilder::cmd("../target/debug/java_wrapper");
     java.envs = vec![
         (
@@ -116,8 +116,7 @@ fn run_java_tests(test_group_name: &str) -> color_eyre::eyre::Result<()> {
         move |path, _| {
             path.extension().filter(|ext| *ext == "java")?;
             Some(
-                test_name
-                    .as_ref()
+                test_name_filter
                     .and_then(|name| {
                         Some(path.components().any(|c| {
                             c.as_os_str()
@@ -138,16 +137,24 @@ fn run_java_tests(test_group_name: &str) -> color_eyre::eyre::Result<()> {
     )
 }
 
-fn main() -> color_eyre::eyre::Result<()> {
+/// Tests that begin with Rust calling into a JVM that Rust created.
+fn rust_to_java_tests(test_name_filter: Option<&OsString>) -> color_eyre::eyre::Result<()> {
     std::env::set_var("CLASSPATH", "../target/java");
+
     run_rust_tests(
         "rust ui tests",
         &Path::new("tests").join("rust-to-java"),
+        test_name_filter,
         default_per_file_config,
     )?;
 
-    // rust classes in rust-to-java/rust-libraries are rust files that
-    // are compiled into shared object libraries which are loaded by java tests
+    Ok(())
+}
+
+/// Tests that begin with Java calling into Rust loaded from a shared object by the JVM.
+fn java_to_rust_tests(test_name_filter: Option<&OsString>) -> color_eyre::eyre::Result<()> {
+    // Build `.rs` files in `rust-to-java/rust-libraries` into shared object libraries
+    // that can be loaded by java tests.
     let library_per_file_config =
         |config: &mut Config, _path: &Path, _file_contents: &[u8]| -> () {
             config.program.args.push("--crate-type=cdylib".into());
@@ -156,14 +163,23 @@ fn main() -> color_eyre::eyre::Result<()> {
                 Some("../target/tests/java-to-rust/java".into()),
             ));
         };
-
     std::env::set_var("CLASSPATH", "../target/rust-to-java/java");
     run_rust_tests(
         "compile rust libraries for java tests",
         &Path::new("tests").join("java-to-rust/rust-libraries"),
+        None, // compile all the libraries; we don't know which ones will be used
         library_per_file_config,
     )?;
 
-    // run java tests that depend on the above libraries
-    run_java_tests("java ui tests")
+    // Run java tests that depend on the above libraries
+    run_java_tests("java ui tests", test_name_filter)?;
+
+    Ok(())
+}
+
+fn main() -> color_eyre::eyre::Result<()> {
+    let test_name = std::env::var_os("TESTNAME");
+    rust_to_java_tests(test_name.as_ref())?;
+    java_to_rust_tests(test_name.as_ref())?;
+    Ok(())
 }
