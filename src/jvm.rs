@@ -141,20 +141,17 @@ fn throw_java_runtime_exception(env: EnvPtr<'_>, message: &str) {
     let runtime_exception_clazz = crate::java::lang::RuntimeException::class(&mut jvm)
         .expect("java/lang/RuntimeException not found");
 
+    let runtime_exception_clazz_ptr = runtime_exception_clazz.as_raw().as_ptr();
+
     let encoded = cesu8::to_java_cesu8(message);
     // SAFETY: cesu8 encodes interior nul bytes as 0xC080
     let c_string = unsafe { CString::from_vec_unchecked(encoded.into_owned()) };
+    let c_string_ptr = c_string.as_ptr();
 
     unsafe {
         env.invoke_unchecked(
             |env| env.ThrowNew,
-            |jni, f| {
-                f(
-                    jni,
-                    runtime_exception_clazz.as_raw().as_ptr(),
-                    c_string.as_ptr(),
-                )
-            },
+            |jni, f| f(jni, runtime_exception_clazz_ptr, c_string_ptr),
         );
     };
 }
@@ -169,23 +166,19 @@ fn error_to_java_exception(env: EnvPtr<'_>, error: Error<Local<Throwable>>) {
         Error::JvmInternal(s) => {
             throw_java_runtime_exception(env, &s);
         }
-        Error::NullDeref => unsafe {
-            env.invoke_unchecked(
-                |env| env.ThrowNew,
-                |jni, f| {
-                    let mut jvm = Jvm(env);
-                    let npe_clazz = crate::java::lang::NullPointerException::class(&mut jvm);
-                    f(
-                        jni,
-                        npe_clazz
-                            .expect("java/lang/NullPointerException not found")
-                            .as_raw()
-                            .as_ptr(),
-                        std::ptr::null(),
-                    )
-                },
-            );
-        },
+        Error::NullDeref => {
+            let mut jvm = Jvm(env);
+            let npe_clazz = crate::java::lang::NullPointerException::class(&mut jvm)
+                .expect("java/lang/NullPointerException not found");
+            let npe_clazz_ptr = npe_clazz.as_raw().as_ptr();
+
+            unsafe {
+                env.invoke_unchecked(
+                    |env| env.ThrowNew,
+                    |jni, f| f(jni, npe_clazz_ptr, std::ptr::null()),
+                );
+            }
+        }
         e => {
             throw_java_runtime_exception(env, &format!("{}", e));
         }
