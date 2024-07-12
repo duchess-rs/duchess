@@ -6,6 +6,7 @@ public class JavaRustExceptions {
     native String raiseNPE();
     native String raiseSliceTooLong();
     native String raiseJvmInternal();
+    native String panic();
 
     public static void expectNPE(JavaRustExceptions test) {
         try {
@@ -23,7 +24,6 @@ public class JavaRustExceptions {
             test.raiseSliceTooLong();
         } catch (RuntimeException e) {
             message = e.getMessage();
-            return;
         }
 
         if (!message.contains("slice was too long")) {
@@ -37,10 +37,22 @@ public class JavaRustExceptions {
             test.raiseJvmInternal();
         } catch (RuntimeException e) {
             message = e.getMessage();
-            return;
         }
 
-        if (message != "JvmInternal") {
+        if (!message.equals("JvmInternal")) {
+            throw new RuntimeException("Caught no exception or the wrong exception: " + message);
+        }
+    }
+
+    public static void expectPanicIsRuntimeException(JavaRustExceptions test) {
+        String message = "no exception thrown";
+        try {
+            test.panic();
+        } catch (RuntimeException e) {
+            message = e.getMessage();
+        }
+
+        if (!message.equals("RUST PANIC!")) {
             throw new RuntimeException("Caught no exception or the wrong exception: " + message);
         }
     }
@@ -52,6 +64,7 @@ public class JavaRustExceptions {
         expectNPE(test);
         expectSliceTooLong(test);
         expectJvmInternal(test);
+        expectPanicIsRuntimeException(test);
     }
 
 }

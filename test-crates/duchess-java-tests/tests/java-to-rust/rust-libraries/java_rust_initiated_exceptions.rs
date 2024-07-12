@@ -28,3 +28,10 @@ fn raiseJvmInternal(
 ) -> duchess::Result<Java<java::lang::String>> {
     Err(duchess::Error::JvmInternal("JvmInternal".to_string()))
 }
+
+#[duchess::java_function(java_rust_initiated_exceptions.JavaRustExceptions::panic)]
+fn panic(
+    this: &java_rust_initiated_exceptions::JavaRustExceptions,
+) -> duchess::Result<Java<java::lang::String>> {
+    panic!("RUST PANIC!");
+}

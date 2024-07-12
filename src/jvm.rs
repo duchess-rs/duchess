@@ -156,7 +156,7 @@ fn throw_java_runtime_exception(env: EnvPtr<'_>, message: &str) {
     };
 }
 
-fn error_to_java_exception(env: EnvPtr<'_>, error: Error<Local<'_ Throwable>>) {
+fn error_to_java_exception(env: EnvPtr<'_>, error: Error<Local<'_, Throwable>>) {
     // SAFETY: invoke_unchecked is used here to raise an exception. The exception is not
     // cleared to force the caller to handle the exception
     let _ = match error {
