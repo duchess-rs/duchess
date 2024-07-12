@@ -152,6 +152,19 @@ The [JNI manual documents](https://docs.oracle.com/javase/8/docs/technotes/guide
     * invokes [`GetStringLength`](https://docs.oracle.com/javase/8/docs/technotes/guides/jni/spec/functions.html#GetStringLength) — infallible
     * invokes [`GetStringUTFLength`](https://docs.oracle.com/javase/8/docs/technotes/guides/jni/spec/functions.html#GetStringUTFLength) — infallible
     * invokes [`GetStringUTFRegion`](https://docs.oracle.com/javase/8/docs/technotes/guides/jni/spec/functions.html#GetStringUTFRegion) with known-valid bounds
+* `jvm.rs`
+    * invokes [`Throw`](https://docs.oracle.com/javase/8/docs/technotes/guides/jni/spec/functions.html#Throw) - Raises an exception for the caller to handle
+    * invokes [`ThrowNew`](https://docs.oracle.com/javase/8/docs/technotes/guides/jni/spec/functions.html#ThrowNew) - Raises an exception for the caller to handle
+
+### Usage of Throw and ThrowNew
+
+> The native method can choose to return immediately, causing the exception to be thrown in the Java code that initiated the native method call.
+
+[Citation.](https://docs.oracle.com/en/java/javase/17/docs/specs/jni/design.html#exception-handling)
+
+**Outcome of nonadherence:** Undefined behavior.
+
+**How Duchess avoids this:** Throw and ThrowNew are invoked from the `java_function` macro as part of `native_function_returning_object` and `native_function_returning_scalar`. After duchess raises the exception, no more JNI calls are made and null or 0 is returned forcing the Java caller to handle the exception.
 
 ### Clear exceptions before invoking other JNI calls
 
