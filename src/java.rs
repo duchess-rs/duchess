@@ -54,6 +54,10 @@ mod auto {
             public java.lang.RuntimeException();
         }
 
+        public class java.lang.NullPointerException extends java.lang.RuntimeException {
+            public java.lang.NullPointerException();
+        }
+
         // NB: In Java, this is `Class<T>`, but we model it as the erased version
         // `Class`. This is beacuse there are a lot of methods, including some that we would
         // like to model such as `arrayType()`, that return a `Class<?>`, and we cannot model

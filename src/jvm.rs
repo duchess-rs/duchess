@@ -15,7 +15,7 @@ use crate::{
 use std::{
     any::Any,
     collections::HashMap,
-    ffi::{c_char, c_void, CStr},
+    ffi::{c_char, c_void, CStr, CString},
     fmt::Display,
     panic::AssertUnwindSafe,
 };
@@ -135,6 +135,56 @@ fn get_or_default_init_jvm() -> crate::Result<JvmPtr> {
     }
 }
 
+fn throw_java_runtime_exception(env: EnvPtr<'_>, message: &str) {
+    let mut jvm = Jvm(env);
+
+    let runtime_exception_clazz = crate::java::lang::RuntimeException::class(&mut jvm)
+        .expect("java/lang/RuntimeException not found");
+
+    let runtime_exception_clazz_ptr = runtime_exception_clazz.as_raw().as_ptr();
+
+    let encoded = cesu8::to_java_cesu8(message);
+    // SAFETY: cesu8 encodes interior nul bytes as 0xC080
+    let c_string = unsafe { CString::from_vec_unchecked(encoded.into_owned()) };
+    let c_string_ptr = c_string.as_ptr();
+
+    unsafe {
+        env.invoke_unchecked(
+            |env| env.ThrowNew,
+            |jni, f| f(jni, runtime_exception_clazz_ptr, c_string_ptr),
+        );
+    };
+}
+
+fn error_to_java_exception(env: EnvPtr<'_>, error: Error<Local<'_, Throwable>>) {
+    // SAFETY: invoke_unchecked is used here to raise an exception. The exception is not
+    // cleared to force the caller to handle the exception
+    let _ = match error {
+        Error::Thrown(t) => unsafe {
+            env.invoke_unchecked(|env| env.Throw, |env, f| f(env, t.as_raw().as_ptr()));
+        },
+        Error::JvmInternal(s) => {
+            throw_java_runtime_exception(env, &s);
+        }
+        Error::NullDeref => {
+            let mut jvm = Jvm(env);
+            let npe_clazz = crate::java::lang::NullPointerException::class(&mut jvm)
+                .expect("java/lang/NullPointerException not found");
+            let npe_clazz_ptr = npe_clazz.as_raw().as_ptr();
+
+            unsafe {
+                env.invoke_unchecked(
+                    |env| env.ThrowNew,
+                    |jni, f| f(jni, npe_clazz_ptr, std::ptr::null()),
+                );
+            }
+        }
+        e => {
+            throw_java_runtime_exception(env, &format!("{}", e));
+        }
+    };
+}
+
 /// Invoked as the body from a JNI native function when it is called by the JVM.
 /// Initializes the environment and invokes `op`. Converts the result into a java
 /// object and returns it. Caller should then return this to the JVM.
@@ -161,12 +211,15 @@ where
             match obj {
                 Ok(Some(p)) => p.into_raw().as_ptr(),
                 Ok(None) => std::ptr::null_mut(),
-                Err(e) => todo!("convert from exception `{e:?}` into java exception"),
+                Err(e) => {
+                    error_to_java_exception(env, e);
+                    std::ptr::null_mut()
+                }
             }
         }
 
         Err(e) => {
-            rust_panic_to_java_exception(e);
+            let panic_as_err = rust_panic_to_java_exception(env, e);
             std::ptr::null_mut()
         }
     };
@@ -193,7 +246,7 @@ where
     let result = match std::panic::catch_unwind(AssertUnwindSafe(|| op())) {
         Ok(result) => result,
         Err(e) => {
-            rust_panic_to_java_exception(e);
+            rust_panic_to_java_exception(env, e);
             R::default()
         }
     };
@@ -221,8 +274,17 @@ unsafe fn init_jvm_from_native_function(env: EnvPtr<'_>) -> Jvm<'_> {
     Jvm(env)
 }
 
-fn rust_panic_to_java_exception(_panic: Box<dyn Any + Send + 'static>) {
-    todo!("rust_panic_to_java_exception")
+fn rust_panic_to_java_exception(env: EnvPtr<'_>, panic: Box<dyn Any + Send + 'static>) {
+    // The documentation suggests that it will *usually* be a str or String.
+    let message = if let Some(s) = panic.downcast_ref::<&'static str>() {
+        (*s).to_string()
+    } else if let Some(s) = panic.downcast_ref::<String>() {
+        s.clone()
+    } else {
+        "Unknown panic!".to_string()
+    };
+
+    throw_java_runtime_exception(env, &message);
 }
 
 /// Get the global [`JvmPtr`] assuming that the JVM has already been initialized. Expected to be used with values
