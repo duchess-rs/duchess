@@ -1,3 +1,5 @@
+#![allow(dead_code)] // FIXME -- change to `#[expect]` once stabilized, the lalrpop code generates some unused code
+
 use std::fmt::Display;
 
 use lalrpop_util::{lalrpop_mod, lexer::Token};

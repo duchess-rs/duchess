@@ -124,6 +124,7 @@ impl Parse for ClassDecl {
 #[derive(Clone, Debug)]
 pub struct ReflectedClassInfo {
     pub span: Span,
+    #[allow(dead_code)] // FIXME: replace with `#[expect]` once that stabilizes
     pub flags: Flags,
     pub name: DotId,
     pub kind: ClassKind,
@@ -132,6 +133,7 @@ pub struct ReflectedClassInfo {
 #[derive(Clone, Debug)]
 pub struct ClassInfo {
     pub span: Span,
+    #[allow(dead_code)] // FIXME: replace with `#[expect]` once that stabilizes
     pub flags: Flags,
     pub name: DotId,
     pub kind: ClassKind,
