@@ -1,29 +1,23 @@
 [package]
-name = "duchess-macro"
-version.workspace = true
+name = "duchess-reflect"
 edition = "2021"
+version.workspace = true
 license.workspace = true
 repository.workspace = true
-readme = "README.md"
+homepage.workspace = true
+documentation.workspace = true
 description = "Internal component of duchess crate"
-
-[lib]
-proc-macro = true
 
 [dependencies]
 anyhow = "1.0.70"
 lalrpop-util = { version = "0.19.9", features = ["lexer"] }
-litrs = "0.4.0"
 lazy_static = "1.4.0"
 proc-macro2 = "1.0.56"
 quote = "1.0.26"
-regex = "1"
+rust-format = { version = "0.3.4", features = ["token_stream"] }
 str_inflector = "0.12.0"
-once_cell = "1.17.1"
-synstructure = "0.13.0"
 syn = "2.0.15"
-derive-where = "1.2.1"
-duchess-reflect = { version = "0.3.0", path = "../duchess-reflect" }
+tempfile = "3.8.1"
 
 [build-dependencies]
 lalrpop = "0.19.9"
