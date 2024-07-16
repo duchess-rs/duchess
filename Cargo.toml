@@ -32,3 +32,7 @@ derive-where = "1.2.1"
 [features]
 default = ["dylibjvm"]
 dylibjvm = ["java-locator", "libloading"]
+jni_at_most_1_6 = []
+jni_at_most_1_8 = []
+jni_at_least_1_6 = []
+jni_at_least_1_8 = []

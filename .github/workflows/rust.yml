@@ -34,8 +34,10 @@ jobs:
       run: curl -sSL https://github.com/rust-lang/mdBook/releases/download/v0.4.28/mdbook-v0.4.28-x86_64-unknown-linux-gnu.tar.gz | tar -xz
     - name: Build
       run: cargo build --verbose
-    - name: Test crates
-      run: cargo test --all-targets --verbose
+    - name: Test crates, JNI 1.8
+      run: cargo test --all-targets --verbose --features jni_at_least_1_8,jni_at_most_1_8
+    - name: Test crates, JNI 1.6
+      run: cargo test --all-targets --verbose --features jni_at_least_1_6,jni_at_most_1_6
     - name: Test client crates
       run: cargo test --all-targets --verbose --manifest-path=test-crates/Cargo.toml
     - name: Test book

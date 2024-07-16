@@ -15,7 +15,43 @@ use jni_sys::jvalue;
 
 use crate::{jvm::JavaObjectExt, plumbing::ToJavaScalar, Error, JavaObject, Jvm, Local};
 
+// Set the JNI version based on features or platform
+// If we don't build for android, the default is JNI 1.8
+// If we do build for android, the default is JNI 1.6
+// Otherwise, we use JNI 1.8 unless we specify directly
+// to use JNI 1.6 at most. This is intended to be used to
+// make sure we test correctly and can add new JNI versions
+// in the future.
+#[cfg(any(
+    all(
+        not(any(
+            feature = "jni_at_most_1_6",
+            feature = "jni_at_least_1_6",
+            feature = "jni_at_most_1_8",
+            feature = "jni_at_least_1_8"
+        )),
+        not(target_os = "android")
+    ),
+    all(
+        any(feature = "jni_at_least_1_6", feature = "jni_at_least_1_8"),
+        not(feature = "jni_at_most_1_6")
+    ),
+    all(feature = "jni_at_most_1_8")
+))]
 const VERSION: jni_sys::jint = jni_sys::JNI_VERSION_1_8;
+#[cfg(any(
+    all(
+        not(any(
+            feature = "jni_at_most_1_6",
+            feature = "jni_at_least_1_6",
+            feature = "jni_at_most_1_8",
+            feature = "jni_at_least_1_8"
+        )),
+        target_os = "android"
+    ),
+    all(feature = "jni_at_most_1_6", not(feature = "jni_at_least_1_8"))
+))]
+const VERSION: jni_sys::jint = jni_sys::JNI_VERSION_1_6;
 
 /// Get a [`JvmPtr`] to an already initialized JVM (if one exists).
 ///
