@@ -125,7 +125,6 @@ pub trait JvmOp: Clone {
 /// adding a where-clause to that effect did not seem to work in all cases, so we define
 /// a distinct associated type.
 pub trait JvmRefOp<T: JavaObject>: Clone {
-    // nikomatsakis:
     type Output<'jvm>: AsJRef<T>;
 
     fn into_as_jref<'jvm>(
