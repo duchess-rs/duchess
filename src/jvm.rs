@@ -34,7 +34,7 @@ mod test;
 /// over into the JVM, so the more you can chain together your jvm-ops,
 /// the better.
 #[must_use = "JvmOps do nothing unless you call `.execute()"]
-pub trait JvmOp: Copy {
+pub trait JvmOp: Clone {
     type Output<'jvm>;
 
     fn assert_not_null<T>(self) -> NotNull<Self>
@@ -116,10 +116,48 @@ pub trait JvmOp: Copy {
     fn do_jni<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, Self::Output<'jvm>>;
 }
 
-/// This trait is only implemented for `()`; it allows the `JvmOp::execute` method to only
-/// be used for `()`.
-pub trait IsVoid: Default {}
-impl IsVoid for () {}
+/// A (pseudo) alias for a`JvmOp` that provides "something converted to a Java `T`".
+/// Don't implement this yourself, just implement `JvmOp`.
+///
+/// # Implementation note
+///
+/// Ideally this would be a "trait alias" for `JvmOp<Output<'_>: JvmRefOp<T>>`, but
+/// adding a where-clause to that effect did not seem to work in all cases, so we define
+/// a distinct associated type.
+pub trait JvmRefOp<T: JavaObject>: Clone {
+    type Output<'jvm>: AsJRef<T>;
+
+    fn into_as_jref<'jvm>(
+        self,
+        jvm: &mut Jvm<'jvm>,
+    ) -> crate::LocalResult<'jvm, Self::Output<'jvm>>;
+}
+
+impl<J, T> JvmRefOp<T> for J
+where
+    T: JavaObject,
+    J: JvmOp,
+    for<'jvm> <J as JvmOp>::Output<'jvm>: AsJRef<T>,
+{
+    type Output<'jvm> = <J as JvmOp>::Output<'jvm>;
+
+    fn into_as_jref<'jvm>(
+        self,
+        jvm: &mut Jvm<'jvm>,
+    ) -> crate::LocalResult<'jvm, <Self as JvmRefOp<T>>::Output<'jvm>> {
+        JvmOp::do_jni(self, jvm)
+    }
+}
+
+/// A [`JvmOp`] that produces a scalar value, like `i8` or `i32`.
+pub trait JvmScalarOp<T: JavaScalar>: for<'jvm> JvmOp<Output<'jvm> = T> {}
+
+impl<J, T> JvmScalarOp<T> for J
+where
+    T: JavaScalar,
+    J: for<'jvm> JvmOp<Output<'jvm> = T>,
+{
+}
 
 static GLOBAL_JVM: OnceCell<JvmPtr> = OnceCell::new();
 
@@ -219,7 +257,7 @@ where
         }
 
         Err(e) => {
-            let panic_as_err = rust_panic_to_java_exception(env, e);
+            let () = rust_panic_to_java_exception(env, e);
             std::ptr::null_mut()
         }
     };
@@ -610,17 +648,4 @@ scalar! {
     i64:  b"[J\0",
     f32:  b"[F\0",
     f64:  b"[D\0",
-}
-
-pub trait CloneIn<'jvm> {
-    fn clone_in(&self, jvm: &mut Jvm<'jvm>) -> Self;
-}
-
-impl<T> CloneIn<'_> for T
-where
-    T: Clone,
-{
-    fn clone_in(&self, _jvm: &mut Jvm<'_>) -> Self {
-        self.clone()
-    }
 }

@@ -1,7 +1,8 @@
 use crate::jvm::JavaScalar;
 use crate::jvm::Jvm;
 use crate::jvm::JvmOp;
-use crate::AsJRef;
+use crate::jvm::JvmRefOp;
+use crate::jvm::JvmScalarOp;
 use crate::Java;
 use crate::JavaObject;
 use crate::Local;
@@ -45,37 +46,52 @@ identity_jvm_op! {
     [] Null,
 }
 
-/// Types that are able to be used as a Java `T`, either because they will produce a Java `T` (e.g. [`JvmOp`]s that
-/// produce a `T`) or because we can convert into them via a JNI call.
+/// Value that can be given as argument to a Java method expecting a value of type `T`.
 ///
-/// **Don't implement this directly.** Instead, implement `JvmOp`. This trait is intended
-/// to be used as a shorthand trait alias in Duchess fn definitions, like
+/// Typically this is a [`JvmOp`][] that produces a `T` value, but it can also be a
+/// Rust value that will be wrapped or given to Java somehow.
 ///
-/// ```ignore
-/// fn my_java_call(a: impl IntoJava<JavaString>, b: impl IntoJava<JavaArray<i8>>) -> impl JvmOp {
-///    // ...
-/// }
-///
-/// let a = some_java_op_that_produces_a_string();
-/// let b = [1, 2, 3].as_slice();
-/// my_java_call(a, b).execute(&jvm)?;
-/// ```
-pub trait IntoJava<T: JavaObject>: Copy {
-    type Output<'jvm>: AsJRef<T>;
+/// This trait's only method (`into_op`) occurs without any JVM in scope,
+/// so it is limited to doing Rust operations.
+/// If you need to perform JNI operations, implement [`JvmOp`][] for your type
+/// (which will in turn mean that this trait is implemented).
+pub trait IntoJava<T: JavaObject> {
+    type JvmOp: JvmRefOp<T>;
 
-    fn into_java<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, Self::Output<'jvm>>;
+    fn into_op(self) -> Self::JvmOp;
 }
 
 impl<J, T> IntoJava<T> for J
 where
     T: JavaObject,
-    for<'jvm> J: JvmOp,
-    for<'jvm> J::Output<'jvm>: AsJRef<T>,
+    J: JvmRefOp<T>,
 {
-    type Output<'jvm> = <J as JvmOp>::Output<'jvm>;
+    type JvmOp = J;
 
-    fn into_java<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, Self::Output<'jvm>> {
-        self.do_jni(jvm)
+    fn into_op(self) -> Self::JvmOp {
+        self
+    }
+}
+
+/// Value that can be given as argument to a Java method expecting a scalar value of type `T` (e.g., `i8`).
+///
+/// Typically this is a [`JvmOp`][] that produces a `T` value, but it can also be a
+/// Rust value that will be wrapped or given to Java somehow. See [`IntoJava`][] for more details.
+pub trait IntoScalar<T: JavaScalar> {
+    type JvmOp: JvmScalarOp<T>;
+
+    fn into_op(self) -> Self::JvmOp;
+}
+
+impl<J, T> IntoScalar<T> for J
+where
+    T: JavaScalar,
+    J: JvmScalarOp<T>,
+{
+    type JvmOp = J;
+
+    fn into_op(self) -> Self::JvmOp {
+        self
     }
 }
 
@@ -94,16 +110,6 @@ where
     T: JavaObject,
     J: for<'jvm> JvmOp<Output<'jvm> = Local<'jvm, T>>,
     J: std::ops::Deref<Target = T::OfOp<Self>>,
-{
-}
-
-/// A [`JvmOp`] that produces a scalar value, like `i8` or `i32`.
-pub trait IntoScalar<T: JavaScalar>: for<'jvm> JvmOp<Output<'jvm> = T> {}
-
-impl<J, T> IntoScalar<T> for J
-where
-    T: JavaScalar,
-    J: for<'jvm> JvmOp<Output<'jvm> = T>,
 {
 }
 

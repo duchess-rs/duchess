@@ -2,7 +2,8 @@ use std::marker::PhantomData;
 
 use crate::{cast::Upcast, java::lang::Throwable, Jvm, JvmOp, Local};
 
-#[derive_where::derive_where(Copy, Clone)]
+#[derive_where::derive_where(Clone)]
+#[derive_where(Copy; This: Copy)]
 pub struct TryCatch<This, J>
 where
     This: JvmOp,
