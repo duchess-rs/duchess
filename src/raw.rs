@@ -15,7 +15,11 @@ use jni_sys::jvalue;
 
 use crate::{jvm::JavaObjectExt, Error, JavaObject, Local};
 
+// TODO: Allow users to set the JVM version
+#[cfg(not(target_os = "android"))]
 const VERSION: jni_sys::jint = jni_sys::JNI_VERSION_1_8;
+#[cfg(target_os = "android")]
+const VERSION: jni_sys::jint = jni_sys::JNI_VERSION_1_6;
 
 /// Get a [`JvmPtr`] to an already initialized JVM (if one exists).
 ///
