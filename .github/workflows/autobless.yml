@@ -26,9 +26,9 @@ jobs:
     - name: Build
       run: cargo build --verbose
     - name: Test crates, JNI 1.8
-      run: cargo test --all-targets --verbose --features jni_at_least_1_8,jni_at_most_1_8
+      run: cargo test --all-targets --verbose --features jni_exactly_1_8
     - name: Test crates, JNI 1.6
-      run: cargo test --all-targets --verbose --features jni_at_least_1_6,jni_at_most_1_6
+      run: cargo test --all-targets --verbose --features jni_exactly_1_6
     - name: setup bot git name and email
       run: |
           git config --global user.name 'The Duchess Cronjob Bot'
