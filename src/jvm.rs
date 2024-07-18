@@ -5,7 +5,7 @@ use crate::{
     java::lang::{Class, Throwable},
     link::{IntoJavaFns, JavaFunction},
     not_null::NotNull,
-    plumbing::{FromRef, ToJavaImpl},
+    plumbing::{FromRef, ToJavaImpl, ToJavaScalar},
     raw::{self, EnvPtr, JvmPtr, ObjectPtr},
     thread,
     try_catch::TryCatch,
@@ -219,7 +219,7 @@ where
         }
 
         Err(e) => {
-            let panic_as_err = rust_panic_to_java_exception(env, e);
+            rust_panic_to_java_exception(env, e);
             std::ptr::null_mut()
         }
     };
@@ -235,19 +235,29 @@ where
 ///
 /// Must be invoked as the entire body of a JNI native function, with
 /// `env` being the `EnvPtr` argument provided.
-pub unsafe fn native_function_returning_scalar<J, R>(env: EnvPtr<'_>, op: impl FnOnce() -> R) -> R
+pub unsafe fn native_function_returning_scalar<J, R>(env: EnvPtr<'_>, op: impl FnOnce() -> R) -> J
 where
-    J: Upcast<crate::java::lang::Object> + Upcast<J>,
-    R: JavaScalar,
+    J: JavaScalar,
+    R: ToJavaScalar<J>,
 {
     init_jvm_from_native_function(env);
     let _callback_guard = thread::attach_from_jni_callback(env);
 
     let result = match std::panic::catch_unwind(AssertUnwindSafe(|| op())) {
-        Ok(result) => result,
+        Ok(result) => {
+            let mut jvm = Jvm(env);
+            let scalar_result = R::to_java_scalar(&result, &mut jvm);
+            match scalar_result {
+                Ok(s) => s,
+                Err(e) => {
+                    error_to_java_exception(env, e);
+                    J::default()
+                }
+            }
+        }
         Err(e) => {
             rust_panic_to_java_exception(env, e);
-            R::default()
+            J::default()
         }
     };
 
