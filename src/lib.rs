@@ -67,7 +67,7 @@ pub mod plumbing {
     pub use crate::link::JavaFunction;
     pub use crate::raw::{EnvPtr, FieldPtr, FromJniValue, IntoJniValue, MethodPtr, ObjectPtr};
     pub use crate::refs::NullJRef;
-    pub use crate::to_java::ToJavaImpl;
+    pub use crate::to_java::{ToJavaImpl, ToJavaScalar};
     pub use jni_sys;
     pub use once_cell;
 }

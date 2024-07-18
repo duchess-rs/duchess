@@ -402,10 +402,13 @@ impl Driver<'_> {
         let span = self.selector.span();
         match &self.method_info.return_ty {
             Some(ty) => match ty {
-                class_info::Type::Scalar(ty) => Ok((
-                    ty.to_tokens(span),
-                    quote_spanned!(span => duchess::plumbing::native_function_returning_scalar(#env_name, || #return_expr)),
-                )),
+                class_info::Type::Scalar(ty) => {
+                    let output_rust_ty = ty.to_tokens(span);
+                    Ok((
+                        output_rust_ty.clone(),
+                        quote_spanned!(span => duchess::plumbing::native_function_returning_scalar::<#output_rust_ty, _>(#env_name, || #return_expr)),
+                    ))
+                }
                 class_info::Type::Ref(_) | class_info::Type::Repeat(_) => {
                     let output_java_ty = self.convert_ty(ty)?;
                     Ok((

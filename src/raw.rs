@@ -13,7 +13,7 @@ use std::{
 
 use jni_sys::jvalue;
 
-use crate::{jvm::JavaObjectExt, Error, JavaObject, Local};
+use crate::{jvm::JavaObjectExt, plumbing::ToJavaScalar, Error, JavaObject, Jvm, Local};
 
 const VERSION: jni_sys::jint = jni_sys::JNI_VERSION_1_8;
 
@@ -470,6 +470,12 @@ macro_rules! scalar_jni_value {
 
                 unsafe fn from_jni_value(_env: EnvPtr<'jvm>, value: Self::JniValue) -> Self {
                     value
+                }
+            }
+
+            impl ToJavaScalar<$rust> for $rust {
+                fn to_java_scalar<'jvm>(rust: &Self, _jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, $rust> {
+                    Ok(*rust)
                 }
             }
         )*

@@ -1,8 +1,8 @@
 use std::{collections::HashMap, marker::PhantomData};
 
-use crate::{
-    cast::Upcast, from_ref::FromRef, java, jvm::JavaView, Error, Java, Jvm, JvmOp, Local,
-};
+use crate::{cast::Upcast, from_ref::FromRef, java, jvm::JavaView, Error, Java, Jvm, JvmOp, Local};
+
+use crate::jvm::JavaScalar;
 
 pub trait ToJava {
     type JvmOp<'a, J>: for<'jvm> JvmOp<Output<'jvm> = Option<Local<'jvm, J>>>
@@ -209,7 +209,7 @@ where
 impl<J, R> ToJavaImpl<J> for &R
 where
     J: Upcast<java::lang::Object>,
-    R: ?Sized + ToJavaImpl<J>
+    R: ?Sized + ToJavaImpl<J>,
 {
     fn to_java_impl<'jvm>(
         rust: &Self,
@@ -280,6 +280,36 @@ where
                 Error::JvmAlreadyExists => Err(Error::JvmAlreadyExists),
                 Error::UnableToLoadLibjvm(t) => Err(Error::UnableToLoadLibjvm(
                     format!("UnableToLoadLibjvm({t:?})").as_str().into(), // FIXME: should to_java_impl be `self` ?
+                )),
+                Error::JvmInternal(t) => Err(Error::JvmInternal(t.clone())),
+            },
+        }
+    }
+}
+
+pub trait ToJavaScalar<S>
+where
+    S: JavaScalar,
+{
+    fn to_java_scalar<'jvm>(rust: &Self, jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, S>;
+}
+
+impl<J, R> ToJavaScalar<J> for crate::Result<R>
+where
+    J: JavaScalar,
+    R: ToJavaScalar<J>,
+{
+    fn to_java_scalar<'jvm>(rust: &Self, jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, J> {
+        match rust {
+            Ok(r) => R::to_java_scalar(r, jvm),
+            Err(e) => match e {
+                Error::Thrown(t) => Err(Error::Thrown(jvm.local(t))),
+                Error::SliceTooLong(t) => Err(Error::SliceTooLong(*t)),
+                Error::NullDeref => Err(Error::NullDeref),
+                Error::NestedUsage => Err(Error::NestedUsage),
+                Error::JvmAlreadyExists => Err(Error::JvmAlreadyExists),
+                Error::UnableToLoadLibjvm(t) => Err(Error::UnableToLoadLibjvm(
+                    format!("UnableToLoadLibjvm({t:?})").as_str().into(), // FIXME: should to_java_scalar be `self` ?
                 )),
                 Error::JvmInternal(t) => Err(Error::JvmInternal(t.clone())),
             },
