@@ -106,7 +106,8 @@ where
     }
 }
 
-#[derive_where::derive_where(Copy, Clone)]
+#[derive_where::derive_where(Clone)]
+#[derive_where(Copy; This: Copy)]
 pub struct ToRustOp<This, R>
 where
     This: JvmOp,

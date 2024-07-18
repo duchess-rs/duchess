@@ -53,7 +53,6 @@ pub mod prelude {
 
 /// Internal module containing non-semver protected
 /// names used by generated code.
-#[doc(hidden)]
 pub mod plumbing {
     pub use crate::cast::Upcast;
     pub use crate::find::{find_class, find_constructor, find_field, find_method};
@@ -62,6 +61,8 @@ pub mod plumbing {
     pub use crate::jvm::native_function_returning_scalar;
     pub use crate::jvm::JavaObjectExt;
     pub use crate::jvm::JavaView;
+    pub use crate::jvm::JvmRefOp;
+    pub use crate::jvm::JvmScalarOp;
     pub use crate::link::JavaFn;
     pub use crate::link::JavaFunction;
     pub use crate::raw::{EnvPtr, FieldPtr, FromJniValue, IntoJniValue, MethodPtr, ObjectPtr};

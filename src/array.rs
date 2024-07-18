@@ -101,7 +101,8 @@ where
     }
 }
 
-#[derive_where::derive_where(Copy, Clone)]
+#[derive_where::derive_where(Clone)]
+#[derive_where(Copy; This: Copy)]
 pub struct Length<This: JvmOp, T> {
     this: This,
     element: PhantomData<T>,

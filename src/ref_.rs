@@ -2,7 +2,7 @@ use std::{marker::PhantomData, ops::Deref, ptr::NonNull};
 
 use crate::jvm::JavaObjectExt;
 use crate::thread;
-use crate::{cast::Upcast, jvm::CloneIn, plumbing::ObjectPtr, raw::EnvPtr, JavaObject, Jvm};
+use crate::{cast::Upcast, plumbing::ObjectPtr, raw::EnvPtr, JavaObject};
 
 /// An owned local reference to a non-null Java object of type `T`. The reference will be freed when
 /// dropped. Cannot be shared across threads or [`Jvm::with`] invocations.
@@ -206,23 +206,5 @@ impl<R: JavaObject> Java<R> {
         // SAFETY: From the Upcast trait contract, we know R is also an instance of S
         let upcast = unsafe { Java::<S>::from_raw(self.obj) };
         upcast
-    }
-}
-
-impl<'jvm, T> CloneIn<'jvm> for Local<'jvm, T>
-where
-    T: JavaObject,
-{
-    fn clone_in(&self, jvm: &mut Jvm<'jvm>) -> Self {
-        jvm.local(self)
-    }
-}
-
-impl<'jvm, T> CloneIn<'jvm> for Java<T>
-where
-    T: JavaObject,
-{
-    fn clone_in(&self, jvm: &mut Jvm<'jvm>) -> Self {
-        jvm.global(self)
     }
 }
