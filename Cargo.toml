@@ -1,4 +1,5 @@
 [workspace]
+members = ["duchess-reflect"]
 
 [workspace.package]
 version = "0.3.0"
