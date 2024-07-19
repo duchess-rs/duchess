@@ -1214,10 +1214,15 @@ impl ClassInfo {
                 NonRepeatingType::Scalar(_) => quote_spanned!(self.span =>
                     let #input_name = self.#input_name.do_jni(jvm)?;
                 ),
-                NonRepeatingType::Ref(_) => quote_spanned!(self.span =>
-                    let #input_name = self.#input_name.into_as_jref(jvm)?;
-                    let #input_name = duchess::prelude::AsJRef::as_jref(&#input_name)?;
-                ),
+                NonRepeatingType::Ref(_) => {
+                    quote_spanned!(self.span =>
+                        let #input_name = self.#input_name.into_as_jref(jvm)?;
+                        let #input_name = match duchess::prelude::AsJRef::as_jref(&#input_name) {
+                            Ok(v) => Some(v),
+                            Err(duchess::NullJRef) => None,
+                        };
+                    )
+                }
             })
             .collect()
     }

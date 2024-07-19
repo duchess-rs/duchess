@@ -31,11 +31,7 @@ fn to_java_and_back() {
         // nul byte
         "\u{0000}",
     ] {
-        let java: Java<java::lang::String> = example
-            .to_java()
-            .assert_not_null()
-            .execute()
-            .unwrap();
+        let java: Java<java::lang::String> = example.to_java().assert_not_null().execute().unwrap();
         let and_back: String = (&*java).execute().unwrap();
         assert_eq!(example, and_back);
     }
