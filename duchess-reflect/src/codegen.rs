@@ -1214,10 +1214,15 @@ impl ClassInfo {
                 NonRepeatingType::Scalar(_) => quote_spanned!(self.span =>
                     let #input_name = self.#input_name.do_jni(jvm)?;
                 ),
-                NonRepeatingType::Ref(_) => quote_spanned!(self.span =>
-                    let #input_name = self.#input_name.into_as_jref(jvm)?;
-                    let #input_name = duchess::prelude::AsJRef::as_jref(&#input_name)?;
-                ),
+                NonRepeatingType::Ref(_) => {
+                    quote_spanned!(self.span =>
+                        let #input_name = self.#input_name.into_as_jref(jvm)?;
+                        // The error case here is when the input is `Option<T>` (this is the only path to produce a NullJref)
+                        // `.ok()` converts `Nullable` into `Option<T>`—later, this uses the `IntoJniValue` impl
+                        // for Option<&T>` which produces a null pointer.
+                        let #input_name = duchess::prelude::AsJRef::as_jref(&#input_name).ok();
+                    )
+                }
             })
             .collect()
     }
