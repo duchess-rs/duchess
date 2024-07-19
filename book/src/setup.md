@@ -27,3 +27,9 @@ If your Rust project uses external JAR files, you may want to configure it to do
 By default, the `dylibjvm` feature is enabled and Duchess will dynamically load and link libjvm at runtime. Like with `javap`, it will first search for libjvm in `JAVA_HOME` if set. Otherwise it will look for `java` on your `PATH` to locate the JRE installation. Non-standard installations can also be configured using `JvmBuilder`.
 
 Without `dylibjvm`, libjvm must be statically linked.
+
+## JNI Versions
+
+By default, we attempt to load JNI 1.6 when compiling for Android, and JNI 1.8 in all other cases. The JNI version can be selected by using the feature `jni_` and the JNI version concatenated, for any supported JNI version, with underscores replacing periods.
+Duchess currently only supports JNI versions 1.6 and 1.8, and only supports 1.6 on Android (the compile will fail if JNI > 1.6 is attempted on Android). Duchess sets the version to the newest version specified by features if features are specified.
+If you want Duchess to support a newer JNI API version or locking behavior, cut an issue with your use case, and it may be added to Duchess's next release.

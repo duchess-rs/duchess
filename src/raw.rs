@@ -15,7 +15,29 @@ use jni_sys::jvalue;
 
 use crate::{jvm::JavaObjectExt, plumbing::ToJavaScalar, Error, JavaObject, Jvm, Local};
 
+// Set the JNI API version
+// JNI 1.8 is the default not in android
+// JNI 1.6 is the default for android
+// If the JNI version is specified through features, use the newest API version
+// specified in the features
+#[cfg(any(
+    all(
+        not(any(feature = "jni_1_6", feature = "jni_1_8",)),
+        not(target_os = "android")
+    ),
+    feature = "jni_1_8"
+))]
 const VERSION: jni_sys::jint = jni_sys::JNI_VERSION_1_8;
+#[cfg(any(
+    all(
+        not(any(feature = "jni_1_6", feature = "jni_1_8",)),
+        target_os = "android"
+    ),
+    all(feature = "jni_1_6", not(feature = "jni_1_8"))
+))]
+const VERSION: jni_sys::jint = jni_sys::JNI_VERSION_1_6;
+#[cfg(all(target_os = "android", feature = "jni_1_8"))]
+std::compile_error!("Set to use JNI API 1.8+ when compiling for Android, invalid. (Android supports JNI 1.6 and below)");
 
 /// Get a [`JvmPtr`] to an already initialized JVM (if one exists).
 ///

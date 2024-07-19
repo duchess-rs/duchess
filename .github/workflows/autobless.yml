@@ -25,8 +25,10 @@ jobs:
         java-version: ${{ matrix.java-version }}
     - name: Build
       run: cargo build --verbose
-    - name: Test crates
-      run: cargo test --all-targets --verbose
+    - name: Test crates, JNI 1.8
+      run: cargo test --all-targets --verbose --features jni_1_8
+    - name: Test crates, JNI 1.6
+      run: cargo test --all-targets --verbose --features jni_1_6
     - name: setup bot git name and email
       run: |
           git config --global user.name 'The Duchess Cronjob Bot'
