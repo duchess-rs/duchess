@@ -1,13 +1,27 @@
 alias t := test
 alias ut:= unit-test
 alias it := integration-test
-unit-test:
-  cargo test
+unit-test: unit-test-jni-1_8 unit-test-jni-1_6
 
-integration-test:
-    (cd test-crates && cargo test)
+unit-test-jni-1_6:
+  cargo test --features jni_1_6
+
+unit-test-jni-1_8:
+  cargo test --features jni_1_8
+
+integration-test: integration-test-jni-1_8 integration-test-jni-1_6
+
+integration-test-jni-1_6:
+    (cd test-crates && cargo test --features jni_1_6)
+
+integration-test-jni-1_8:
+    (cd test-crates && cargo test --features jni_1_8)
 
 test: unit-test integration-test
+
+test-jni-1_8: unit-test-jni-1_8 integration-test-jni-1_8
+
+test-jni-1_6: unit-test-jni-1_6 integration-test-jni-1_6
 
 coverage-tools:
   rustup component add llvm-tools 

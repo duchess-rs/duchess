@@ -20,6 +20,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         java-version: ['17', '21']
+        jni-version: ['1_6', '1_8']
       fail-fast: false
     runs-on: ${{ matrix.os }}
 
@@ -34,14 +35,10 @@ jobs:
       run: curl -sSL https://github.com/rust-lang/mdBook/releases/download/v0.4.28/mdbook-v0.4.28-x86_64-unknown-linux-gnu.tar.gz | tar -xz
     - name: Build
       run: cargo build --verbose
-    - name: Test crates, JNI 1.8
-      run: cargo test --all-targets --verbose --features jni_exactly_1_8
-    - name: Test crates, JNI 1.6
-      run: cargo test --all-targets --verbose --features jni_exactly_1_6
-    - name: Test client crates, JNI 1.8
-      run: cargo test --all-targets --verbose --manifest-path=test-crates/Cargo.toml --features jni_exactly_1_8
-    - name: Test client crates, JNI 1.6
-      run: cargo test --all-targets --verbose --manifest-path=test-crates/Cargo.toml --features jni_exactly_1_6
+    - name: Test crates, jni_${{ matrix.jni-version }}
+      run: cargo test --all-targets --verbose --features jni_${{ matrix.jni-version }}
+    - name: Test client crates, jni_${{ matrix.jni-version }}
+      run: cargo test --all-targets --verbose --manifest-path=test-crates/Cargo.toml --features jni_${{ matrix.jni-version }}
     - name: Test book
       if: matrix.os == 'ubuntu-latest'
       run: ./mdbook test book

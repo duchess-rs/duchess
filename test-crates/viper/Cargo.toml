@@ -10,5 +10,5 @@ duchess = { path = "../.." }
 ureq = "2.1"
 
 [features]
-jni_exactly_1_6 = ["duchess/jni_exactly_1_6"]
-jni_exactly_1_8 = ["duchess/jni_exactly_1_8"]
+jni_1_6 = ["duchess/jni_1_6"]
+jni_1_8 = ["duchess/jni_1_8"]
