@@ -1,3 +1,15 @@
+# 0.3.0 (July 22nd, 2024)
+This release contains many improvements for calling Rust code from Java:
+1. Add support for returning scalars (#181)
+2. Allow specifying a minimum JNI version (#180)
+
+**Breaking changes**:
+1. `class` or `interface` when specified in `java_package` must actually match (#168). If you get an error after upgrading, change the keyword in your `java_package` macro to match the actual type in Java.
+2. A `duchess-reflect` crate has also been split out from the macro package.
+
+**Bug fixes**:
+* Fix bug where passing `None` for `Option<T>` resulted in a spurious error from Duchess (#182).
+
 # 0.2.1 (June 4th, 2024)
 * Add `JMX` APIs to Java prelude. These allow querying the current memory usage of the JVM.
 
