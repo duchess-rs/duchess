@@ -39,7 +39,17 @@ jobs:
         git switch -c $BRANCH
         git push -u origin $BRANCH
     - name: Create Pull Request
-      run: gh pr create -B main --title 'Automatic bless' --body ''
+      run: |
+        BRANCH="bless-$(date -u +%Y-%m-%d)"
+        MAIN_SHA=$(git rev-parse main)
+        BRANCH_SHA=$(git rev-parse $BRANCH)
+
+        # Check if the commit hashes are different
+        if [ "$MAIN_SHA" != "$BRANCH_SHA" ]; then
+            gh pr create -B main --title 'Automatic bless' --body ''
+        else
+            echo "No changes between main and $BRANCH, skipping pull request creation."
+        fi
     env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         DUCHESS_BLESS: 1
