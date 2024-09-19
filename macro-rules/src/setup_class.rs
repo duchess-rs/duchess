@@ -1,8 +1,8 @@
 #[macro_export]
 macro_rules! setup_class {
     (
-        struct_name: [$struct_name:ident],
-        java_class_generics: [$($java_class_generics:ident,)*],
+        struct_name: [$S:ident],
+        java_class_generics: [$($G:ident,)*],
         jni_class_name: [$jni_class_name:expr],
         mro_tys: [$($mro_ty:ty,)*],
         constructors: [$($constructors:tt)*],
@@ -14,10 +14,13 @@ macro_rules! setup_class {
         op_name: [$op_name:ident],
         obj_name: [$obj_name:ident],
     ) => {
+        // Create the Rust struct $S that will represent the Java struct.
+        // It is impossible to create an instance of this struct.
+
         #[allow(non_camel_case_types)]
-        pub struct $struct_name<$($java_class_generics = duchess::java::lang::Object,)*> {
+        pub struct $S<$($G = duchess::java::lang::Object,)*> {
             _empty: std::convert::Infallible,
-            _dummy: ::core::marker::PhantomData<($($java_class_generics,)*)>
+            _dummy: ::core::marker::PhantomData<($($G,)*)>
         }
 
         // Hide other generated items
@@ -28,9 +31,17 @@ macro_rules! setup_class {
             use duchess::plumbing::once_cell::sync::OnceCell;
             use duchess::plumbing::mro;
 
-            unsafe impl<$($java_class_generics,)*> duchess::JavaObject for $struct_name<$($java_class_generics,)*>
+            // Implement the `JavaObject` trait for `$S`.
+            // This impl is unsafe because we are asserting that
+            // it is impossible to create an instance of this struct
+            // (this is true because the field contains an uninhabited type).
+            // We are also asserting that we maintain the invariant that
+            // users only access it by reference and that every such reference
+            // comes from the JNI.
+
+            unsafe impl<$($G,)*> duchess::JavaObject for $S<$($G,)*>
             where
-                $($java_class_generics: duchess::JavaObject,)*
+                $($G: duchess::JavaObject,)*
             {
                 fn class<'jvm>(jvm: &mut Jvm<'jvm>) -> LocalResult<'jvm, Local<'jvm, java::lang::Class>> {
                     static CLASS: OnceCell<Java<java::lang::Class>> = OnceCell::new();
@@ -42,38 +53,24 @@ macro_rules! setup_class {
                 }
             }
 
-            impl<$($java_class_generics,)*> ::core::convert::AsRef<$struct_name<$($java_class_generics,)*>> for $struct_name<$($java_class_generics,)*>
+            // Add a reflexive `AsRef` impl for `$S`.
+
+            impl<$($G,)*> ::core::convert::AsRef<$S<$($G,)*>> for $S<$($G,)*>
             where
-                $($java_class_generics: duchess::JavaObject,)*
+                $($G: duchess::JavaObject,)*
             {
-                fn as_ref(&self) -> &$struct_name<$($java_class_generics,)*> {
+                fn as_ref(&self) -> &$S<$($G,)*> {
                     self
                 }
             }
 
-            impl<$($java_class_generics,)*> ::core::ops::Deref for $struct_name<$($java_class_generics,)*>
-            where
-                $($java_class_generics: duchess::JavaObject,)*
-            {
-                type Target = <Self as duchess::plumbing::JavaView>::OfObj<Self>;
+            // The TryJDeref trait indicates a type that can be dereferenced
+            // to a reference to a java object (possibly returning null).
+            // In our case, we deref to ourselves, and the operation is infallible.
 
-                fn deref(&self) -> &Self::Target {
-                    duchess::plumbing::FromRef::from_ref(self)
-                }
-            }
-
-            impl<$($java_class_generics,)*> duchess::prelude::JDeref for $struct_name<$($java_class_generics,)*>
+            impl<$($G,)*> duchess::prelude::TryJDeref for $S<$($G,)*>
             where
-                $($java_class_generics: duchess::JavaObject,)*
-            {
-                fn jderef(&self) -> &Self {
-                    self
-                }
-            }
-
-            impl<$($java_class_generics,)*> duchess::prelude::TryJDeref for $struct_name<$($java_class_generics,)*>
-            where
-                $($java_class_generics: duchess::JavaObject,)*
+                $($G: duchess::JavaObject,)*
             {
                 type Java = Self;
 
@@ -82,19 +79,55 @@ macro_rules! setup_class {
                 }
             }
 
-            // Reflexive upcast impl
-            unsafe impl<$($java_class_generics,)*> duchess::plumbing::Upcast<$struct_name<$($java_class_generics,)*>> for $struct_name<$($java_class_generics,)*>
-            where
-                $($java_class_generics: duchess::JavaObject,)*
-            {}
+            // The JDeref trait refines `TryJDeref` for cases where the result cannot be null.
 
-            duchess::plumbing::setup_class! {
-                @upcast_impls($struct_name, [$($mro_ty,)*], [$($java_class_generics,)*])
+            impl<$($G,)*> duchess::prelude::JDeref for $S<$($G,)*>
+            where
+                $($G: duchess::JavaObject,)*
+            {
+                fn jderef(&self) -> &Self {
+                    self
+                }
             }
 
-            impl<$($java_class_generics,)* > $struct_name<$($java_class_generics,)*>
+            // The deref for `$S` derefs to a **view** onto `$S` based on the
+            // method-resolution-order (MRO). This is a fairly complex topic.
+            // See [the method chapter][mro] in the book for more details.
+            //
+            // [mro]: https://duchess-rs.github.io/duchess/methods.html
+
+            impl<$($G,)*> ::core::ops::Deref for $S<$($G,)*>
             where
-                $($java_class_generics: duchess::JavaObject,)*
+                $($G: duchess::JavaObject,)*
+            {
+                type Target = <Self as duchess::plumbing::JavaView>::OfObj<Self>;
+
+                fn deref(&self) -> &Self::Target {
+                    duchess::plumbing::FromRef::from_ref(self)
+                }
+            }
+
+            // Reflexive upcast impl
+
+            unsafe impl<$($G,)*> duchess::plumbing::Upcast<$S<$($G,)*>> for $S<$($G,)*>
+            where
+                $($G: duchess::JavaObject,)*
+            {}
+
+            // Generate impls that permit upcasting to every type on the [method-resolution-order][mro].
+            // This is a recursive macro invocation to one of the "helper arms" below.
+            //
+            // [mro]: https://duchess-rs.github.io/duchess/methods.html
+
+            duchess::plumbing::setup_class! {
+                @upcast_impls($S, [$($mro_ty,)*], [$($G,)*])
+            }
+
+            // Add helper methods, constructors, and other things directly invokable on `$S`.
+
+            impl<$($G,)* > $S<$($G,)*>
+            where
+                $($G: duchess::JavaObject,)*
             {
                 $($constructors)*
 
@@ -105,84 +138,126 @@ macro_rules! setup_class {
                 $($inherent_object_methods)*
             }
 
-            impl<$($java_class_generics,)*> duchess::plumbing::JavaView for $struct_name<$($java_class_generics,)*>
+            // Helper structs for [managing method dispatch][mro]:
+            //
+            // * The `Op` struct, or "operation type", hosts methods that are available on the `JvmOp`
+            // and produce another `JvmOp` (i.e., if you do `foo.bar().baz().execute()`,
+            // the call to `baz()` is being invoked on a jvm-op representing the value that
+            // will be returned by `bar` when execution actually occurs).
+            //
+            // * The `Op` struct, or "object type", hosts the same methods but is used
+            // when invoking methods on an actual pointer to the object
+            // (i.e., if you do `foo.bar()`, the `bar()` method
+            // is being called on some reference to a Java object `foo`).
+            //
+            // [mro]: https://duchess-rs.github.io/duchess/methods.html
+
+            duchess::plumbing::setup_class! {
+                @op_obj_definitions($S, $op_name, [$($G,)*])
+            }
+
+            duchess::plumbing::setup_class! {
+                @op_obj_definitions($S, $obj_name, [$($G,)*])
+            }
+
+            // Add the methods for the op/obj types, as explained above.
+
+            impl<$($G,)* J, N> $op_name<$($G,)* J, N>
+            where
+                $($G: duchess::JavaObject,)*
+                J: duchess::plumbing::JvmRefOp<$S<$($G,)*>>,
+                N: duchess::plumbing::FromRef<J>,
+            {
+                $($op_struct_methods)*
+            }
+
+            impl<$($G,)* J, N> $obj_name<$($G,)* J, N>
+            where
+                $($G: duchess::JavaObject,)*
+                for<'jvm> &'jvm J: duchess::plumbing::JvmRefOp<$S<$($G,)*>>,
+            {
+                $($obj_struct_methods)*
+            }
+
+            // The `JavaView` type navigates the [method-resolution-order][mro].
+            //
+            // The `OfOp` associated type indicates the starting "operation type" for `$S`;
+            // the `OfOpWith` associated type indicates the "operation type" for the next
+            // class in the method resolution order.
+            //
+            // The `OfObj` associated type indicates the starting "object type" for `$S`;
+            // the `OfObjWith` associated type indicates the "object type" for the next
+            // class in the method resolution order.
+            //
+            // [mro]: https://duchess-rs.github.io/duchess/methods.html
+
+            impl<$($G,)*> duchess::plumbing::JavaView for $S<$($G,)*>
             {
                 type OfOp<J> = $op_name<
-                    $($java_class_generics,)* J,
+                    $($G,)* J,
                     mro!(J, OfOpWith, [$($mro_ty,)*])
                 >;
 
                 type OfOpWith<J, N> = $op_name<
-                    $($java_class_generics,)* J,
+                    $($G,)* J,
                     N,
                 >
                 where
                     N: duchess::plumbing::FromRef<J>;
 
                 type OfObj<J> = $obj_name<
-                    $($java_class_generics,)* J,
+                    $($G,)* J,
                     mro!(J, OfObjWith, [$($mro_ty,)*])
                 >;
 
                 type OfObjWith<J, N> = $obj_name<
-                    $($java_class_generics,)* J,
+                    $($G,)* J,
                     N,
                 >
                 where
                     N: duchess::plumbing::FromRef<J>;
             }
-
-            impl<$($java_class_generics,)* J, N> $op_name<$($java_class_generics,)* J, N>
-            where
-                $($java_class_generics: duchess::JavaObject,)*
-                J: duchess::plumbing::JvmRefOp<$struct_name<$($java_class_generics,)*>>,
-                N: duchess::plumbing::FromRef<J>,
-            {
-                $($op_struct_methods)*
-            }
-
-            impl<$($java_class_generics,)* J, N> $obj_name<$($java_class_generics,)* J, N>
-            where
-                $($java_class_generics: duchess::JavaObject,)*
-                for<'jvm> &'jvm J: duchess::plumbing::JvmRefOp<$struct_name<$($java_class_generics,)*>>,
-            {
-                $($obj_struct_methods)*
-            }
-
-            duchess::plumbing::setup_class! {
-                @op_obj_definitions($struct_name, $op_name, [$($java_class_generics,)*])
-            }
-
-            duchess::plumbing::setup_class! {
-                @op_obj_definitions($struct_name, $obj_name, [$($java_class_generics,)*])
-            }
         };
     };
 
-    (@op_obj_definitions($struct_name:ident, $opobj_name:ident, [$($java_class_generics:ident,)*])) => {
+    // Generate the struct definition and necessary impls for the op or obj struct.
+
+    (@op_obj_definitions($S:ident, $opobj_name:ident, [$($G:ident,)*])) => {
         duchess::plumbing::setup_class! {
-            @op_obj_struct($struct_name, $opobj_name, [$($java_class_generics,)*])
+            @op_obj_struct($S, $opobj_name, [$($G,)*])
         }
 
         duchess::plumbing::setup_class! {
-            @op_obj_FromRef_impl($opobj_name, [$($java_class_generics,)*])
+            @op_obj_FromRef_impl($opobj_name, [$($G,)*])
         }
 
         duchess::plumbing::setup_class! {
-            @op_obj_Deref_impl($opobj_name, [$($java_class_generics,)*])
+            @op_obj_Deref_impl($opobj_name, [$($G,)*])
         }
     };
 
-    (@op_obj_struct($struct_name:ident, $opobj_name:ident, [$($java_class_generics:ident,)*])) => {
+    // Generate the struct definition for the op or obj struct.
+    //
+    // This is basically a newtyped version of `J`, and the
+    // `#[repr(transparent)]` is used to ensure that we can
+    // transmute a `&J` reference into an `&OpStruct<J, ...>`
+    // (resp. `&ObjStruct<J, ...>`) reference.
+
+    (@op_obj_struct($S:ident, $opobj_name:ident, [$($G:ident,)*])) => {
         #[repr(transparent)]
-        pub struct $opobj_name<$($java_class_generics,)* J, N> {
+        pub struct $opobj_name<$($G,)* J, N> {
             this: J,
-            phantom: ::core::marker::PhantomData<($struct_name<$($java_class_generics,)*>, N)>,
+            phantom: ::core::marker::PhantomData<($S<$($G,)*>, N)>,
         }
     };
 
-    (@op_obj_Deref_impl($opobj_name:ident,[$($java_class_generics:ident,)*])) => {
-        impl<$($java_class_generics,)* J, N> ::core::ops::Deref for $opobj_name<$($java_class_generics,)* J, N>
+    // Generate a `Deref` impl for the op or object struct;
+    // the `Op` (resp. `Obj`) struct will deref to the
+    // `Op` (resp. `Obj`) struct for the next
+    // item in the method resolution order.
+
+    (@op_obj_Deref_impl($opobj_name:ident,[$($G:ident,)*])) => {
+        impl<$($G,)* J, N> ::core::ops::Deref for $opobj_name<$($G,)* J, N>
         where
             N: duchess::plumbing::FromRef<J>,
         {
@@ -194,8 +269,13 @@ macro_rules! setup_class {
         }
     };
 
-    (@op_obj_FromRef_impl($opobj_name:ident, [$($java_class_generics:ident,)*])) => {
-        impl<$($java_class_generics,)* J, N> duchess::plumbing::FromRef<J> for $opobj_name<$($java_class_generics,)* J, N> {
+    // Generate a `FromRef` impl allowing the op/obj struct
+    // to be created from the original object reference.
+    // This is safe because of the `#[repr(transparent)]`
+    // on the op/obj struct definitions.
+
+    (@op_obj_FromRef_impl($opobj_name:ident, [$($G:ident,)*])) => {
+        impl<$($G,)* J, N> duchess::plumbing::FromRef<J> for $opobj_name<$($G,)* J, N> {
             fn from_ref(j: &J) -> &Self {
                 // This is safe because of the `#[repr(transparent)]`
                 // on the struct declaration.
@@ -213,15 +293,15 @@ macro_rules! setup_class {
     //
     // [pg]: https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=6bdda5a7268d02833cb1730d5558723a
 
-    (@upcast_impls($struct_name:ident, [], [$($java_class_generics:ident,)*])) => {};
-    (@upcast_impls($struct_name:ident, [$mro_head_ty:ty, $($mro_tail_ty:ty,)*], [$($java_class_generics:ident,)*])) => {
-        unsafe impl<$($java_class_generics,)*> duchess::plumbing::Upcast<$mro_head_ty> for $struct_name<$($java_class_generics,)*>
+    (@upcast_impls($S:ident, [], [$($G:ident,)*])) => {};
+    (@upcast_impls($S:ident, [$mro_head_ty:ty, $($mro_tail_ty:ty,)*], [$($G:ident,)*])) => {
+        unsafe impl<$($G,)*> duchess::plumbing::Upcast<$mro_head_ty> for $S<$($G,)*>
         where
-            $($java_class_generics: duchess::JavaObject,)*
+            $($G: duchess::JavaObject,)*
         {}
 
         duchess::plumbing::setup_class! {
-            @upcast_impls($struct_name, [$($mro_tail_ty,)*], [$($java_class_generics,)*])
+            @upcast_impls($S, [$($mro_tail_ty,)*], [$($G,)*])
         }
     };
 }
