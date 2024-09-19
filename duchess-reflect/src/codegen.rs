@@ -10,7 +10,7 @@ use crate::{
 };
 use inflector::Inflector;
 use proc_macro2::{Ident, Literal, Span, TokenStream};
-use quote::quote_spanned;
+use quote::{quote, quote_spanned};
 
 impl DuchessDeclaration {
     pub fn to_tokens(&self) -> syn::Result<TokenStream> {
@@ -75,10 +75,8 @@ impl SpannedPackageInfo {
 impl ClassInfo {
     pub fn to_tokens(&self, upcasts: &Upcasts) -> syn::Result<TokenStream> {
         let struct_name = self.struct_name();
-        let cached_class = self.cached_class();
-        let this_ty = self.this_type();
-        let java_class_generics_with_defaults = self.class_generic_names_with_defaults();
         let java_class_generics = self.class_generic_names();
+        let jni_class_name = self.jni_class_name();
 
         // Convert constructors
         let constructors: Vec<_> = self
@@ -114,7 +112,8 @@ impl ClassInfo {
             .map(|m| self.obj_struct_method(m))
             .collect::<Result<_, _>>()?;
 
-        let assoc_struct_declarations = self.assoc_structs(upcasts, op_methods, obj_methods)?;
+        let op_name = Id::from(format!("ViewAs{}Op", self.name.class_name())).to_ident(self.span);
+        let obj_name = Id::from(format!("ViewAs{}Obj", self.name.class_name())).to_ident(self.span);
 
         // Convert instance methods of the form `Foo::method`
         let inherent_object_methods: Vec<_> = self
@@ -134,236 +133,28 @@ impl ClassInfo {
             .map(|f| self.static_field_getter(f))
             .collect::<Result<_, _>>()?;
 
-        let upcast_impls = self.upcast_impls(upcasts)?;
+        let mro_tys = self.mro(upcasts)?;
 
-        let output = quote_spanned! {
-            self.span =>
-
-            #[allow(non_camel_case_types)]
-            pub struct #struct_name<#(#java_class_generics_with_defaults,)*> {
-                _empty: std::convert::Infallible,
-                _dummy: ::core::marker::PhantomData<(#(#java_class_generics,)*)>
+        let output = quote! {
+            duchess::plumbing::setup_class! {
+                struct_name: [#struct_name],
+                java_class_generics: [#(#java_class_generics,)*],
+                jni_class_name: [#jni_class_name],
+                mro_tys: [#(#mro_tys,)*],
+                constructors: [#(#constructors)*],
+                static_methods: [#(#static_methods)*],
+                static_field_getters: [#(#static_field_getters)*],
+                inherent_object_methods: [#(#inherent_object_methods)*],
+                op_struct_methods: [#(#op_methods)*],
+                obj_struct_methods: [#(#obj_methods)*],
+                op_name: [#op_name],
+                obj_name: [#obj_name],
             }
-
-            // Hide other generated items
-            #[allow(unused_imports)]
-            #[allow(nonstandard_style)]
-            const _: () = {
-                #assoc_struct_declarations
-
-                unsafe impl<#(#java_class_generics,)*> duchess::JavaObject for #struct_name<#(#java_class_generics,)*>
-                where
-                    #(#java_class_generics: duchess::JavaObject,)*
-                {
-                    #cached_class
-                }
-
-                impl<#(#java_class_generics,)*> ::core::convert::AsRef<#struct_name<#(#java_class_generics,)*>> for #struct_name<#(#java_class_generics,)*>
-                where
-                    #(#java_class_generics: duchess::JavaObject,)*
-                {
-                    fn as_ref(&self) -> &#struct_name<#(#java_class_generics,)*> {
-                        self
-                    }
-                }
-
-                impl<#(#java_class_generics,)*> ::core::ops::Deref for #struct_name<#(#java_class_generics,)*>
-                where
-                    #(#java_class_generics: duchess::JavaObject,)*
-                {
-                    type Target = <Self as duchess::plumbing::JavaView>::OfObj<Self>;
-
-                    fn deref(&self) -> &Self::Target {
-                        duchess::plumbing::FromRef::from_ref(self)
-                    }
-                }
-
-                impl<#(#java_class_generics,)*> duchess::prelude::JDeref for #struct_name<#(#java_class_generics,)*>
-                where
-                    #(#java_class_generics: duchess::JavaObject,)*
-                {
-                    fn jderef(&self) -> &Self {
-                        self
-                    }
-                }
-
-                impl<#(#java_class_generics,)*> duchess::prelude::TryJDeref for #struct_name<#(#java_class_generics,)*>
-                where
-                    #(#java_class_generics: duchess::JavaObject,)*
-                {
-                    type Java = Self;
-
-                    fn try_jderef(&self) -> duchess::Nullable<&Self> {
-                        Ok(self)
-                    }
-                }
-
-                // Reflexive upcast impl
-                unsafe impl<#(#java_class_generics,)*> duchess::plumbing::Upcast<#struct_name<#(#java_class_generics,)*>> for #struct_name<#(#java_class_generics,)*>
-                where
-                    #(#java_class_generics: duchess::JavaObject,)*
-                {}
-
-                // Other upcast impls
-                #upcast_impls
-
-                impl< #(#java_class_generics,)* > #this_ty
-                where
-                    #(#java_class_generics: duchess::JavaObject,)*
-                {
-                    #(#constructors)*
-
-                    #(#static_methods)*
-
-                    #(#static_field_getters)*
-
-                    #(#inherent_object_methods)*
-                }
-            };
         };
 
         crate::debug_tokens(&self.name, &output);
 
         Ok(output)
-    }
-
-    /// Construct the various declarations related to the op struct,
-    /// with the exception of any methods that must be invoked.
-    fn assoc_structs(
-        &self,
-        upcasts: &Upcasts,
-        op_struct_methods: Vec<TokenStream>,
-        obj_struct_methods: Vec<TokenStream>,
-    ) -> syn::Result<TokenStream> {
-        let name = self.struct_name();
-        let java_class_generics = self.class_generic_names();
-
-        // Names for the `J` and `N` parameters.
-        // There is no particular reason to create `Ident` for these
-        // except that I decided to pretend we had hygienic procedural
-        // macros in this particular piece of code for some reason.
-        let j = Ident::new("J", self.span);
-        let n = Ident::new("N", self.span);
-
-        // Subtle: the struct itself does not require
-        // that `J: IntoJava<Self>` or `N: FromRef<J>`.
-        // Those requirements are placed only on the `Deref` impls.
-
-        let struct_definition = |struct_name: &Ident| {
-            quote_spanned!(self.span =>
-                #[repr(transparent)]
-                pub struct #struct_name<#(#java_class_generics,)* #j, #n> {
-                    this: #j,
-                    phantom: ::core::marker::PhantomData<(#name<#(#java_class_generics),*>, #n)>,
-                }
-            )
-        };
-
-        let deref_impl = |struct_name: &Ident| {
-            quote_spanned!(self.span =>
-                impl<#(#java_class_generics,)* #j, #n> ::core::ops::Deref
-                for #struct_name<#(#java_class_generics,)* #j, #n>
-                where
-                    #n: duchess::plumbing::FromRef<#j>,
-                {
-                    type Target = #n;
-
-                    fn deref(&self) -> &#n {
-                        duchess::plumbing::FromRef::from_ref(&self.this)
-                    }
-                }
-            )
-        };
-
-        let from_ref_impl = |struct_name: &Ident| {
-            quote_spanned!(self.span =>
-                impl<#(#java_class_generics,)* #j, #n> duchess::plumbing::FromRef<#j> for #struct_name<#(#java_class_generics,)* #j, #n> {
-                    fn from_ref(j: &J) -> &Self {
-                        // This is safe because of the `#[repr(transparent)]`
-                        // on the struct declaration.
-                        unsafe {
-                            ::core::mem::transmute::<&J, &Self>(j)
-                        }
-                    }
-                }
-            )
-        };
-
-        // Construct the default value for the "next" (#n) parameter.
-        let mro = self.mro(upcasts)?;
-
-        let op_name = Id::from(format!("ViewAs{}Op", self.name.class_name())).to_ident(self.span);
-        let op_mro_tokens = self.mro_tokens(&j, "OfOpWith", &mro);
-
-        let obj_name = Id::from(format!("ViewAs{}Obj", self.name.class_name())).to_ident(self.span);
-        let obj_mro_tokens = self.mro_tokens(&j, "OfObjWith", &mro);
-
-        let all_names = &[&op_name, &obj_name];
-
-        let this_ty = self.this_type();
-
-        let other_impls = quote_spanned!(self.span =>
-            impl<#(#java_class_generics,)*> duchess::plumbing::JavaView for #name<#(#java_class_generics,)*>
-            {
-                type OfOp<#j> = #op_name<#(#java_class_generics,)* #j, #op_mro_tokens>;
-
-                type OfOpWith<#j, #n> = #op_name<#(#java_class_generics,)* #j, #n>
-                where
-                    N: duchess::plumbing::FromRef<J>;
-
-                type OfObj<#j> = #obj_name<#(#java_class_generics,)* #j, #obj_mro_tokens>;
-
-                type OfObjWith<#j, #n> = #obj_name<#(#java_class_generics,)* #j, #n>
-                where
-                    N: duchess::plumbing::FromRef<J>;
-            }
-
-            impl<#(#java_class_generics,)* #j, #n> #op_name<#(#java_class_generics,)* #j, #n>
-            where
-                #(#java_class_generics: duchess::JavaObject,)*
-                #j: duchess::plumbing::JvmRefOp<#name<#(#java_class_generics,)*>>,
-                #n: duchess::plumbing::FromRef<#j>,
-            {
-                #(#op_struct_methods)*
-            }
-
-            impl<#(#java_class_generics,)* #j, #n> #obj_name<#(#java_class_generics,)* #j, #n>
-            where
-                #(#java_class_generics: duchess::JavaObject,)*
-                for<'jvm> &'jvm #j: duchess::plumbing::JvmRefOp<#this_ty>,
-            {
-                #(#obj_struct_methods)*
-            }
-        );
-
-        let declarations: TokenStream = all_names
-            .iter()
-            .copied()
-            .flat_map(|n| vec![struct_definition(n), deref_impl(n), from_ref_impl(n)])
-            .chain(Some(other_impls))
-            .collect();
-
-        Ok(declarations)
-    }
-
-    /// Constructs the default "next" type for our [op struct].
-    /// This is based on the method resolution order (mro) for the
-    /// current type. For example, if `Foo` extends `Bar`, then the
-    /// result for `Foo` would be
-    /// `Bar::OfOpWith<J, java::lang::Object::OfOpWith<J, ()>>`.
-    ///
-    /// [op struct]: https://duchess-rs.github.io/duchess/methods.html#op-structs
-    fn mro_tokens(&self, j: &Ident, assoc_name: &str, mro: &[TokenStream]) -> TokenStream {
-        let Some((head, tail)) = mro.split_first() else {
-            return quote_spanned!(self.span => ());
-        };
-
-        let tail_tokens = self.mro_tokens(j, assoc_name, tail);
-
-        let assoc_ident = Ident::new(assoc_name, self.span);
-        quote_spanned!(self.span =>
-            <#head as duchess::plumbing::JavaView>::#assoc_ident<#j, #tail_tokens>
-        )
     }
 
     /// Returns the ["method resolution order"][mro] for self. This is a series of
@@ -387,38 +178,6 @@ impl ClassInfo {
                 Ok(sig.forbid_capture(|sig| sig.class_ref_ty(r)).unwrap())
             })
             .collect()
-    }
-
-    fn upcast_impls(&self, upcasts: &Upcasts) -> syn::Result<TokenStream> {
-        let struct_name = self.struct_name();
-        let java_class_generics = self.class_generic_names();
-        Ok(self.mro(upcasts)?
-            .into_iter()
-            .map(|tokens| {
-                quote_spanned!(self.span =>
-                    unsafe impl<#(#java_class_generics,)*> duchess::plumbing::Upcast<#tokens> for #struct_name<#(#java_class_generics,)*>
-                    where
-                        #(#java_class_generics: duchess::JavaObject,)*
-                    {}
-                )
-            })
-            .collect())
-    }
-
-    fn cached_class(&self) -> TokenStream {
-        let jni_class_name = self.jni_class_name();
-
-        quote_spanned! {
-            self.span =>
-            fn class<'jvm>(jvm: &mut duchess::Jvm<'jvm>) -> duchess::LocalResult<'jvm, duchess::Local<'jvm, java::lang::Class>> {
-                static CLASS: duchess::plumbing::once_cell::sync::OnceCell<duchess::Java<java::lang::Class>> = duchess::plumbing::once_cell::sync::OnceCell::new();
-                let global = CLASS.get_or_try_init::<_, duchess::Error<duchess::Local<java::lang::Throwable>>>(|| {
-                    let class = duchess::plumbing::find_class(jvm, #jni_class_name)?;
-                    Ok(jvm.global(&class))
-                })?;
-                Ok(jvm.local(global))
-            }
-        }
     }
 
     fn constructor(&self, constructor: &Constructor) -> syn::Result<TokenStream> {
@@ -1181,13 +940,6 @@ impl ClassInfo {
         self.generics
             .iter()
             .map(|g| g.to_ident(self.span))
-            .collect()
-    }
-
-    fn class_generic_names_with_defaults(&self) -> Vec<TokenStream> {
-        self.class_generic_names()
-            .into_iter()
-            .map(|g| quote_spanned!(self.span => #g = java::lang::Object))
             .collect()
     }
 
