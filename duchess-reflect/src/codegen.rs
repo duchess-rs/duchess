@@ -206,118 +206,21 @@ impl ClassInfo {
         let prepare_inputs = self.prepare_inputs(&input_names, &constructor.argument_tys);
 
         // for debugging JVM invocation failures
-        let name = Literal::string(&self.name.to_string());
         let descriptor = Literal::string(&constructor.descriptor(&self.generics_scope()));
 
-        let output = quote_spanned!(self.span =>
-            pub fn new(
-                #(#input_names : impl #input_traits,)*
-            ) -> impl #output_trait {
-                struct Impl<
-                    #(#java_class_generics,)*
-                    #(#input_names),*
-                > {
-                    #(#input_names: #input_names,)*
-                    phantom: ::core::marker::PhantomData<(
-                        #(#java_class_generics,)*
-                    )>,
-                }
-
-                impl<
-                    #(#java_class_generics,)*
-                    #(#input_names,)*
-                > ::core::clone::Clone for Impl<
-                    #(#java_class_generics,)*
-                    #(#input_names,)*
-                >
-                where
-                    #(#java_class_generics: duchess::JavaObject,)*
-                    #(#input_names : #jvm_op_traits,)*
-                {
-                    fn clone(&self) -> Self {
-                        Impl {
-                            #(#input_names: Clone::clone(&self.#input_names),)*
-                            phantom: self.phantom,
-                        }
-                    }
-                }
-
-                impl<
-                    #(#java_class_generics,)*
-                    #(#input_names,)*
-                > duchess::prelude::JvmOp for Impl<
-                    #(#java_class_generics,)*
-                    #(#input_names,)*
-                >
-                where
-                    #(#java_class_generics: duchess::JavaObject,)*
-                    #(#input_names : #jvm_op_traits,)*
-                {
-                    type Output<'jvm> = duchess::Local<'jvm, #ty>;
-
-                    fn do_jni<'jvm>(
-                        self,
-                        jvm: &mut duchess::Jvm<'jvm>,
-                    ) -> duchess::LocalResult<'jvm, Self::Output<'jvm>> {
-                        #(#prepare_inputs)*
-
-                        let class = <#ty as duchess::JavaObject>::class(jvm)?;
-
-                        // Cache the method id for the constructor -- note that we only have one cache
-                        // no matter how many generic monomorphizations there are. This makes sense
-                        // given Java's erased-based generics system.
-                        static CONSTRUCTOR: duchess::plumbing::once_cell::sync::OnceCell<duchess::plumbing::MethodPtr> = duchess::plumbing::once_cell::sync::OnceCell::new();
-                        let constructor = CONSTRUCTOR.get_or_try_init(|| {
-                            duchess::plumbing::find_constructor(jvm, &class, #jni_descriptor)
-                        })?;
-
-                        let env = jvm.env();
-                        let obj: ::core::option::Option<duchess::Local<#ty>> = unsafe {
-                            env.invoke(|env| env.NewObjectA, |env, f| f(
-                                env,
-                                duchess::plumbing::JavaObjectExt::as_raw(&*class).as_ptr(),
-                                constructor.as_ptr(),
-                                [
-                                    #(duchess::plumbing::IntoJniValue::into_jni_value(#input_names),)*
-                                ].as_ptr(),
-                            ))
-                        }?;
-                        obj.ok_or_else(|| {
-                            // NewObjectA should only return a null pointer when an exception occurred in the
-                            // constructor, so reaching here is a strange JVM state
-                            duchess::Error::JvmInternal(format!(
-                                "failed to create new `{}` via constructor `{}`",
-                                #name, #descriptor,
-                            ))
-                        })
-                    }
-                }
-
-                impl<
-                    #(#java_class_generics,)*
-                    #(#input_names,)*
-                > ::core::ops::Deref for Impl<
-                    #(#java_class_generics,)*
-                    #(#input_names,)*
-                > {
-                    type Target = <#ty as duchess::plumbing::JavaView>::OfOp<Self>;
-
-                    fn deref(&self) -> &Self::Target {
-                        <Self::Target as duchess::plumbing::FromRef<_>>::from_ref(self)
-                    }
-                }
-
-                Impl {
-                    #(#input_names: #input_names.into_op(),)*
-                    phantom: ::core::default::Default::default()
-                }
+        Ok(quote! {
+            duchess::plumbing::setup_constructor! {
+                struct_name: [#ty],
+                java_class_generics: [#(#java_class_generics,)*],
+                input_names: [#(#input_names,)*],
+                input_traits: [#(#input_traits,)*],
+                jvm_op_traits: [#(#jvm_op_traits,)*],
+                output_trait: [#output_trait],
+                prepare_inputs: [#(#prepare_inputs)*],
+                descriptor: [#descriptor],
+                jni_descriptor: [#jni_descriptor],
             }
-        );
-
-        // useful for debugging
-        // eprintln!("{output}");
-
-        Ok(output)
+        })
     }
 
     /// Generates code for the methods that goes on the `ops` object.

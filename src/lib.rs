@@ -68,7 +68,7 @@ pub mod plumbing {
     pub use crate::raw::{EnvPtr, FieldPtr, FromJniValue, IntoJniValue, MethodPtr, ObjectPtr};
     pub use crate::refs::NullJRef;
     pub use crate::to_java::{ToJavaImpl, ToJavaScalar};
-    pub use duchess_macro_rules::{mro, setup_class};
+    pub use duchess_macro_rules::{mro, setup_class, setup_constructor};
     pub use jni_sys;
     pub use once_cell;
 }
