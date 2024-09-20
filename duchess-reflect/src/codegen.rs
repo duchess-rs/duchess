@@ -195,8 +195,7 @@ impl ClassInfo {
             .map(|i| Ident::new(&format!("a{i}"), self.span))
             .collect();
 
-        let ty = self.this_type();
-        let output_trait = quote_spanned!(self.span => duchess::prelude::JavaConstructor<#ty>);
+        let struct_name = self.struct_name();
 
         let java_class_generics = self.class_generic_names();
 
@@ -210,15 +209,15 @@ impl ClassInfo {
 
         Ok(quote! {
             duchess::plumbing::setup_constructor! {
-                struct_name: [#ty],
+                struct_name: [#struct_name],
                 java_class_generics: [#(#java_class_generics,)*],
                 input_names: [#(#input_names,)*],
                 input_traits: [#(#input_traits,)*],
                 jvm_op_traits: [#(#jvm_op_traits,)*],
-                output_trait: [#output_trait],
                 prepare_inputs: [#(#prepare_inputs)*],
                 descriptor: [#descriptor],
                 jni_descriptor: [#jni_descriptor],
+                idents: [self, jvm],
             }
         })
     }
