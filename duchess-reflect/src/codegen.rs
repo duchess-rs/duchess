@@ -228,6 +228,9 @@ impl ClassInfo {
     /// NB. This function (particularly the JvmOp impl) has significant overlap with `static_method`
     /// and `static_field_getter`, so if you make changes here, you may well need changes there.
     fn op_struct_method(&self, method: &Method) -> syn::Result<TokenStream> {
+        let struct_name = self.struct_name();
+        let java_class_generics = self.class_generic_names();
+
         let mut sig = Signature::new(&method.name, self.span, &self.generics)
             .with_internal_generics(&method.generics)?;
 
@@ -263,24 +266,16 @@ impl ClassInfo {
         // to account for captures.
         let sig_where_clauses = &sig.where_clauses;
 
-        let this_ty = self.this_type();
-
-        let inherent_method = quote_spanned!(self.span =>
-            pub fn #rust_method_name<#(#rust_method_generics),*>(
-                &self,
-                #(#input_names: impl #input_traits),*
-            ) -> impl #output_trait
-            where
-                #(#sig_where_clauses,)*
-            {
-                <#this_ty>::#rust_method_name(
-                    Clone::clone(&self.this),
-                    #(#input_names,)*
-                )
-            }
-        );
-
-        Ok(inherent_method)
+        Ok(quote!(duchess::plumbing::setup_op_method! {
+            struct_name: [#struct_name],
+            java_class_generics: [#(#java_class_generics,)*],
+            rust_method_name: [#rust_method_name],
+            rust_method_generics: [#(#rust_method_generics,)*],
+            input_names: [#(#input_names,)*],
+            input_traits: [#(#input_traits,)*],
+            output_trait: [#output_trait],
+            sig_where_clauses: [#(#sig_where_clauses,)*],
+        }))
     }
 
     fn obj_struct_method(&self, method: &Method) -> syn::Result<TokenStream> {
