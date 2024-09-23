@@ -537,6 +537,9 @@ impl ClassInfo {
     fn static_method(&self, method: &Method) -> syn::Result<TokenStream> {
         assert!(method.flags.is_static);
 
+        let struct_name = self.struct_name();
+        let java_class_generics = self.class_generic_names();
+
         let mut sig = Signature::new(&method.name, self.span, &self.generics)
             .with_internal_generics(&method.generics)?;
 
@@ -574,10 +577,7 @@ impl ClassInfo {
         let jni_method = jni_c_str(&*method.name, self.span);
 
         let rust_method_name = Id::from(method.name.to_snake_case()).to_ident(self.span);
-        let rust_method_type_name = Id::from(method.name.to_camel_case()).to_ident(self.span);
-
-        // The generic parameters declared on the Java method.
-        let java_class_generics: Vec<_> = self.class_generic_names();
+        let rust_method_struct_name = Id::from(method.name.to_camel_case()).to_ident(self.span);
 
         // The generic parameters we need on the Rust method, these include:
         //
@@ -585,129 +585,27 @@ impl ClassInfo {
         // * any fresh generics we created to capture wildcards
         let rust_method_generics = &sig.rust_generics;
 
-        // The generic parameters we need on the *method struct* (which will implement the `JvmOp`).
-        // These include the class generics plus all the generics from the method,
-        // plus a type parameter `a0` for each input.
-        let method_struct_generics: Vec<_> = java_class_generics
-            .iter()
-            .chain(rust_method_generics)
-            .chain(&input_names)
-            .collect();
-
-        // For each method `m` in the Java type, we create a struct (named `m`)
-        // that will implement the `JvmOp`.
-        let method_struct = quote_spanned!(self.span =>
-            pub struct #rust_method_type_name<
-                #(#method_struct_generics,)*
-            > {
-                #(#input_names : #input_names,)*
-                phantom: ::core::marker::PhantomData<(
-                    #(#method_struct_generics,)*
-                )>,
-            }
-        );
-
         let sig_where_clauses = &sig.where_clauses;
 
-        // Implementation of `JvmOp` for `m` -- when executed, call the method
-        // via JNI, after converting its arguments appropriately.
-        let this_ty = self.this_type();
-        let jvmop_impl = quote_spanned!(self.span =>
-            impl<#(#method_struct_generics),*> ::core::clone::Clone
-            for #rust_method_type_name<#(#method_struct_generics),*>
-            where
-                #(#input_names: #jvm_op_traits,)*
-                #(#java_class_generics: duchess::JavaObject,)*
-                #(#sig_where_clauses,)*
-            {
-                fn clone(&self) -> Self {
-                    #rust_method_type_name {
-                        #(#input_names: Clone::clone(&self.#input_names),)*
-                        phantom: self.phantom,
-                    }
-                }
-            }
-
-            impl<#(#method_struct_generics),*> duchess::prelude::JvmOp
-            for #rust_method_type_name<#(#method_struct_generics),*>
-            where
-                #(#input_names: #jvm_op_traits,)*
-                #(#java_class_generics: duchess::JavaObject,)*
-                #(#sig_where_clauses,)*
-            {
-                type Output<'jvm> = #output_ty;
-
-                fn do_jni<'jvm>(
-                    self,
-                    jvm: &mut duchess::Jvm<'jvm>,
-                ) -> duchess::LocalResult<'jvm, Self::Output<'jvm>> {
-                    #(#prepare_inputs)*
-
-                    // Cache the method id for this method -- note that we only have one cache
-                    // no matter how many generic monomorphizations there are. This makes sense
-                    // given Java's erased-based generics system.
-                    static METHOD: duchess::plumbing::once_cell::sync::OnceCell<duchess::plumbing::MethodPtr> = duchess::plumbing::once_cell::sync::OnceCell::new();
-                    let method = METHOD.get_or_try_init(|| {
-                        let class = <#this_ty as duchess::JavaObject>::class(jvm)?;
-                        duchess::plumbing::find_method(jvm, &class, #jni_method, #jni_descriptor, true)
-                    })?;
-
-                    let class = <#this_ty as duchess::JavaObject>::class(jvm)?;
-                    unsafe {
-                        jvm.env().invoke(|env| env.#jni_call_fn, |env, f| f(
-                            env,
-                            duchess::plumbing::JavaObjectExt::as_raw(&*class).as_ptr(),
-                            method.as_ptr(),
-                            [
-                                #(duchess::plumbing::IntoJniValue::into_jni_value(#input_names),)*
-                            ].as_ptr(),
-                        ))
-                    }
-                }
-            }
-        );
-
-        // If we return a Java object, then deref to its op struct.
-        // See [method docs] for more details.
-        // [method docs]:https://duchess-rs.github.io/duchess/methods.html
-        let deref_impl = java_ref_output_ty.map(|java_ref_output_ty| {
-            quote_spanned!(self.span =>
-                impl<#(#method_struct_generics),*> ::core::ops::Deref
-                for #rust_method_type_name<#(#method_struct_generics),*>
-                where
-                    #(#java_class_generics: duchess::JavaObject,)*
-                    #(#sig_where_clauses,)*
-                {
-                    type Target = <#java_ref_output_ty as duchess::plumbing::JavaView>::OfOp<Self>;
-
-                    fn deref(&self) -> &Self::Target {
-                        <Self::Target as duchess::plumbing::FromRef<_>>::from_ref(self)
-                    }
-                }
-            )
-        });
-
-        let inherent_method = quote_spanned!(self.span =>
-            pub fn #rust_method_name<#(#rust_method_generics),*>(
-                #(#input_names: impl #input_traits),*
-            ) -> impl #output_trait
-            where
-                #(#sig_where_clauses,)*
-            {
-                #method_struct
-
-                #jvmop_impl
-
-                #deref_impl
-
-                #rust_method_type_name {
-                    #(#input_names: #input_names.into_op(),)*
-                    phantom: ::core::default::Default::default(),
-                }
-            }
-        );
-
-        Ok(inherent_method)
+        Ok(quote!(duchess::plumbing::setup_static_method! {
+            struct_name: [#struct_name],
+            java_class_generics: [#(#java_class_generics,)*],
+            rust_method_name: [#rust_method_name],
+            rust_method_struct_name: [#rust_method_struct_name],
+            rust_method_generics: [#(#rust_method_generics,)*],
+            input_names: [#(#input_names,)*],
+            input_traits: [#(#input_traits,)*],
+            jvm_op_traits: [#(#jvm_op_traits,)*],
+            output_ty: [#output_ty],
+            output_trait: [#output_trait],
+            java_ref_output_ty: [#java_ref_output_ty],
+            sig_where_clauses: [#(#sig_where_clauses,)*],
+            prepare_inputs: [#(#prepare_inputs)*],
+            jni_call_fn: [#jni_call_fn],
+            jni_method: [#jni_method],
+            jni_descriptor: [#jni_descriptor],
+            idents: [self, jvm],
+        }))
     }
 
     /// Generates a static field getter that should be part of the inherent methods
