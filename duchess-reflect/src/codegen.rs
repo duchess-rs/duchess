@@ -500,6 +500,9 @@ impl ClassInfo {
     fn static_field_getter(&self, field: &Field) -> syn::Result<TokenStream> {
         assert!(field.flags.is_static);
 
+        let struct_name = self.struct_name();
+        let java_class_generics = self.class_generic_names();
+
         let mut sig = Signature::new(&field.name, self.span, &self.generics);
 
         let output_ty = sig.non_void_output_type(&field.ty)?;
@@ -514,96 +517,20 @@ impl ClassInfo {
         let rust_field_type_name =
             Id::from(format!("{}Getter", field.name.to_camel_case())).to_ident(self.span);
 
-        // The generic parameters declared on the Java method.
-        let java_class_generics: Vec<_> = self.class_generic_names();
-
-        // The generic parameters we need on the *method struct* (which will implement the `JvmOp`).
-        // These include the class generics plus all the generics from the method.
-        let field_struct_generics: Vec<_> = java_class_generics.clone(); // XX: Unnecessary clone
-
-        // For each field `f` in the Java type, we create a struct (named `<f>Getter`)
-        // that will implement the `JvmOp`.
-        let field_struct = quote_spanned!(self.span =>
-            pub struct #rust_field_type_name<
-                #(#field_struct_generics,)*
-            > {
-                phantom: ::core::marker::PhantomData<(
-                    #(#field_struct_generics,)*
-                )>,
-            }
-        );
-
         let sig_where_clauses = &sig.where_clauses;
 
-        // Implementation of `JvmOp` for `f` -- when executed, call the method
-        // via JNI, after converting its arguments appropriately.
-        let this_ty = self.this_type();
-        let jvmop_impl = quote_spanned!(self.span =>
-            impl<#(#field_struct_generics),*> duchess::prelude::JvmOp
-            for #rust_field_type_name<#(#field_struct_generics),*>
-            where
-                #(#java_class_generics: duchess::JavaObject,)*
-                #(#sig_where_clauses,)*
-            {
-                type Output<'jvm> = #output_ty;
-
-                fn do_jni<'jvm>(
-                    self,
-                    jvm: &mut duchess::Jvm<'jvm>,
-                ) -> duchess::LocalResult<'jvm, Self::Output<'jvm>> {
-
-                    // Cache the field id for this field -- note that we only have one cache
-                    // no matter how many generic monomorphizations there are. This makes sense
-                    // given Java's erased-based generics system.
-                    static FIELD: duchess::plumbing::once_cell::sync::OnceCell<duchess::plumbing::FieldPtr> = duchess::plumbing::once_cell::sync::OnceCell::new();
-                    let field = FIELD.get_or_try_init(|| {
-                        let class = <#this_ty as duchess::JavaObject>::class(jvm)?;
-                        duchess::plumbing::find_field(jvm, &class, #jni_field, #jni_descriptor, true)
-                    })?;
-
-                    let class = <#this_ty as duchess::JavaObject>::class(jvm)?;
-                    unsafe {
-                        jvm.env().invoke(|env| env.#jni_field_fn, |env, f| f(
-                            env,
-                            duchess::plumbing::JavaObjectExt::as_raw(&*class).as_ptr(),
-                            field.as_ptr(),
-                        ))
-                    }
-                }
-            }
-
-            impl<#(#field_struct_generics),*> ::core::clone::Clone for #rust_field_type_name<#(#field_struct_generics),*>
-            where
-                #(#java_class_generics: duchess::JavaObject,)*
-                #(#sig_where_clauses,)*
-            {
-                fn clone(&self) -> Self {
-                    #rust_field_type_name {
-                        phantom: self.phantom,
-                    }
-                }
-            }
-        );
-
-        let inherent_method = quote_spanned!(self.span =>
-            pub fn #rust_field_name() -> impl #output_trait
-            where
-                #(#sig_where_clauses,)*
-            {
-                #field_struct
-
-                #jvmop_impl
-
-                #rust_field_type_name {
-                    phantom: ::core::default::Default::default(),
-                }
-            }
-        );
-
-        // useful for debugging
-        // eprintln!("{inherent_method}");
-
-        Ok(inherent_method)
+        Ok(quote!(duchess::plumbing::setup_static_field_getter! {
+            struct_name: [#struct_name],
+            java_class_generics: [#(#java_class_generics,)*],
+            rust_field_name: [#rust_field_name],
+            rust_field_struct_name: [#rust_field_type_name],
+            output_ty: [#output_ty],
+            output_trait: [#output_trait],
+            sig_where_clauses: [#(#sig_where_clauses,)*],
+            jni_field: [#jni_field],
+            jni_descriptor: [#jni_descriptor],
+            jni_field_fn: [#jni_field_fn],
+        }))
     }
 
     fn struct_name(&self) -> Ident {
@@ -615,16 +542,6 @@ impl ClassInfo {
             .iter()
             .map(|g| g.to_ident(self.span))
             .collect()
-    }
-
-    fn this_type(&self) -> TokenStream {
-        let s = self.struct_name();
-        if self.generics.is_empty() {
-            quote_spanned!(self.span => #s)
-        } else {
-            let g: Vec<Ident> = self.class_generic_names();
-            quote_spanned!(self.span => #s < #(#g),* >)
-        }
     }
 
     /// Returns a class name with `/`, like `java/lang/Object` as a &CStr

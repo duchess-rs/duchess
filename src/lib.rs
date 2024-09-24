@@ -70,7 +70,7 @@ pub mod plumbing {
     pub use crate::to_java::{ToJavaImpl, ToJavaScalar};
     pub use duchess_macro_rules::{
         macro_if, mro, setup_class, setup_constructor, setup_inherent_object_method,
-        setup_obj_method, setup_op_method, setup_static_method,
+        setup_obj_method, setup_op_method, setup_static_field_getter, setup_static_method,
     };
     pub use jni_sys;
     pub use once_cell;
