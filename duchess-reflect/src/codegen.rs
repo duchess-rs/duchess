@@ -312,9 +312,6 @@ impl ClassInfo {
         let (input_ty_tts, input_ty_ops, input_names, output_ty_tt) =
             sig.method_tts(method, self.span)?;
 
-        // The appropriate JNI function to call this method.
-        let jni_call_fn = sig.jni_call_fn(&method.return_ty)?;
-
         let jni_descriptor = jni_c_str(&method.descriptor(&self.generics_scope()), self.span);
 
         // Code to convert each input appropriately
@@ -347,7 +344,6 @@ impl ClassInfo {
             output_ty_tt: [#output_ty_tt],
             sig_where_clauses: [#(#sig_where_clauses,)*],
             prepare_inputs: [#(#prepare_inputs)*],
-            jni_call_fn: [#jni_call_fn],
             jni_method: [#jni_method],
             jni_descriptor: [#jni_descriptor],
             idents: [self, jvm],

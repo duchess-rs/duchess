@@ -16,7 +16,6 @@ macro_rules! setup_inherent_object_method {
         output_ty_tt: [$O_ty:tt],
         sig_where_clauses: [$($SIG:tt)*],
         prepare_inputs: [$($prepare_inputs:tt)*],
-        jni_call_fn: [$jni_call_fn:ident],
         jni_method: [$jni_method:expr],
         jni_descriptor: [$jni_descriptor:expr],
         idents: [$self:ident, $jvm:ident],
@@ -88,14 +87,17 @@ macro_rules! setup_inherent_object_method {
                     })?;
 
                     unsafe {
-                        $jvm.env().invoke(|env| env.$jni_call_fn, |env, f| f(
-                            env,
-                            this.as_ptr(),
-                            method.as_ptr(),
-                            [
-                                $(duchess::plumbing::IntoJniValue::into_jni_value($I),)*
-                            ].as_ptr(),
-                        ))
+                        $jvm.env().invoke(
+                            duchess::plumbing::jni_call_fn!($O_ty),
+                            |env, f| f(
+                                env,
+                                this.as_ptr(),
+                                method.as_ptr(),
+                                [
+                                    $(duchess::plumbing::IntoJniValue::into_jni_value($I),)*
+                                ].as_ptr(),
+                            ),
+                        )
                     }
                 }
             }

@@ -174,35 +174,6 @@ impl Signature {
         self.where_clauses.push(t);
     }
 
-    /// Returns the name of the jni accessor method suitable for calling a function
-    /// that returns a value of type `ty`.
-    pub fn jni_call_fn(&mut self, ty: &Option<Type>) -> syn::Result<Ident> {
-        let f = match ty {
-            Some(Type::Ref(_)) => "CallObjectMethodA",
-            Some(Type::Repeat(_)) => {
-                return Err(syn::Error::new(
-                    self.span,
-                    format!(
-                        "unsupported repeating return type in method `{}`",
-                        self.item_name
-                    ),
-                ))
-            }
-            Some(Type::Scalar(scalar)) => match scalar {
-                ScalarType::Int => "CallIntMethodA",
-                ScalarType::Long => "CallLongMethodA",
-                ScalarType::Short => "CallShortMethodA",
-                ScalarType::Byte => "CallByteMethodA",
-                ScalarType::F64 => "CallDoubleMethodA",
-                ScalarType::F32 => "CallFloatMethodA",
-                ScalarType::Boolean => "CallBooleanMethodA",
-                ScalarType::Char => "CallCharMethodA",
-            },
-            None => "CallVoidMethodA",
-        };
-        Ok(Ident::new(f, self.span))
-    }
-
     /// Returns the name of the jni accessor method suitable for calling a
     /// static function that returns a value of type `ty`.
     pub fn jni_static_call_fn(&mut self, ty: &Option<Type>) -> syn::Result<Ident> {
