@@ -174,33 +174,6 @@ impl Signature {
         self.where_clauses.push(t);
     }
 
-    /// Returns the name of the jni accessor method suitable for calling a
-    /// static function that returns a value of type `ty`.
-    pub fn jni_static_call_fn(&mut self, ty: &Option<Type>) -> syn::Result<Ident> {
-        let f = match ty {
-            Some(Type::Ref(_)) => "CallStaticObjectMethodA",
-            Some(Type::Repeat(_)) => {
-                let msg = format!(
-                    "unsupported repeating return type in static method `{}`",
-                    self.item_name
-                );
-                return Err(syn::Error::new(self.span, msg));
-            }
-            Some(Type::Scalar(scalar)) => match scalar {
-                ScalarType::Int => "CallStaticIntMethodA",
-                ScalarType::Long => "CallStaticLongMethodA",
-                ScalarType::Short => "CallStaticShortMethodA",
-                ScalarType::Byte => "CallStaticByteMethodA",
-                ScalarType::F64 => "CallStaticDoubleMethodA",
-                ScalarType::F32 => "CallStaticFloatMethodA",
-                ScalarType::Boolean => "CallStaticBooleanMethodA",
-                ScalarType::Char => "CallStaticCharMethodA",
-            },
-            None => "CallStaticVoidMethodA",
-        };
-        Ok(Ident::new(f, self.span))
-    }
-
     /// Returns a path to a suitable JVM trait alias
     /// (`duchess::JvmRefOp` or `duchess::JavaScalarOp`)
     /// to the type. This really *ought* to be done in
