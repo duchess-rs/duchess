@@ -2,36 +2,28 @@
 macro_rules! setup_static_method {
     (
         struct_name: [$S:ident],
-
         java_class_generics: [$($G:ident,)*],
-
-        // Snake case version of java method name
-        rust_method_name: [$rust_method_name:ident],
-
-        // Camel case version of java method name
-        rust_method_struct_name: [$rust_method_struct_name:ident],
+        rust_method_name: [$M:ident],
         rust_method_generics: [$($MG:ident,)*],
-        input_names: [$($I:ident,)*],
-        input_traits: [$($input_trait:path,)*],
-        jvm_op_traits: [$($jvm_op_trait:path,)*],
-        output_ty: [$output_ty:ty],
-        output_trait: [$output_trait:path],
-        java_ref_output_ty: [$($java_ref_output_ty:tt)*],
-        sig_where_clauses: [$($sig_where_clause:tt)*],
+        input_names: [$($I:tt,)*],
+        input_ty_tts: [$($I_ty:tt,)*],
+        input_ty_ops: [$($I_op:path,)*],
+        output_ty_tt: [$O_ty:tt],
+        sig_where_clauses: [$($SIG:tt)*],
         prepare_inputs: [$($prepare_inputs:tt)*],
         jni_call_fn: [$jni_call_fn:ident],
         jni_method: [$jni_method:expr],
         jni_descriptor: [$jni_descriptor:expr],
         idents: [$this:ident, $jvm:ident],
     ) => {
-        pub fn $rust_method_name<$($MG,)*>(
-            $($I: impl $input_trait),*
-        ) -> impl $output_trait
+        pub fn $M<$($MG,)*>(
+            $($I: duchess::plumbing::argument_impl_trait!($I_ty),)*
+        ) -> duchess::plumbing::output_trait!($O_ty)
         where
-            $($sig_where_clause)*
+            $($SIG)*
         {
             // Create a struct that will implement the `JvmOp`.
-            pub struct $rust_method_struct_name<
+            pub struct $M<
                 $($G,)*
                 $($MG,)*
                 $($I,)*
@@ -41,14 +33,14 @@ macro_rules! setup_static_method {
             }
 
             impl<$($G,)* $($MG,)* $($I,)*> ::core::clone::Clone
-            for $rust_method_struct_name<$($G,)* $($MG,)* $($I,)*>
+            for $M<$($G,)* $($MG,)* $($I,)*>
             where
-                $($I: $jvm_op_trait,)*
+                $($I: $I_op,)*
                 $($G: duchess::JavaObject,)*
-                $($sig_where_clause)*
+                $($SIG)*
             {
                 fn clone(&self) -> Self {
-                    $rust_method_struct_name {
+                    $M {
                         $($I: Clone::clone(&self.$I),)*
                         phantom: self.phantom,
                     }
@@ -56,13 +48,13 @@ macro_rules! setup_static_method {
             }
 
             impl<$($G,)* $($MG,)* $($I,)*> duchess::prelude::JvmOp
-            for $rust_method_struct_name<$($G,)* $($MG,)* $($I,)*>
+            for $M<$($G,)* $($MG,)* $($I,)*>
             where
-                $($I: $jvm_op_trait,)*
+                $($I: $I_op,)*
                 $($G: duchess::JavaObject,)*
-                $($sig_where_clause)*
+                $($SIG)*
             {
-                type Output<'jvm> = $output_ty;
+                type Output<'jvm> = duchess::plumbing::output_type!('jvm, $O_ty);
 
                 fn do_jni<'jvm>(
                     $this,
@@ -96,14 +88,14 @@ macro_rules! setup_static_method {
             }
 
             duchess::plumbing::macro_if! {
-                if [$($java_ref_output_ty)*] {
+                if is_ref_ty($O_ty) {
                     impl<$($G,)* $($MG,)* $($I,)*> ::core::ops::Deref
-                    for $rust_method_struct_name<$($G,)* $($MG,)* $($I,)*>
+                    for $M<$($G,)* $($MG,)* $($I,)*>
                     where
                         $($G: duchess::JavaObject,)*
-                        $($sig_where_clause)*
+                        $($SIG)*
                     {
-                        type Target = <$($java_ref_output_ty)* as duchess::plumbing::JavaView>::OfOp<Self>;
+                        type Target = duchess::plumbing::view_of_op!($O_ty);
 
                         fn deref(&self) -> &Self::Target {
                             <Self::Target as duchess::plumbing::FromRef<_>>::from_ref(self)
@@ -112,7 +104,7 @@ macro_rules! setup_static_method {
                 }
             }
 
-            $rust_method_struct_name {
+            $M {
                 $($I: $I.into_op(),)*
                 phantom: ::core::default::Default::default(),
             }

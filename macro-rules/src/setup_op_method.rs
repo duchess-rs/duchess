@@ -3,25 +3,24 @@ macro_rules! setup_op_method {
     (
         struct_name: [$S:ident],
         java_class_generics: [$($G:ident,)*],
-        rust_method_name: [$rust_method_name:ident],
+        rust_method_name: [$M:ident],
         rust_method_generics: [$($MG:ident,)*],
-        input_names: [$($input_name:ident,)*],
-        input_traits: [$($input_trait:path,)*],
-        output_trait: [$output_trait:path],
-        sig_where_clauses: [$($sig_where_clause:tt)*],
+        input_names: [$($I:ident,)*],
+        input_ty_tts: [$($I_ty:tt,)*],
+        output_ty_tt: [$O_ty:tt],
+        sig_where_clauses: [$($SIG:tt)*],
     ) => {
-        pub fn $rust_method_name<$($MG,)*>(
+        pub fn $M<$($MG,)*>(
             &self,
-            $($input_name: impl $input_trait,)*
-        ) -> impl $output_trait
+            $($I: duchess::plumbing::argument_impl_trait!($I_ty),)*
+        ) -> duchess::plumbing::output_trait!($O_ty)
         where
-            $($sig_where_clause)*
+            $($SIG)*
         {
-            <$S<$($G,)*>>::$rust_method_name(
+            <$S<$($G,)*>>::$M(
                 Clone::clone(&self.this),
-                $($input_name,)*
+                $($I,)*
             )
         }
-
     }
 }

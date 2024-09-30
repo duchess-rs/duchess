@@ -1,6 +1,8 @@
-use crate::class_info::{ClassRef, Generic, Id, NonRepeatingType, RefType, ScalarType, Type};
+use crate::class_info::{
+    ClassRef, Generic, Id, Method, NonRepeatingType, RefType, ScalarType, Type,
+};
 use proc_macro2::{Ident, Span, TokenStream};
-use quote::quote_spanned;
+use quote::{quote, quote_spanned};
 
 /// "Signature" processes Java argument/return types and
 /// converts them into Rust types. This includes translating Java
@@ -79,7 +81,7 @@ impl Signature {
                 s.where_clauses
                     .push(quote_spanned!(s.span => #ident : duchess::JavaObject));
                 for e in &g.extends {
-                    let ty = s.class_ref_ty(e)?;
+                    let ty = s.class_ref_ty_rs(e)?;
                     s.where_clauses
                         .push(quote_spanned!(s.span => #ident : duchess::AsJRef<#ty>));
                 }
@@ -97,6 +99,44 @@ impl Signature {
         let r = op(self);
         self.capture_generics = v;
         r
+    }
+
+    /// Create and return a tuple with three fields:
+    ///
+    /// * the `input_ty_tts` token trees describing the input types to `method` (see [`Self::java_ty_tt`][])
+    /// * the `input_ty_ops` token trees describing the JVM traits for each input type (see [`Self::jvm_op_trait`][])
+    /// * the `input_names` identifiers naming each argument to `method`
+    /// * the `output_ty_tt` token tree describing the return types of `method` (see [`Self::output_ty_tt`][])
+    pub fn method_tts(
+        &mut self,
+        method: &Method,
+        span: Span,
+    ) -> syn::Result<(
+        Vec<TokenStream>,
+        Vec<TokenStream>,
+        Vec<syn::Ident>,
+        TokenStream,
+    )> {
+        let input_ty_tts = method
+            .argument_tys
+            .iter()
+            .map(|ty| self.java_ty_tt(ty))
+            .collect::<syn::Result<Vec<_>>>()?;
+
+        let input_ty_ops = method
+            .argument_tys
+            .iter()
+            .zip(&input_ty_tts)
+            .map(|(ty, tt)| self.jvm_op_trait(ty, tt))
+            .collect::<syn::Result<Vec<_>>>()?;
+
+        let input_names: Vec<_> = (0..input_ty_tts.len())
+            .map(|i| Ident::new(&format!("a{i}"), span))
+            .collect();
+
+        let output_ty_tt = self.output_ty_tt(&method.return_ty)?;
+
+        Ok((input_ty_tts, input_ty_ops, input_names, output_ty_tt))
     }
 
     /// Generates a fresh generic type and adds it to `self.generics`.
@@ -134,55 +174,8 @@ impl Signature {
         self.where_clauses.push(t);
     }
 
-    /// Returns an appropriate `impl type` for a function that
-    /// takes `ty` as input. Assumes objects are nullable.
-    pub fn input_and_jvm_op_traits(
-        &mut self,
-        ty: &Type,
-    ) -> syn::Result<(TokenStream, TokenStream)> {
-        match ty.to_non_repeating() {
-            NonRepeatingType::Ref(ty) => {
-                let t = self.java_ref_ty(&ty)?;
-                Ok((
-                    quote_spanned!(self.span => duchess::IntoJava<#t>),
-                    quote_spanned!(self.span => duchess::plumbing::JvmRefOp<#t>),
-                ))
-            }
-            NonRepeatingType::Scalar(ty) => {
-                let t = self.java_scalar_ty(&ty);
-                Ok((
-                    quote_spanned!(self.span => duchess::IntoScalar<#t>),
-                    quote_spanned!(self.span => duchess::plumbing::JvmScalarOp<#t>),
-                ))
-            }
-        }
-    }
-
-    /// Returns an appropriate `impl type` for a function that
-    /// returns a `ty` or void. Assumes objects are nullable.
-    pub fn output_type(&mut self, ty: &Option<Type>) -> syn::Result<TokenStream> {
-        match ty.as_ref() {
-            Some(ty) => self.non_void_output_type(ty),
-            None => Ok(quote_spanned!(self.span => ())),
-        }
-    }
-
-    /// Returns an appropriate `impl type` for a function that
-    /// returns `ty`. Assumes objects are nullable.
-    pub fn non_void_output_type(&mut self, ty: &Type) -> syn::Result<TokenStream> {
-        // XX: do we need the non_repeating transform here? Shouldn't be allowed in return position
-        self.forbid_capture(|this| match ty.to_non_repeating() {
-            NonRepeatingType::Ref(ty) => {
-                let t = this.java_ref_ty(&ty)?;
-                Ok(quote_spanned!(this.span => ::core::option::Option<duchess::Local<'jvm, #t>>))
-            }
-            NonRepeatingType::Scalar(ty) => {
-                let t = this.java_scalar_ty(&ty);
-                Ok(quote_spanned!(this.span => #t))
-            }
-        })
-    }
-
+    /// Returns the name of the jni accessor method suitable for calling a function
+    /// that returns a value of type `ty`.
     pub fn jni_call_fn(&mut self, ty: &Option<Type>) -> syn::Result<Ident> {
         let f = match ty {
             Some(Type::Ref(_)) => "CallObjectMethodA",
@@ -210,6 +203,8 @@ impl Signature {
         Ok(Ident::new(f, self.span))
     }
 
+    /// Returns the name of the jni accessor method suitable for calling a
+    /// static function that returns a value of type `ty`.
     pub fn jni_static_call_fn(&mut self, ty: &Option<Type>) -> syn::Result<Ident> {
         let f = match ty {
             Some(Type::Ref(_)) => "CallStaticObjectMethodA",
@@ -235,6 +230,8 @@ impl Signature {
         Ok(Ident::new(f, self.span))
     }
 
+    /// Returns the name of the jni accessor method suitable for getting
+    /// the value of a static field of type `ty`.
     pub fn jni_static_field_get_fn(&mut self, ty: &Type) -> syn::Result<Ident> {
         let f = match ty {
             Type::Ref(_) => "GetStaticObjectField",
@@ -259,66 +256,76 @@ impl Signature {
         Ok(Ident::new(f, self.span))
     }
 
-    /// Returns an appropriate trait for a method that
-    /// returns `ty`. Assumes objects are nullable.
-    pub fn method_trait(&mut self, ty: &Option<Type>) -> syn::Result<TokenStream> {
-        self.forbid_capture(|this| match ty.as_ref().map(|ty| ty.to_non_repeating()) {
-            Some(NonRepeatingType::Ref(ty)) => {
-                let t = this.java_ref_ty(&ty)?;
-                Ok(quote_spanned!(this.span => duchess::JavaMethod<#t>))
-            }
-            Some(NonRepeatingType::Scalar(ty)) => {
-                let t = this.java_scalar_ty(&ty);
-                Ok(quote_spanned!(this.span => duchess::ScalarMethod<#t>))
-            }
-            None => Ok(quote_spanned!(this.span => duchess::VoidMethod)),
-        })
-    }
-
-    /// Returns an appropriate trait for a field that
-    /// returns `ty`. Assumes objects are nullable.
-    pub fn field_trait(&mut self, ty: &Type) -> syn::Result<TokenStream> {
-        self.forbid_capture(|this| match ty.to_non_repeating() {
-            NonRepeatingType::Ref(ty) => {
-                let t = this.java_ref_ty(&ty)?;
-                Ok(quote_spanned!(this.span => duchess::JavaField<#t>))
-            }
-            NonRepeatingType::Scalar(ty) => {
-                let t = this.java_scalar_ty(&ty);
-                Ok(quote_spanned!(this.span => duchess::ScalarField<#t>))
-            }
-        })
-    }
-
-    /// Returns the Rust type that represents this Java type -- e.g., for `Object`,
-    /// returns `java::lang::Object`. Note that this is not the type of a *reference* to this
-    /// java type (which would be e.g. `Java<java::lang::Object>`).
-    pub fn java_ty(&mut self, ty: &Type) -> syn::Result<TokenStream> {
+    /// Returns a path to a suitable JVM trait alias
+    /// (`duchess::JvmRefOp` or `duchess::JavaScalarOp`)
+    /// to the type. This really *ought* to be done in
+    /// macro-rules code (e.g., `$I: duchess::plumbing::jvm_op!($_ty)`)
+    /// but we can't easily do that because macro invocations
+    /// aren't allowed in that position.
+    pub fn jvm_op_trait(&mut self, ty: &Type, ty_tt: &TokenStream) -> syn::Result<TokenStream> {
         match &ty.to_non_repeating() {
-            NonRepeatingType::Ref(ty) => self.java_ref_ty(ty),
-            NonRepeatingType::Scalar(ty) => Ok(self.java_scalar_ty(ty)),
+            NonRepeatingType::Ref(_) => Ok(quote!(
+                duchess::plumbing::JvmRefOp<duchess::plumbing::rust_ty!(#ty_tt)>
+            )),
+            NonRepeatingType::Scalar(_) => Ok(quote!(
+                duchess::plumbing::JvmScalarOp<duchess::plumbing::rust_ty!(#ty_tt)>
+            )),
         }
     }
 
-    /// Like `java_ty`, but only for reference types (returns `None` for scalars).
-    pub fn java_ty_if_ref(&mut self, ty: &Type) -> syn::Result<Option<TokenStream>> {
-        match &ty.to_non_repeating() {
-            NonRepeatingType::Ref(ty) => Ok(Some(self.java_ref_ty(ty)?)),
-            NonRepeatingType::Scalar(_) => Ok(None),
-        }
-    }
-
-    fn java_ref_ty(&mut self, ty: &RefType) -> syn::Result<TokenStream> {
+    /// Return a token tree that can be passed to the macro-rules macros
+    /// to represent the output type of a function; this can include `void`.
+    pub fn output_ty_tt(&mut self, ty: &Option<Type>) -> syn::Result<TokenStream> {
         match ty {
-            RefType::Class(ty) => Ok(self.class_ref_ty(ty)?),
+            Some(ty) => self.java_ty_tt(ty),
+            None => Ok(quote!(void)),
+        }
+    }
+
+    /// Returns a token tree that can be passed to the various
+    /// macro-rules (see `macro_rules/src/java_types.rs`
+    /// for a description of the format) representing the type
+    /// of an input.
+    ///
+    /// NB: This function may modify `self` to add fresh generics
+    /// and bounds into the signature, allowing for the translation
+    /// of Java wildcards in some cases. For example, a function that
+    /// takes `List<?>` can be translated to a Rust function taking
+    /// `List<T>` where `T: JavaObject`.
+    pub fn java_ty_tt(&mut self, ty: &Type) -> syn::Result<TokenStream> {
+        match &ty.to_non_repeating() {
+            NonRepeatingType::Ref(ty) => self.java_ref_ty_tt(ty),
+            NonRepeatingType::Scalar(ty) => Ok(self.java_scalar_ty_tt(ty)),
+        }
+    }
+
+    /// Returns a Rust type that corresponds to the Java type `ty`.
+    ///
+    /// Use this when generating Rust code; to pass into the macro-rules macros,
+    /// prefer [`Self::java_ty_tt`][].
+    pub fn java_ty_rs(&mut self, ty: &Type) -> syn::Result<TokenStream> {
+        let tt = self.java_ty_tt(ty)?;
+        Ok(quote!(duchess::plumbing::rust_ty!(#tt)))
+    }
+
+    /// Return tokens to create the Rust type for a RefType.
+    fn java_ref_ty_rs(&mut self, ty: &RefType) -> syn::Result<TokenStream> {
+        let tt = self.java_ref_ty_tt(ty)?;
+        Ok(quote!(duchess::plumbing::rust_ty!(#tt)))
+    }
+
+    /// Return the token-tree for a RefType.
+    fn java_ref_ty_tt(&mut self, ty: &RefType) -> syn::Result<TokenStream> {
+        match ty {
+            RefType::Class(ty) => Ok(self.class_ref_ty_tt(ty)?),
             RefType::Array(e) => {
-                let e = self.java_ty(e)?;
-                Ok(quote_spanned!(self.span => java::Array<#e>))
+                let e = self.java_ty_tt(e)?;
+                Ok(quote!((array #e)))
             }
             RefType::TypeParameter(t) => {
                 if self.in_scope_generics.contains(t) {
                     let t = t.to_ident(self.span);
-                    Ok(quote_spanned!(self.span => #t))
+                    Ok(quote!((generic #t)))
                 } else {
                     let msg = format!(
                         "generic type parameter `{:?}` not among in-scope parameters: {:?}",
@@ -329,37 +336,47 @@ impl Signature {
             }
             RefType::Extends(ty) => {
                 let g = self.fresh_generic()?;
-                let e = self.java_ref_ty(ty)?;
+                let e = self.java_ref_ty_rs(ty)?;
                 self.push_where_bound(quote_spanned!(self.span => #g : duchess::AsJRef<#e>));
-                Ok(quote_spanned!(self.span => #g))
+                Ok(quote!((generic #g)))
             }
             RefType::Super(_) => {
                 let g = self.fresh_generic()?;
                 // FIXME: missing where bound, really
-                Ok(quote_spanned!(self.span => #g))
+                Ok(quote!((generic #g)))
             }
             RefType::Wildcard => {
                 let g = self.fresh_generic()?;
-                Ok(quote_spanned!(self.span => #g))
+                Ok(quote!((generic #g)))
             }
         }
     }
 
-    pub fn class_ref_ty(&mut self, ty: &ClassRef) -> syn::Result<TokenStream> {
-        let ClassRef { name, generics } = ty;
-        let rust_name = name.to_module_name(self.span);
-        if generics.len() == 0 {
-            Ok(quote_spanned!(self.span => #rust_name))
-        } else {
-            let rust_tys: Vec<_> = generics
-                .iter()
-                .map(|t| self.java_ref_ty(t))
-                .collect::<Result<_, _>>()?;
-            Ok(quote_spanned!(self.span => #rust_name < #(#rust_tys),* >))
-        }
+    pub fn class_ref_ty_rs(&mut self, ty: &ClassRef) -> syn::Result<TokenStream> {
+        let tt = self.class_ref_ty_tt(ty)?;
+        Ok(quote!(duchess::plumbing::rust_ty!(#tt)))
     }
 
-    fn java_scalar_ty(&self, ty: &ScalarType) -> TokenStream {
-        ty.to_tokens(self.span)
+    fn class_ref_ty_tt(&mut self, ty: &ClassRef) -> syn::Result<TokenStream> {
+        let ClassRef { name, generics } = ty;
+        let rust_name = name.to_module_name(self.span);
+        let rust_ty_tts: Vec<_> = generics
+            .iter()
+            .map(|t| self.java_ref_ty_tt(t))
+            .collect::<Result<_, _>>()?;
+        Ok(quote!((class[#rust_name] #(#rust_ty_tts)*)))
+    }
+
+    fn java_scalar_ty_tt(&self, ty: &ScalarType) -> TokenStream {
+        match ty {
+            ScalarType::Int => quote!(int),
+            ScalarType::Long => quote!(long),
+            ScalarType::Short => quote!(short),
+            ScalarType::Byte => quote!(byte),
+            ScalarType::F64 => quote!(double),
+            ScalarType::F32 => quote!(float),
+            ScalarType::Boolean => quote!(boolean),
+            ScalarType::Char => quote!(char),
+        }
     }
 }

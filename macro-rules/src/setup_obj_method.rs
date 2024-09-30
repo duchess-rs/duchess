@@ -3,23 +3,23 @@ macro_rules! setup_obj_method {
     (
         struct_name: [$S:ident],
         java_class_generics: [$($G:ident,)*],
-        rust_method_name: [$rust_method_name:ident],
+        rust_method_name: [$M:ident],
         rust_method_generics: [$($MG:ident,)*],
-        input_names: [$($input_name:ident,)*],
-        input_traits: [$($input_trait:path,)*],
-        output_trait: [$output_trait:path],
-        sig_where_clauses: [$($sig_where_clause:tt)*],
+        input_names: [$($I:tt,)*],
+        input_ty_tts: [$($I_ty:tt,)*],
+        output_ty_tt: [$O_ty:tt],
+        sig_where_clauses: [$($SIG:tt)*],
     ) => {
-        pub fn $rust_method_name<'a, $($MG,)*>(
+        pub fn $M<'a, $($MG,)*>(
             &'a self,
-            $($input_name: impl $input_trait + 'a,)*
-        ) -> impl $output_trait + 'a
+            $($I: duchess::plumbing::argument_impl_trait!($I_ty + 'a),)*
+        ) -> duchess::plumbing::output_trait!($O_ty + 'a)
         where
-            $($sig_where_clause)*
+            $($SIG)*
         {
-            <$S<$($G,)*>>::$rust_method_name(
+            <$S<$($G,)*>>::$M(
                 &self.this,
-                $($input_name,)*
+                $($I,)*
             )
         }
     }

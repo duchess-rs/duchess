@@ -3,20 +3,19 @@ macro_rules! setup_static_field_getter {
     (
         struct_name: [$S:ident],
         java_class_generics: [$($G:ident,)*],
-        rust_field_name: [$rust_field_name:ident],
-        rust_field_struct_name: [$rust_field_struct_name:ident],
-        output_ty: [$output_ty:ty],
-        output_trait: [$output_trait:path],
-        sig_where_clauses: [$($sig_where_clause:tt)*],
+        rust_field_name: [$F:ident],
+        field_ty: [$F_ty:tt],
+        sig_where_clauses: [$($SIG:tt)*],
         jni_field: [$jni_field:expr],
         jni_descriptor: [$jni_descriptor:expr],
         jni_field_fn: [$jni_field_fn:ident],
     ) => {
-        pub fn $rust_field_name() -> impl $output_trait
+        pub fn $F() -> duchess::plumbing::field_output_trait!($F_ty)
         where
-            $($sig_where_clause)*
+            $($SIG)*
         {
-            pub struct $rust_field_struct_name<
+            #[allow(non_camel_case_types)]
+            pub struct $F<
                 $($G,)*
             > {
                 phantom: ::core::marker::PhantomData<(
@@ -25,12 +24,12 @@ macro_rules! setup_static_field_getter {
             }
 
             impl<$($G,)*> duchess::prelude::JvmOp
-            for $rust_field_struct_name<$($G,)*>
+            for $F<$($G,)*>
             where
                 $($G: duchess::JavaObject,)*
-                $($sig_where_clause)*
+                $($SIG)*
             {
-                type Output<'jvm> = $output_ty;
+                type Output<'jvm> = duchess::plumbing::output_type!('jvm, $F_ty);
 
                 fn do_jni<'jvm>(
                     self,
@@ -59,19 +58,19 @@ macro_rules! setup_static_field_getter {
             }
 
 
-            impl<$($G,)*> ::core::clone::Clone for $rust_field_struct_name<$($G,)*>
+            impl<$($G,)*> ::core::clone::Clone for $F<$($G,)*>
             where
                 $($G: duchess::JavaObject,)*
-                $($sig_where_clause)*
+                $($SIG)*
             {
                 fn clone(&self) -> Self {
-                    $rust_field_struct_name {
+                    $F {
                         phantom: self.phantom,
                     }
                 }
             }
 
-            $rust_field_struct_name {
+            $F {
                 phantom: ::core::default::Default::default(),
             }
         }

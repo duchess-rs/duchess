@@ -15,25 +15,73 @@
 /// in a Rust function reflecting a Java method.
 #[macro_export]
 macro_rules! argument_impl_trait {
-    ($scalar:ident) => {
-        impl IntoScalar< duchess::plumbing::rust_ty!($scalar) >
+    ($scalar:ident $(+ $lt:lifetime)?) => {
+        impl duchess::IntoScalar< duchess::plumbing::rust_ty!($scalar) > $(+ $lt)?
     };
 
-    ($r:tt) => {
-        impl IntoJava< duchess::plumbing::rust_ty!($r) >
+    ($r:tt $(+ $lt:lifetime)?) => {
+        impl duchess::IntoJava< duchess::plumbing::rust_ty!($r) > $(+ $lt)?
     };
 }
 
-/// Generates an `impl Trait` expression that is used as the type of a method argument
-/// in a Rust function reflecting a Java method.
+/// Returns an appropriate trait for a method that
+/// returns `ty`. Assumes objects are nullable.
 #[macro_export]
-macro_rules! argument_op {
+macro_rules! output_type {
+    ($lt:lifetime, void) => {
+        ()
+    };
+
+    ($lt:lifetime, $scalar:ident) => {
+        duchess::plumbing::rust_ty!($scalar)
+    };
+
+    ($lt:lifetime, $r:tt) => {
+        Option<duchess::Local<$lt, duchess::plumbing::rust_ty!($r)>>
+    };
+}
+
+/// Returns an appropriate trait for a method that
+/// returns `ty`. Assumes objects are nullable.
+#[macro_export]
+macro_rules! output_trait {
+    (void $(+ $lt:lifetime)?) => {
+        impl duchess::VoidMethod $(+ $lt)?
+    };
+
+    ($scalar:ident $(+ $lt:lifetime)?) => {
+        impl duchess::ScalarMethod< duchess::plumbing::rust_ty!($scalar) > $(+ $lt)?
+    };
+
+    ($r:tt $(+ $lt:lifetime)?) => {
+        impl duchess::JavaMethod< duchess::plumbing::rust_ty!($r) > $(+ $lt)?
+    };
+}
+
+/// Returns an appropriate trait for a method that
+/// returns `ty`. Assumes objects are nullable.
+#[macro_export]
+macro_rules! field_output_trait {
     ($scalar:ident) => {
-        impl JvmScalarOp< duchess::plumbing::rust_ty!($scalar) >
+        impl duchess::ScalarField< duchess::plumbing::rust_ty!($scalar) >
     };
 
     ($r:tt) => {
-        impl JvmRefOp< duchess::plumbing::rust_ty!($r) >
+        impl duchess::JavaField< duchess::plumbing::rust_ty!($r) >
+    };
+}
+
+#[macro_export]
+macro_rules! view_of_op {
+    ($r:tt) => {
+        <duchess::plumbing::rust_ty!($r) as duchess::plumbing::JavaView>::OfOp<Self>
+    };
+}
+
+#[macro_export]
+macro_rules! view_of_obj {
+    ($r:tt) => {
+        <duchess::plumbing::rust_ty!($r) as duchess::plumbing::JavaView>::OfObj<Self>
     };
 }
 
@@ -60,7 +108,7 @@ macro_rules! rust_ty {
         f64
     };
     (char) => {
-        char
+        u16
     };
     (boolean) => {
         bool
@@ -68,6 +116,9 @@ macro_rules! rust_ty {
 
     // Reference types
 
+    ((class[$($path:tt)*])) => {
+        $($path)*
+    };
     ((class[$($path:tt)*] $($args:tt)*)) => {
         ($($path)* < $(duchess::plumbing::rust_ty!($args),)* >)
     };

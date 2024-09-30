@@ -8,7 +8,6 @@ use crate::{
     signature::Signature,
     upcasts::Upcasts,
 };
-use inflector::Inflector;
 use proc_macro2::{Ident, Literal, Span, TokenStream};
 use quote::{quote, quote_spanned};
 
@@ -175,7 +174,7 @@ impl ClassInfo {
             .map(|r| {
                 let mut sig = Signature::new(&Id::from("supertrait"), self.span, &[])
                     .with_internal_generics(&self.generics)?;
-                Ok(sig.forbid_capture(|sig| sig.class_ref_ty(r)).unwrap())
+                Ok(sig.forbid_capture(|sig| sig.class_ref_ty_rs(r)).unwrap())
             })
             .collect()
     }
@@ -183,15 +182,20 @@ impl ClassInfo {
     fn constructor(&self, constructor: &Constructor) -> syn::Result<TokenStream> {
         let mut sig = Signature::new(self.name.class_name(), self.span, &self.generics);
 
-        let (input_traits, jvm_op_traits): (Vec<_>, Vec<_>) = constructor
+        let input_ty_tts = constructor
             .argument_tys
             .iter()
-            .map(|ty| sig.input_and_jvm_op_traits(ty))
-            .collect::<Result<Vec<_>, _>>()?
-            .into_iter()
-            .unzip();
+            .map(|ty| sig.java_ty_tt(ty))
+            .collect::<syn::Result<Vec<_>>>()?;
 
-        let input_names: Vec<_> = (0..input_traits.len())
+        let input_ty_ops = constructor
+            .argument_tys
+            .iter()
+            .zip(&input_ty_tts)
+            .map(|(ty, tt)| sig.jvm_op_trait(ty, tt))
+            .collect::<syn::Result<Vec<_>>>()?;
+
+        let input_names: Vec<Ident> = (0..input_ty_tts.len())
             .map(|i| Ident::new(&format!("a{i}"), self.span))
             .collect();
 
@@ -212,8 +216,8 @@ impl ClassInfo {
                 struct_name: [#struct_name],
                 java_class_generics: [#(#java_class_generics,)*],
                 input_names: [#(#input_names,)*],
-                input_traits: [#(#input_traits,)*],
-                jvm_op_traits: [#(#jvm_op_traits,)*],
+                input_ty_tts: [#(#input_ty_tts,)*],
+                input_ty_ops: [#(#input_ty_ops,)*],
                 prepare_inputs: [#(#prepare_inputs)*],
                 descriptor: [#descriptor],
                 jni_descriptor: [#jni_descriptor],
@@ -234,23 +238,8 @@ impl ClassInfo {
         let mut sig = Signature::new(&method.name, self.span, &self.generics)
             .with_internal_generics(&method.generics)?;
 
-        let (input_traits, _jvm_op_traits): (Vec<_>, Vec<_>) = method
-            .argument_tys
-            .iter()
-            .map(|ty| sig.input_and_jvm_op_traits(ty))
-            .collect::<Result<Vec<_>, _>>()?
-            .into_iter()
-            .unzip();
-
-        let input_names: Vec<_> = (0..input_traits.len())
-            .map(|i| Ident::new(&format!("a{i}"), self.span))
-            .collect();
-
-        // The "output trait" is the trait bounds we declare for the user,
-        // e.g., for a method like `Foo method()`, we will declare a
-        // Rust method `-> impl JavaMethod<Foo>`, and this variable
-        // would be `JavaMethod<Foo>`.
-        let output_trait = sig.method_trait(&method.return_ty)?;
+        let (input_ty_tts, _input_ty_ops, input_names, output_ty_tt) =
+            sig.method_tts(method, self.span)?;
 
         let rust_method_name = Id::from(method.name.to_snake_case()).to_ident(self.span);
 
@@ -272,8 +261,8 @@ impl ClassInfo {
             rust_method_name: [#rust_method_name],
             rust_method_generics: [#(#rust_method_generics,)*],
             input_names: [#(#input_names,)*],
-            input_traits: [#(#input_traits,)*],
-            output_trait: [#output_trait],
+            input_ty_tts: [#(#input_ty_tts,)*],
+            output_ty_tt: [#output_ty_tt],
             sig_where_clauses: [#(#sig_where_clauses,)*],
         }))
     }
@@ -285,23 +274,8 @@ impl ClassInfo {
         let mut sig = Signature::new(&method.name, self.span, &self.generics)
             .with_internal_generics(&method.generics)?;
 
-        let (input_traits, _jvm_op_traits): (Vec<_>, Vec<_>) = method
-            .argument_tys
-            .iter()
-            .map(|ty| sig.input_and_jvm_op_traits(ty))
-            .collect::<Result<Vec<_>, _>>()?
-            .into_iter()
-            .unzip();
-
-        let input_names: Vec<_> = (0..input_traits.len())
-            .map(|i| Ident::new(&format!("a{i}"), self.span))
-            .collect();
-
-        // The "output trait" is the trait bounds we declare for the user,
-        // e.g., for a method like `Foo method()`, we will declare a
-        // Rust method `-> impl JavaMethod<Foo>`, and this variable
-        // would be `JavaMethod<Foo>`.
-        let output_trait = sig.method_trait(&method.return_ty)?;
+        let (input_ty_tts, _input_ty_ops, input_names, output_ty_tt) =
+            sig.method_tts(method, self.span)?;
 
         let rust_method_name = Id::from(method.name.to_snake_case()).to_ident(self.span);
 
@@ -323,8 +297,8 @@ impl ClassInfo {
             rust_method_name: [#rust_method_name],
             rust_method_generics: [#(#rust_method_generics,)*],
             input_names: [#(#input_names,)*],
-            input_traits: [#(#input_traits,)*],
-            output_trait: [#output_trait],
+            input_ty_tts: [#(#input_ty_tts,)*],
+            output_ty_tt: [#output_ty_tt],
             sig_where_clauses: [#(#sig_where_clauses,)*],
         }))
     }
@@ -335,40 +309,11 @@ impl ClassInfo {
         let mut sig = Signature::new(&method.name, self.span, &self.generics)
             .with_internal_generics(&method.generics)?;
 
-        let (input_traits, jvm_op_traits): (Vec<_>, Vec<_>) = method
-            .argument_tys
-            .iter()
-            .map(|ty| sig.input_and_jvm_op_traits(ty))
-            .collect::<Result<Vec<_>, _>>()?
-            .into_iter()
-            .unzip();
-
-        let input_names: Vec<_> = (0..input_traits.len())
-            .map(|i| Ident::new(&format!("a{i}"), self.span))
-            .collect();
-
-        // The "output type" is the actual type returned by this method,
-        // e.g., `Option<Local<Foo>>`.
-        let output_ty = sig.output_type(&method.return_ty)?;
-
-        // The "output trait" is the trait bounds we declare for the user,
-        // e.g., for a method like `Foo method()`, we will declare a
-        // Rust method `-> impl JavaMethod<Foo>`, and this variable
-        // would be `JavaMethod<Foo>`.
-        let output_trait = sig.method_trait(&method.return_ty)?;
+        let (input_ty_tts, input_ty_ops, input_names, output_ty_tt) =
+            sig.method_tts(method, self.span)?;
 
         // The appropriate JNI function to call this method.
         let jni_call_fn = sig.jni_call_fn(&method.return_ty)?;
-
-        // If this method returns a java object, then this is the
-        // Rust type representing the java class/interface that is returned
-        // (e.g., `Some(java::lang::Object)`).
-        let java_ref_output_ty = match &method.return_ty {
-            Some(java_return_type) => {
-                sig.forbid_capture(|sig| sig.java_ty_if_ref(java_return_type))?
-            }
-            None => None,
-        };
 
         let jni_descriptor = jni_c_str(&method.descriptor(&self.generics_scope()), self.span);
 
@@ -378,7 +323,6 @@ impl ClassInfo {
         let jni_method = jni_c_str(&*method.name, self.span);
 
         let rust_method_name = Id::from(method.name.to_snake_case()).to_ident(self.span);
-        let rust_method_struct_name = Id::from(method.name.to_camel_case()).to_ident(self.span);
 
         // The generic parameters we need on the Rust method, these include:
         //
@@ -396,14 +340,11 @@ impl ClassInfo {
             struct_name: [#struct_name],
             java_class_generics: [#(#java_class_generics,)*],
             rust_method_name: [#rust_method_name],
-            rust_method_struct_name: [#rust_method_struct_name],
             rust_method_generics: [#(#rust_method_generics,)*],
             input_names: [#(#input_names,)*],
-            input_traits: [#(#input_traits,)*],
-            jvm_op_traits: [#(#jvm_op_traits,)*],
-            output_ty: [#output_ty],
-            output_trait: [#output_trait],
-            java_ref_output_ty: [#java_ref_output_ty],
+            input_ty_tts: [#(#input_ty_tts,)*],
+            input_ty_ops: [#(#input_ty_ops,)*],
+            output_ty_tt: [#output_ty_tt],
             sig_where_clauses: [#(#sig_where_clauses,)*],
             prepare_inputs: [#(#prepare_inputs)*],
             jni_call_fn: [#jni_call_fn],
@@ -427,31 +368,10 @@ impl ClassInfo {
         let mut sig = Signature::new(&method.name, self.span, &self.generics)
             .with_internal_generics(&method.generics)?;
 
-        let (input_traits, jvm_op_traits): (Vec<_>, Vec<_>) = method
-            .argument_tys
-            .iter()
-            .map(|ty| sig.input_and_jvm_op_traits(ty))
-            .collect::<Result<Vec<_>, _>>()?
-            .into_iter()
-            .unzip();
+        let (input_ty_tts, input_ty_ops, input_names, output_ty_tt) =
+            sig.method_tts(method, self.span)?;
 
-        let input_names: Vec<_> = (0..input_traits.len())
-            .map(|i| Ident::new(&format!("a{i}"), self.span))
-            .collect();
-
-        let output_ty = sig.output_type(&method.return_ty)?;
-        let output_trait = sig.method_trait(&method.return_ty)?;
         let jni_call_fn = sig.jni_static_call_fn(&method.return_ty)?;
-
-        // If this method returns a java object, then this is the
-        // Rust type representing the java class/interface that is returned
-        // (e.g., `Some(java::lang::Object)`).
-        let java_ref_output_ty = match &method.return_ty {
-            Some(java_return_type) => {
-                sig.forbid_capture(|sig| sig.java_ty_if_ref(java_return_type))?
-            }
-            None => None,
-        };
 
         let jni_descriptor = jni_c_str(&method.descriptor(&self.generics_scope()), self.span);
 
@@ -461,7 +381,6 @@ impl ClassInfo {
         let jni_method = jni_c_str(&*method.name, self.span);
 
         let rust_method_name = Id::from(method.name.to_snake_case()).to_ident(self.span);
-        let rust_method_struct_name = Id::from(method.name.to_camel_case()).to_ident(self.span);
 
         // The generic parameters we need on the Rust method, these include:
         //
@@ -475,14 +394,11 @@ impl ClassInfo {
             struct_name: [#struct_name],
             java_class_generics: [#(#java_class_generics,)*],
             rust_method_name: [#rust_method_name],
-            rust_method_struct_name: [#rust_method_struct_name],
             rust_method_generics: [#(#rust_method_generics,)*],
             input_names: [#(#input_names,)*],
-            input_traits: [#(#input_traits,)*],
-            jvm_op_traits: [#(#jvm_op_traits,)*],
-            output_ty: [#output_ty],
-            output_trait: [#output_trait],
-            java_ref_output_ty: [#java_ref_output_ty],
+            input_ty_tts: [#(#input_ty_tts,)*],
+            input_ty_ops: [#(#input_ty_ops,)*],
+            output_ty_tt: [#output_ty_tt],
             sig_where_clauses: [#(#sig_where_clauses,)*],
             prepare_inputs: [#(#prepare_inputs)*],
             jni_call_fn: [#jni_call_fn],
@@ -505,8 +421,7 @@ impl ClassInfo {
 
         let mut sig = Signature::new(&field.name, self.span, &self.generics);
 
-        let output_ty = sig.non_void_output_type(&field.ty)?;
-        let output_trait = sig.field_trait(&field.ty)?;
+        let field_ty = sig.java_ty_tt(&field.ty)?;
         let jni_field_fn = sig.jni_static_field_get_fn(&field.ty)?;
 
         let jni_field = jni_c_str(&*field.name, self.span);
@@ -514,8 +429,6 @@ impl ClassInfo {
 
         let rust_field_name =
             Id::from(format!("get_{}", field.name.to_snake_case())).to_ident(self.span);
-        let rust_field_type_name =
-            Id::from(format!("{}Getter", field.name.to_camel_case())).to_ident(self.span);
 
         let sig_where_clauses = &sig.where_clauses;
 
@@ -523,9 +436,7 @@ impl ClassInfo {
             struct_name: [#struct_name],
             java_class_generics: [#(#java_class_generics,)*],
             rust_field_name: [#rust_field_name],
-            rust_field_struct_name: [#rust_field_type_name],
-            output_ty: [#output_ty],
-            output_trait: [#output_trait],
+            field_ty: [#field_ty],
             sig_where_clauses: [#(#sig_where_clauses,)*],
             jni_field: [#jni_field],
             jni_descriptor: [#jni_descriptor],

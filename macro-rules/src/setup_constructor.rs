@@ -3,42 +3,42 @@ macro_rules! setup_constructor {
     (
         struct_name: [$S:ident],
         java_class_generics: [$($G:ident,)*],
-        input_names: [$($input_name:ident,)*],
-        input_traits: [$($input_trait:path,)*],
-        jvm_op_traits: [$($jvm_op_trait:path,)*],
+        input_names: [$($I:ident,)*],
+        input_ty_tts: [$($I_ty:tt,)*],
+        input_ty_ops: [$($I_op:path,)*],
         prepare_inputs: [$($prepare_inputs:tt)*],
         descriptor: [$descriptor:expr],
         jni_descriptor: [$jni_descriptor:expr],
         idents: [$this:ident, $jvm:ident],
     ) => {
         pub fn new(
-            $($input_name : impl $input_trait,)*
+            $($I : duchess::plumbing::argument_impl_trait!($I_ty),)*
         ) -> impl duchess::prelude::JavaConstructor<$S<$($G,)*>> {
             struct Impl<
                 $($G,)*
-                $($input_name,)*
+                $($I,)*
             > {
-                $($input_name : $input_name,)*
+                $($I : $I,)*
                 phantom: ::core::marker::PhantomData<($($G,)*)>,
             }
 
-            impl<$($G,)* $($input_name,)*> ::core::clone::Clone for Impl<$($G,)* $($input_name,)*>
+            impl<$($G,)* $($I,)*> ::core::clone::Clone for Impl<$($G,)* $($I,)*>
             where
                 $($G: duchess::JavaObject,)*
-                $($input_name: $jvm_op_trait,)*
+                $($I: $I_op,)*
             {
                 fn clone(&self) -> Self {
                     Impl {
-                        $($input_name : ::core::clone::Clone::clone(&self.$input_name),)*
+                        $($I : ::core::clone::Clone::clone(&self.$I),)*
                         phantom: ::core::marker::PhantomData,
                     }
                 }
             }
 
-            impl<$($G,)* $($input_name,)*> duchess::prelude::JvmOp for Impl<$($G,)* $($input_name,)*>
+            impl<$($G,)* $($I,)*> duchess::prelude::JvmOp for Impl<$($G,)* $($I,)*>
             where
                 $($G: duchess::JavaObject,)*
-                $($input_name: $jvm_op_trait,)*
+                $($I: $I_op,)*
             {
                 type Output<'jvm> = duchess::Local<'jvm, $S<$($G,)*>>;
 
@@ -67,7 +67,7 @@ macro_rules! setup_constructor {
                             duchess::plumbing::JavaObjectExt::as_raw(&*class).as_ptr(),
                             constructor.as_ptr(),
                             [
-                                $(duchess::plumbing::IntoJniValue::into_jni_value($input_name),)*
+                                $(duchess::plumbing::IntoJniValue::into_jni_value($I),)*
                             ].as_ptr(),
                         ))
                     }?;
@@ -83,10 +83,10 @@ macro_rules! setup_constructor {
             }
 
 
-            impl<$($G,)* $($input_name,)*> ::core::ops::Deref for Impl<$($G,)* $($input_name,)*>
+            impl<$($G,)* $($I,)*> ::core::ops::Deref for Impl<$($G,)* $($I,)*>
             where
                 $($G: duchess::JavaObject,)*
-                $($input_name: $jvm_op_trait,)*
+                $($I: $I_op,)*
             {
                 type Target = <$S<$($G,)*> as duchess::plumbing::JavaView>::OfOp<Self>;
 
@@ -96,7 +96,7 @@ macro_rules! setup_constructor {
             }
 
             Impl {
-                $($input_name: $input_name.into_op(),)*
+                $($I: $I.into_op(),)*
                 phantom: ::core::default::Default::default()
             }
         }
