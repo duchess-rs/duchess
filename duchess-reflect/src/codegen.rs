@@ -1,9 +1,6 @@
 use crate::{
     argument::DuchessDeclaration,
-    class_info::{
-        ClassInfo, Constructor, DotId, Field, Id, Method, NonRepeatingType, RootMap,
-        SpannedPackageInfo, Type,
-    },
+    class_info::{ClassInfo, Constructor, DotId, Field, Id, Method, RootMap, SpannedPackageInfo},
     reflect::Reflector,
     signature::Signature,
     upcasts::Upcasts,
@@ -205,9 +202,6 @@ impl ClassInfo {
 
         let jni_descriptor = jni_c_str(constructor.descriptor(&self.generics_scope()), self.span);
 
-        // Code to convert each input appropriately
-        let prepare_inputs = self.prepare_inputs(&input_names, &constructor.argument_tys);
-
         // for debugging JVM invocation failures
         let descriptor = Literal::string(&constructor.descriptor(&self.generics_scope()));
 
@@ -218,10 +212,8 @@ impl ClassInfo {
                 input_names: [#(#input_names,)*],
                 input_ty_tts: [#(#input_ty_tts,)*],
                 input_ty_ops: [#(#input_ty_ops,)*],
-                prepare_inputs: [#(#prepare_inputs)*],
                 descriptor: [#descriptor],
                 jni_descriptor: [#jni_descriptor],
-                idents: [self, jvm],
             }
         })
     }
@@ -314,9 +306,6 @@ impl ClassInfo {
 
         let jni_descriptor = jni_c_str(&method.descriptor(&self.generics_scope()), self.span);
 
-        // Code to convert each input appropriately
-        let prepare_inputs = self.prepare_inputs(&input_names, &method.argument_tys);
-
         let jni_method = jni_c_str(&*method.name, self.span);
 
         let rust_method_name = Id::from(method.name.to_snake_case()).to_ident(self.span);
@@ -343,10 +332,8 @@ impl ClassInfo {
             input_ty_ops: [#(#input_ty_ops,)*],
             output_ty_tt: [#output_ty_tt],
             sig_where_clauses: [#(#sig_where_clauses,)*],
-            prepare_inputs: [#(#prepare_inputs)*],
             jni_method: [#jni_method],
             jni_descriptor: [#jni_descriptor],
-            idents: [self, jvm],
         }))
     }
 
@@ -368,9 +355,6 @@ impl ClassInfo {
             sig.method_tts(method, self.span)?;
 
         let jni_descriptor = jni_c_str(&method.descriptor(&self.generics_scope()), self.span);
-
-        // Code to convert each input appropriately
-        let prepare_inputs = self.prepare_inputs(&input_names, &method.argument_tys);
 
         let jni_method = jni_c_str(&*method.name, self.span);
 
@@ -394,10 +378,8 @@ impl ClassInfo {
             input_ty_ops: [#(#input_ty_ops,)*],
             output_ty_tt: [#output_ty_tt],
             sig_where_clauses: [#(#sig_where_clauses,)*],
-            prepare_inputs: [#(#prepare_inputs)*],
             jni_method: [#jni_method],
             jni_descriptor: [#jni_descriptor],
-            idents: [self, jvm],
         }))
     }
 
@@ -449,27 +431,6 @@ impl ClassInfo {
     /// Returns a class name with `/`, like `java/lang/Object` as a &CStr
     fn jni_class_name(&self) -> TokenStream {
         jni_c_str(self.name.to_jni_name(), self.span)
-    }
-
-    fn prepare_inputs(&self, input_names: &[Ident], input_types: &[Type]) -> Vec<TokenStream> {
-        input_names
-            .iter()
-            .zip(input_types)
-            .map(|(input_name, input_ty)| match input_ty.to_non_repeating() {
-                NonRepeatingType::Scalar(_) => quote_spanned!(self.span =>
-                    let #input_name = self.#input_name.do_jni(jvm)?;
-                ),
-                NonRepeatingType::Ref(_) => {
-                    quote_spanned!(self.span =>
-                        let #input_name = self.#input_name.into_as_jref(jvm)?;
-                        let #input_name = match duchess::prelude::AsJRef::as_jref(&#input_name) {
-                            Ok(v) => Some(v),
-                            Err(duchess::NullJRef) => None,
-                        };
-                    )
-                }
-            })
-            .collect()
     }
 }
 

@@ -15,10 +15,8 @@ macro_rules! setup_inherent_object_method {
         input_ty_ops: [$($I_op:path,)*],
         output_ty_tt: [$O_ty:tt],
         sig_where_clauses: [$($SIG:tt)*],
-        prepare_inputs: [$($prepare_inputs:tt)*],
         jni_method: [$jni_method:expr],
         jni_descriptor: [$jni_descriptor:expr],
-        idents: [$self:ident, $jvm:ident],
     ) => {
         pub fn $M<$($MG,)*>(
             this: impl duchess::prelude::IntoJava<$S<$($G,)*>>,
@@ -66,28 +64,30 @@ macro_rules! setup_inherent_object_method {
                 type Output<'jvm> = duchess::plumbing::output_type!('jvm, $O_ty);
 
                 fn do_jni<'jvm>(
-                    $self,
-                    $jvm: &mut duchess::Jvm<'jvm>,
+                    self,
+                    jvm: &mut duchess::Jvm<'jvm>,
                 ) -> duchess::LocalResult<'jvm, Self::Output<'jvm>> {
                     use duchess::plumbing::once_cell::sync::OnceCell;
 
-                    let this = $self.this.into_as_jref($jvm)?;
+                    let this = self.this.into_as_jref(jvm)?;
                     let this: &$S<$($G,)*> = duchess::prelude::AsJRef::as_jref(&this)?;
                     let this = duchess::plumbing::JavaObjectExt::as_raw(this);
 
-                    $($prepare_inputs)*
+                    $(
+                        duchess::plumbing::prepare_input!(let $I = (self.$I: $I_ty) in jvm);
+                    )*
 
                     // Cache the method id for this method -- note that we only have one cache
                     // no matter how many generic monomorphizations there are. This makes sense
                     // given Java's erased-based generics system.
                     static METHOD: OnceCell<duchess::plumbing::MethodPtr> = OnceCell::new();
                     let method = METHOD.get_or_try_init(|| {
-                        let class = <$S<$($G,)*> as duchess::JavaObject>::class($jvm)?;
-                        duchess::plumbing::find_method($jvm, &class, $jni_method, $jni_descriptor, false)
+                        let class = <$S<$($G,)*> as duchess::JavaObject>::class(jvm)?;
+                        duchess::plumbing::find_method(jvm, &class, $jni_method, $jni_descriptor, false)
                     })?;
 
                     unsafe {
-                        $jvm.env().invoke(
+                        jvm.env().invoke(
                             duchess::plumbing::jni_call_fn!($O_ty),
                             |env, f| f(
                                 env,

@@ -6,10 +6,8 @@ macro_rules! setup_constructor {
         input_names: [$($I:ident,)*],
         input_ty_tts: [$($I_ty:tt,)*],
         input_ty_ops: [$($I_op:path,)*],
-        prepare_inputs: [$($prepare_inputs:tt)*],
         descriptor: [$descriptor:expr],
         jni_descriptor: [$jni_descriptor:expr],
-        idents: [$this:ident, $jvm:ident],
     ) => {
         pub fn new(
             $($I : duchess::plumbing::argument_impl_trait!($I_ty),)*
@@ -43,24 +41,26 @@ macro_rules! setup_constructor {
                 type Output<'jvm> = duchess::Local<'jvm, $S<$($G,)*>>;
 
                 fn do_jni<'jvm>(
-                    $this,
-                    $jvm: &mut duchess::Jvm<'jvm>,
+                    self,
+                    jvm: &mut duchess::Jvm<'jvm>,
                 ) -> duchess::LocalResult<'jvm, Self::Output<'jvm>> {
                     use duchess::plumbing::once_cell::sync::OnceCell;
 
-                    $($prepare_inputs)*
+                    $(
+                        duchess::plumbing::prepare_input!(let $I = (self.$I: $I_ty) in jvm);
+                    )*
 
-                    let class = <$S<$($G,)*> as duchess::JavaObject>::class($jvm)?;
+                    let class = <$S<$($G,)*> as duchess::JavaObject>::class(jvm)?;
 
                     // Cache the method id for the constructor -- note that we only have one cache
                     // no matter how many generic monomorphizations there are. This makes sense
                     // given Java's erased-based generics system.
                     static CONSTRUCTOR: OnceCell<duchess::plumbing::MethodPtr> = OnceCell::new();
                     let constructor = CONSTRUCTOR.get_or_try_init(|| {
-                        duchess::plumbing::find_constructor($jvm, &class, $jni_descriptor)
+                        duchess::plumbing::find_constructor(jvm, &class, $jni_descriptor)
                     })?;
 
-                    let env = $jvm.env();
+                    let env = jvm.env();
                     let obj: ::core::option::Option<duchess::Local<$S<$($G,)*>>> = unsafe {
                         env.invoke(|env| env.NewObjectA, |env, f| f(
                             env,
