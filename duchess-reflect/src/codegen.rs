@@ -422,7 +422,6 @@ impl ClassInfo {
         let mut sig = Signature::new(&field.name, self.span, &self.generics);
 
         let field_ty = sig.java_ty_tt(&field.ty)?;
-        let jni_field_fn = sig.jni_static_field_get_fn(&field.ty)?;
 
         let jni_field = jni_c_str(&*field.name, self.span);
         let jni_descriptor = jni_c_str(&field.ty.descriptor(&self.generics_scope()), self.span);
@@ -440,7 +439,6 @@ impl ClassInfo {
             sig_where_clauses: [#(#sig_where_clauses,)*],
             jni_field: [#jni_field],
             jni_descriptor: [#jni_descriptor],
-            jni_field_fn: [#jni_field_fn],
         }))
     }
 

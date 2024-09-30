@@ -230,32 +230,6 @@ impl Signature {
         Ok(Ident::new(f, self.span))
     }
 
-    /// Returns the name of the jni accessor method suitable for getting
-    /// the value of a static field of type `ty`.
-    pub fn jni_static_field_get_fn(&mut self, ty: &Type) -> syn::Result<Ident> {
-        let f = match ty {
-            Type::Ref(_) => "GetStaticObjectField",
-            Type::Repeat(_) => {
-                let msg = format!(
-                    "unsupported repeating type in getter of static field `{}`",
-                    self.item_name
-                );
-                return Err(syn::Error::new(self.span, msg));
-            }
-            Type::Scalar(scalar) => match scalar {
-                ScalarType::Int => "GetStaticIntField",
-                ScalarType::Long => "GetStaticLongField",
-                ScalarType::Short => "GetStaticShortField",
-                ScalarType::Byte => "GetStaticByteField",
-                ScalarType::F64 => "GetStaticDoubleField",
-                ScalarType::F32 => "GetStaticFloatField",
-                ScalarType::Boolean => "GetStaticBooleanField",
-                ScalarType::Char => "GetStaticCharField",
-            },
-        };
-        Ok(Ident::new(f, self.span))
-    }
-
     /// Returns a path to a suitable JVM trait alias
     /// (`duchess::JvmRefOp` or `duchess::JavaScalarOp`)
     /// to the type. This really *ought* to be done in

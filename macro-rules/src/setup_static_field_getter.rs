@@ -8,7 +8,6 @@ macro_rules! setup_static_field_getter {
         sig_where_clauses: [$($SIG:tt)*],
         jni_field: [$jni_field:expr],
         jni_descriptor: [$jni_descriptor:expr],
-        jni_field_fn: [$jni_field_fn:ident],
     ) => {
         pub fn $F() -> duchess::plumbing::field_output_trait!($F_ty)
         where
@@ -48,11 +47,14 @@ macro_rules! setup_static_field_getter {
 
                     let class = <$S<$($G,)*> as duchess::JavaObject>::class(jvm)?;
                     unsafe {
-                        jvm.env().invoke(|env| env.$jni_field_fn, |env, f| f(
-                            env,
-                            duchess::plumbing::JavaObjectExt::as_raw(&*class).as_ptr(),
-                            field.as_ptr(),
-                        ))
+                        jvm.env().invoke(
+                            duchess::plumbing::jni_static_field_get_fn!($F_ty),
+                            |env, f| f(
+                                env,
+                                duchess::plumbing::JavaObjectExt::as_raw(&*class).as_ptr(),
+                                field.as_ptr(),
+                            ),
+                        )
                     }
                 }
             }

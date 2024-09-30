@@ -129,3 +129,36 @@ macro_rules! rust_ty {
         $name
     };
 }
+
+#[macro_export]
+macro_rules! jni_static_field_get_fn {
+    (byte) => {
+        |env| env.GetStaticByteField
+    };
+    (short) => {
+        |env| env.GetStaticShortField
+    };
+    (int) => {
+        |env| env.GetStaticIntField
+    };
+    (long) => {
+        |env| env.GetStaticLongField
+    };
+    (float) => {
+        |env| env.GetStaticFloatField
+    };
+    (double) => {
+        |env| env.GetStaticDoubleField
+    };
+    (char) => {
+        |env| env.GetStaticCharField
+    };
+    (boolean) => {
+        |env| env.GetStaticBooleanField
+    };
+
+    // Reference types
+    ($r:tt) => {
+        |env| env.GetStaticObjectField
+    };
+}
