@@ -375,7 +375,7 @@ impl Driver<'_> {
                         // deref scalar inputs to bare value
                         Type::Scalar(_) => quote_spanned!(binding.span()=> *#binding),
                         Type::Ref(_) | Type::Repeat(_) => {
-                            let java_ty = signature.java_ty(t)?;
+                            let java_ty = signature.java_ty_rs(t)?;
                             quote_spanned!(binding.span()=> duchess::ToJava::to_java::<#java_ty>(#binding))
                         }
                     })

@@ -252,7 +252,7 @@ impl Driver<'_> {
             self.selector.span(),
             &self.class_info.generics,
         )
-        .forbid_capture(|sig| sig.java_ty(ty))?)
+        .forbid_capture(|sig| sig.java_ty_rs(ty))?)
     }
 
     fn user_arguments(&self) -> syn::Result<Vec<Argument>> {
