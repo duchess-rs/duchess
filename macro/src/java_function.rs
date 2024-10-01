@@ -117,10 +117,10 @@ pub fn java_function(selector: MethodSelector, input: syn::ItemFn) -> syn::Resul
                 }
             }
 
-            impl duchess::plumbing::JavaFn for #input_fn_name {
-                fn java_fn() -> duchess::plumbing::JavaFunction {
+            impl duchess::semver_unstable::JavaFn for #input_fn_name {
+                fn java_fn() -> duchess::semver_unstable::JavaFunction {
                     unsafe {
-                        duchess::plumbing::JavaFunction::new(
+                        duchess::semver_unstable::JavaFunction::new(
                             #method_name_literal,
                             #signature_literal,
                             std::ptr::NonNull::new_unchecked(#java_fn_name as *mut ()),
@@ -228,11 +228,11 @@ impl Driver<'_> {
 
         let env_arg = Argument {
             name: syn::Ident::new("jni_env", span),
-            ty: quote_spanned!(span => duchess::plumbing::EnvPtr<'_>),
+            ty: quote_spanned!(span => duchess::semver_unstable::EnvPtr<'_>),
         };
 
         let this_ty = if self.method_info.flags.is_static {
-            quote_spanned!(span => duchess::plumbing::jni_sys::jclass)
+            quote_spanned!(span => duchess::semver_unstable::jni_sys::jclass)
         } else {
             let rust_this_ty = self.convert_ty(&self.class_info.this_ref().into())?;
             quote_spanned!(span => &#rust_this_ty)
@@ -406,14 +406,14 @@ impl Driver<'_> {
                     let output_rust_ty = ty.to_tokens(span);
                     Ok((
                         output_rust_ty.clone(),
-                        quote_spanned!(span => duchess::plumbing::native_function_returning_scalar::<#output_rust_ty, _>(#env_name, || #return_expr)),
+                        quote_spanned!(span => duchess::semver_unstable::native_function_returning_scalar::<#output_rust_ty, _>(#env_name, || #return_expr)),
                     ))
                 }
                 class_info::Type::Ref(_) | class_info::Type::Repeat(_) => {
                     let output_java_ty = self.convert_ty(ty)?;
                     Ok((
-                        quote_spanned!(span => duchess::plumbing::jni_sys::jobject),
-                        quote_spanned!(span => duchess::plumbing::native_function_returning_object::<#output_java_ty, _>(#env_name, || #return_expr)),
+                        quote_spanned!(span => duchess::semver_unstable::jni_sys::jobject),
+                        quote_spanned!(span => duchess::semver_unstable::native_function_returning_object::<#output_java_ty, _>(#env_name, || #return_expr)),
                     ))
                 }
             },

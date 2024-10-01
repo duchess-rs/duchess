@@ -13,7 +13,7 @@ use std::{
 
 use jni_sys::jvalue;
 
-use crate::{jvm::JavaObjectExt, plumbing::ToJavaScalar, Error, JavaObject, Jvm, Local};
+use crate::{jvm::JavaObjectExt, semver_unstable::ToJavaScalar, Error, JavaObject, Jvm, Local};
 
 // Set the JNI API version
 // JNI 1.8 is the default not in android

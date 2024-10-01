@@ -15,10 +15,10 @@ macro_rules! output_trait {
     };
 
     ($scalar:ident $(+ $lt:lifetime)?) => {
-        impl duchess::ScalarMethod< duchess::plumbing::rust_ty!($scalar) > $(+ $lt)?
+        impl duchess::ScalarMethod< duchess::semver_unstable::rust_ty!($scalar) > $(+ $lt)?
     };
 
     ($r:tt $(+ $lt:lifetime)?) => {
-        impl duchess::JavaMethod< duchess::plumbing::rust_ty!($r) > $(+ $lt)?
+        impl duchess::JavaMethod< duchess::semver_unstable::rust_ty!($r) > $(+ $lt)?
     };
 }

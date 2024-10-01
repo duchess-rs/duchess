@@ -177,16 +177,16 @@ impl Signature {
     /// Returns a path to a suitable JVM trait alias
     /// (`duchess::JvmRefOp` or `duchess::JavaScalarOp`)
     /// to the type. This really *ought* to be done in
-    /// macro-rules code (e.g., `$I: duchess::plumbing::jvm_op!($_ty)`)
+    /// macro-rules code (e.g., `$I: duchess::semver_unstable::jvm_op!($_ty)`)
     /// but we can't easily do that because macro invocations
     /// aren't allowed in that position.
     pub fn jvm_op_trait(&mut self, ty: &Type, ty_tt: &TokenStream) -> syn::Result<TokenStream> {
         match &ty.to_non_repeating() {
             NonRepeatingType::Ref(_) => Ok(quote!(
-                duchess::plumbing::JvmRefOp<duchess::plumbing::rust_ty!(#ty_tt)>
+                duchess::semver_unstable::JvmRefOp<duchess::semver_unstable::rust_ty!(#ty_tt)>
             )),
             NonRepeatingType::Scalar(_) => Ok(quote!(
-                duchess::plumbing::JvmScalarOp<duchess::plumbing::rust_ty!(#ty_tt)>
+                duchess::semver_unstable::JvmScalarOp<duchess::semver_unstable::rust_ty!(#ty_tt)>
             )),
         }
     }
@@ -223,13 +223,13 @@ impl Signature {
     /// prefer [`Self::java_ty_tt`][].
     pub fn java_ty_rs(&mut self, ty: &Type) -> syn::Result<TokenStream> {
         let tt = self.java_ty_tt(ty)?;
-        Ok(quote!(duchess::plumbing::rust_ty!(#tt)))
+        Ok(quote!(duchess::semver_unstable::rust_ty!(#tt)))
     }
 
     /// Return tokens to create the Rust type for a RefType.
     fn java_ref_ty_rs(&mut self, ty: &RefType) -> syn::Result<TokenStream> {
         let tt = self.java_ref_ty_tt(ty)?;
-        Ok(quote!(duchess::plumbing::rust_ty!(#tt)))
+        Ok(quote!(duchess::semver_unstable::rust_ty!(#tt)))
     }
 
     /// Return the token-tree for a RefType.
@@ -272,7 +272,7 @@ impl Signature {
 
     pub fn class_ref_ty_rs(&mut self, ty: &ClassRef) -> syn::Result<TokenStream> {
         let tt = self.class_ref_ty_tt(ty)?;
-        Ok(quote!(duchess::plumbing::rust_ty!(#tt)))
+        Ok(quote!(duchess::semver_unstable::rust_ty!(#tt)))
     }
 
     fn class_ref_ty_tt(&mut self, ty: &ClassRef) -> syn::Result<TokenStream> {

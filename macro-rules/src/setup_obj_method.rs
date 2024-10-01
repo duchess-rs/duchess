@@ -12,8 +12,8 @@ macro_rules! setup_obj_method {
     ) => {
         pub fn $M<'a, $($MG,)*>(
             &'a self,
-            $($I: duchess::plumbing::argument_impl_trait!($I_ty + 'a),)*
-        ) -> duchess::plumbing::output_trait!($O_ty + 'a)
+            $($I: duchess::semver_unstable::argument_impl_trait!($I_ty + 'a),)*
+        ) -> duchess::semver_unstable::output_trait!($O_ty + 'a)
         where
             $($SIG)*
         {

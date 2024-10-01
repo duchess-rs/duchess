@@ -8,10 +8,10 @@
 #[macro_export]
 macro_rules! field_output_trait {
     ($scalar:ident) => {
-        impl duchess::ScalarField< duchess::plumbing::rust_ty!($scalar) >
+        impl duchess::ScalarField< duchess::semver_unstable::rust_ty!($scalar) >
     };
 
     ($r:tt) => {
-        impl duchess::JavaField< duchess::plumbing::rust_ty!($r) >
+        impl duchess::JavaField< duchess::semver_unstable::rust_ty!($r) >
     };
 }

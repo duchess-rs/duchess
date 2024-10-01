@@ -28,8 +28,8 @@ macro_rules! setup_class {
         #[allow(nonstandard_style)]
         const _: () = {
             use duchess::{java, Java, Jvm, Local, LocalResult};
-            use duchess::plumbing::once_cell::sync::OnceCell;
-            use duchess::plumbing::mro;
+            use duchess::semver_unstable::once_cell::sync::OnceCell;
+            use duchess::semver_unstable::mro;
 
             // Implement the `JavaObject` trait for `$S`.
             // This impl is unsafe because we are asserting that
@@ -46,7 +46,7 @@ macro_rules! setup_class {
                 fn class<'jvm>(jvm: &mut Jvm<'jvm>) -> LocalResult<'jvm, Local<'jvm, java::lang::Class>> {
                     static CLASS: OnceCell<Java<java::lang::Class>> = OnceCell::new();
                     let global = CLASS.get_or_try_init::<_, duchess::Error<Local<java::lang::Throwable>>>(|| {
-                        let class = duchess::plumbing::find_class(jvm, $jni_class_name)?;
+                        let class = duchess::semver_unstable::find_class(jvm, $jni_class_name)?;
                         Ok(jvm.global(&class))
                     })?;
                     Ok(jvm.local(global))
@@ -100,16 +100,16 @@ macro_rules! setup_class {
             where
                 $($G: duchess::JavaObject,)*
             {
-                type Target = <Self as duchess::plumbing::JavaView>::OfObj<Self>;
+                type Target = <Self as duchess::semver_unstable::JavaView>::OfObj<Self>;
 
                 fn deref(&self) -> &Self::Target {
-                    duchess::plumbing::FromRef::from_ref(self)
+                    duchess::semver_unstable::FromRef::from_ref(self)
                 }
             }
 
             // Reflexive upcast impl
 
-            unsafe impl<$($G,)*> duchess::plumbing::Upcast<$S<$($G,)*>> for $S<$($G,)*>
+            unsafe impl<$($G,)*> duchess::semver_unstable::Upcast<$S<$($G,)*>> for $S<$($G,)*>
             where
                 $($G: duchess::JavaObject,)*
             {}
@@ -119,7 +119,7 @@ macro_rules! setup_class {
             //
             // [mro]: https://duchess-rs.github.io/duchess/methods.html
 
-            duchess::plumbing::setup_class! {
+            duchess::semver_unstable::setup_class! {
                 @upcast_impls($S, [$($mro_ty,)*], [$($G,)*])
             }
 
@@ -152,11 +152,11 @@ macro_rules! setup_class {
             //
             // [mro]: https://duchess-rs.github.io/duchess/methods.html
 
-            duchess::plumbing::setup_class! {
+            duchess::semver_unstable::setup_class! {
                 @op_obj_definitions($S, $op_name, [$($G,)*])
             }
 
-            duchess::plumbing::setup_class! {
+            duchess::semver_unstable::setup_class! {
                 @op_obj_definitions($S, $obj_name, [$($G,)*])
             }
 
@@ -165,8 +165,8 @@ macro_rules! setup_class {
             impl<$($G,)* J, N> $op_name<$($G,)* J, N>
             where
                 $($G: duchess::JavaObject,)*
-                J: duchess::plumbing::JvmRefOp<$S<$($G,)*>>,
-                N: duchess::plumbing::FromRef<J>,
+                J: duchess::semver_unstable::JvmRefOp<$S<$($G,)*>>,
+                N: duchess::semver_unstable::FromRef<J>,
             {
                 $($op_struct_methods)*
             }
@@ -174,7 +174,7 @@ macro_rules! setup_class {
             impl<$($G,)* J, N> $obj_name<$($G,)* J, N>
             where
                 $($G: duchess::JavaObject,)*
-                for<'jvm> &'jvm J: duchess::plumbing::JvmRefOp<$S<$($G,)*>>,
+                for<'jvm> &'jvm J: duchess::semver_unstable::JvmRefOp<$S<$($G,)*>>,
             {
                 $($obj_struct_methods)*
             }
@@ -191,7 +191,7 @@ macro_rules! setup_class {
             //
             // [mro]: https://duchess-rs.github.io/duchess/methods.html
 
-            impl<$($G,)*> duchess::plumbing::JavaView for $S<$($G,)*>
+            impl<$($G,)*> duchess::semver_unstable::JavaView for $S<$($G,)*>
             {
                 type OfOp<J> = $op_name<
                     $($G,)* J,
@@ -203,7 +203,7 @@ macro_rules! setup_class {
                     N,
                 >
                 where
-                    N: duchess::plumbing::FromRef<J>;
+                    N: duchess::semver_unstable::FromRef<J>;
 
                 type OfObj<J> = $obj_name<
                     $($G,)* J,
@@ -215,7 +215,7 @@ macro_rules! setup_class {
                     N,
                 >
                 where
-                    N: duchess::plumbing::FromRef<J>;
+                    N: duchess::semver_unstable::FromRef<J>;
             }
         };
     };
@@ -223,15 +223,15 @@ macro_rules! setup_class {
     // Generate the struct definition and necessary impls for the op or obj struct.
 
     (@op_obj_definitions($S:ident, $opobj_name:ident, [$($G:ident,)*])) => {
-        duchess::plumbing::setup_class! {
+        duchess::semver_unstable::setup_class! {
             @op_obj_struct($S, $opobj_name, [$($G,)*])
         }
 
-        duchess::plumbing::setup_class! {
+        duchess::semver_unstable::setup_class! {
             @op_obj_FromRef_impl($opobj_name, [$($G,)*])
         }
 
-        duchess::plumbing::setup_class! {
+        duchess::semver_unstable::setup_class! {
             @op_obj_Deref_impl($opobj_name, [$($G,)*])
         }
     };
@@ -259,12 +259,12 @@ macro_rules! setup_class {
     (@op_obj_Deref_impl($opobj_name:ident,[$($G:ident,)*])) => {
         impl<$($G,)* J, N> ::core::ops::Deref for $opobj_name<$($G,)* J, N>
         where
-            N: duchess::plumbing::FromRef<J>,
+            N: duchess::semver_unstable::FromRef<J>,
         {
             type Target = N;
 
             fn deref(&self) -> &N {
-                duchess::plumbing::FromRef::from_ref(&self.this)
+                duchess::semver_unstable::FromRef::from_ref(&self.this)
             }
         }
     };
@@ -275,7 +275,7 @@ macro_rules! setup_class {
     // on the op/obj struct definitions.
 
     (@op_obj_FromRef_impl($opobj_name:ident, [$($G:ident,)*])) => {
-        impl<$($G,)* J, N> duchess::plumbing::FromRef<J> for $opobj_name<$($G,)* J, N> {
+        impl<$($G,)* J, N> duchess::semver_unstable::FromRef<J> for $opobj_name<$($G,)* J, N> {
             fn from_ref(j: &J) -> &Self {
                 // This is safe because of the `#[repr(transparent)]`
                 // on the struct declaration.
@@ -295,12 +295,12 @@ macro_rules! setup_class {
 
     (@upcast_impls($S:ident, [], [$($G:ident,)*])) => {};
     (@upcast_impls($S:ident, [$mro_head_ty:ty, $($mro_tail_ty:ty,)*], [$($G:ident,)*])) => {
-        unsafe impl<$($G,)*> duchess::plumbing::Upcast<$mro_head_ty> for $S<$($G,)*>
+        unsafe impl<$($G,)*> duchess::semver_unstable::Upcast<$mro_head_ty> for $S<$($G,)*>
         where
             $($G: duchess::JavaObject,)*
         {}
 
-        duchess::plumbing::setup_class! {
+        duchess::semver_unstable::setup_class! {
             @upcast_impls($S, [$($mro_tail_ty,)*], [$($G,)*])
         }
     };

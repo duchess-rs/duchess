@@ -20,8 +20,8 @@ macro_rules! setup_inherent_object_method {
     ) => {
         pub fn $M<$($MG,)*>(
             this: impl duchess::prelude::IntoJava<$S<$($G,)*>>,
-            $($I: duchess::plumbing::argument_impl_trait!($I_ty),)*
-        ) -> duchess::plumbing::output_trait!($O_ty)
+            $($I: duchess::semver_unstable::argument_impl_trait!($I_ty),)*
+        ) -> duchess::semver_unstable::output_trait!($O_ty)
         where
             $($SIG)*
         {
@@ -39,7 +39,7 @@ macro_rules! setup_inherent_object_method {
             impl<$($G,)* $($MG,)* this, $($I,)*> ::core::clone::Clone
             for $M<$($G,)* $($MG,)* this, $($I,)*>
             where
-                this: duchess::plumbing::JvmRefOp<$S<$($G,)*>>,
+                this: duchess::semver_unstable::JvmRefOp<$S<$($G,)*>>,
                 $($I: $I_op,)*
                 $($G: duchess::JavaObject,)*
                 $($SIG)*
@@ -56,45 +56,45 @@ macro_rules! setup_inherent_object_method {
             impl<$($G,)* $($MG,)* this, $($I,)*> duchess::prelude::JvmOp
             for $M<$($G,)* $($MG,)* this, $($I,)*>
             where
-                this: duchess::plumbing::JvmRefOp<$S<$($G,)*>>,
+                this: duchess::semver_unstable::JvmRefOp<$S<$($G,)*>>,
                 $($I: $I_op,)*
                 $($G: duchess::JavaObject,)*
                 $($SIG)*
             {
-                type Output<'jvm> = duchess::plumbing::output_type!('jvm, $O_ty);
+                type Output<'jvm> = duchess::semver_unstable::output_type!('jvm, $O_ty);
 
                 fn do_jni<'jvm>(
                     self,
                     jvm: &mut duchess::Jvm<'jvm>,
                 ) -> duchess::LocalResult<'jvm, Self::Output<'jvm>> {
-                    use duchess::plumbing::once_cell::sync::OnceCell;
+                    use duchess::semver_unstable::once_cell::sync::OnceCell;
 
                     let this = self.this.into_as_jref(jvm)?;
                     let this: &$S<$($G,)*> = duchess::prelude::AsJRef::as_jref(&this)?;
-                    let this = duchess::plumbing::JavaObjectExt::as_raw(this);
+                    let this = duchess::semver_unstable::JavaObjectExt::as_raw(this);
 
                     $(
-                        duchess::plumbing::prepare_input!(let $I = (self.$I: $I_ty) in jvm);
+                        duchess::semver_unstable::prepare_input!(let $I = (self.$I: $I_ty) in jvm);
                     )*
 
                     // Cache the method id for this method -- note that we only have one cache
                     // no matter how many generic monomorphizations there are. This makes sense
                     // given Java's erased-based generics system.
-                    static METHOD: OnceCell<duchess::plumbing::MethodPtr> = OnceCell::new();
+                    static METHOD: OnceCell<duchess::semver_unstable::MethodPtr> = OnceCell::new();
                     let method = METHOD.get_or_try_init(|| {
                         let class = <$S<$($G,)*> as duchess::JavaObject>::class(jvm)?;
-                        duchess::plumbing::find_method(jvm, &class, $jni_method, $jni_descriptor, false)
+                        duchess::semver_unstable::find_method(jvm, &class, $jni_method, $jni_descriptor, false)
                     })?;
 
                     unsafe {
                         jvm.env().invoke(
-                            duchess::plumbing::jni_call_fn!($O_ty),
+                            duchess::semver_unstable::jni_call_fn!($O_ty),
                             |env, f| f(
                                 env,
                                 this.as_ptr(),
                                 method.as_ptr(),
                                 [
-                                    $(duchess::plumbing::IntoJniValue::into_jni_value($I),)*
+                                    $(duchess::semver_unstable::IntoJniValue::into_jni_value($I),)*
                                 ].as_ptr(),
                             ),
                         )
@@ -102,7 +102,7 @@ macro_rules! setup_inherent_object_method {
                 }
             }
 
-            duchess::plumbing::macro_if! {
+            duchess::semver_unstable::macro_if! {
                 if is_ref_ty($O_ty) {
                     impl<$($G,)* $($MG,)* this, $($I,)*> ::core::ops::Deref
                     for $M<$($G,)* $($MG,)* this, $($I,)*>
@@ -110,10 +110,10 @@ macro_rules! setup_inherent_object_method {
                         $($G: duchess::JavaObject,)*
                         $($SIG)*
                     {
-                        type Target = duchess::plumbing::view_of_op!($O_ty);
+                        type Target = duchess::semver_unstable::view_of_op!($O_ty);
 
                         fn deref(&self) -> &Self::Target {
-                            <Self::Target as duchess::plumbing::FromRef<_>>::from_ref(self)
+                            <Self::Target as duchess::semver_unstable::FromRef<_>>::from_ref(self)
                         }
                     }
                 }
