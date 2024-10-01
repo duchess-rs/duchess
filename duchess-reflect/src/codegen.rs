@@ -132,7 +132,7 @@ impl ClassInfo {
         let mro_tys = self.mro(upcasts)?;
 
         let output = quote! {
-            duchess::plumbing::setup_class! {
+            duchess::semver_unstable::setup_class! {
                 struct_name: [#struct_name],
                 java_class_generics: [#(#java_class_generics,)*],
                 jni_class_name: [#jni_class_name],
@@ -206,7 +206,7 @@ impl ClassInfo {
         let descriptor = Literal::string(&constructor.descriptor(&self.generics_scope()));
 
         Ok(quote! {
-            duchess::plumbing::setup_constructor! {
+            duchess::semver_unstable::setup_constructor! {
                 struct_name: [#struct_name],
                 java_class_generics: [#(#java_class_generics,)*],
                 input_names: [#(#input_names,)*],
@@ -247,7 +247,7 @@ impl ClassInfo {
         // to account for captures.
         let sig_where_clauses = &sig.where_clauses;
 
-        Ok(quote!(duchess::plumbing::setup_op_method! {
+        Ok(quote!(duchess::semver_unstable::setup_op_method! {
             struct_name: [#struct_name],
             java_class_generics: [#(#java_class_generics,)*],
             rust_method_name: [#rust_method_name],
@@ -283,7 +283,7 @@ impl ClassInfo {
         // to account for captures.
         let sig_where_clauses = &sig.where_clauses;
 
-        Ok(quote!(duchess::plumbing::setup_obj_method! {
+        Ok(quote!(duchess::semver_unstable::setup_obj_method! {
             struct_name: [#struct_name],
             java_class_generics: [#(#java_class_generics,)*],
             rust_method_name: [#rust_method_name],
@@ -322,19 +322,21 @@ impl ClassInfo {
         // to account for captures.
         let sig_where_clauses = &sig.where_clauses;
 
-        Ok(quote!(duchess::plumbing::setup_inherent_object_method! {
-            struct_name: [#struct_name],
-            java_class_generics: [#(#java_class_generics,)*],
-            rust_method_name: [#rust_method_name],
-            rust_method_generics: [#(#rust_method_generics,)*],
-            input_names: [#(#input_names,)*],
-            input_ty_tts: [#(#input_ty_tts,)*],
-            input_ty_ops: [#(#input_ty_ops,)*],
-            output_ty_tt: [#output_ty_tt],
-            sig_where_clauses: [#(#sig_where_clauses,)*],
-            jni_method: [#jni_method],
-            jni_descriptor: [#jni_descriptor],
-        }))
+        Ok(quote!(
+            duchess::semver_unstable::setup_inherent_object_method! {
+                struct_name: [#struct_name],
+                java_class_generics: [#(#java_class_generics,)*],
+                rust_method_name: [#rust_method_name],
+                rust_method_generics: [#(#rust_method_generics,)*],
+                input_names: [#(#input_names,)*],
+                input_ty_tts: [#(#input_ty_tts,)*],
+                input_ty_ops: [#(#input_ty_ops,)*],
+                output_ty_tt: [#output_ty_tt],
+                sig_where_clauses: [#(#sig_where_clauses,)*],
+                jni_method: [#jni_method],
+                jni_descriptor: [#jni_descriptor],
+            }
+        ))
     }
 
     /// Generates a static method declaration that should be part of the inherent methods
@@ -368,7 +370,7 @@ impl ClassInfo {
 
         let sig_where_clauses = &sig.where_clauses;
 
-        Ok(quote!(duchess::plumbing::setup_static_method! {
+        Ok(quote!(duchess::semver_unstable::setup_static_method! {
             struct_name: [#struct_name],
             java_class_generics: [#(#java_class_generics,)*],
             rust_method_name: [#rust_method_name],
@@ -406,15 +408,17 @@ impl ClassInfo {
 
         let sig_where_clauses = &sig.where_clauses;
 
-        Ok(quote!(duchess::plumbing::setup_static_field_getter! {
-            struct_name: [#struct_name],
-            java_class_generics: [#(#java_class_generics,)*],
-            rust_field_name: [#rust_field_name],
-            field_ty: [#field_ty],
-            sig_where_clauses: [#(#sig_where_clauses,)*],
-            jni_field: [#jni_field],
-            jni_descriptor: [#jni_descriptor],
-        }))
+        Ok(quote!(
+            duchess::semver_unstable::setup_static_field_getter! {
+                struct_name: [#struct_name],
+                java_class_generics: [#(#java_class_generics,)*],
+                rust_field_name: [#rust_field_name],
+                field_ty: [#field_ty],
+                sig_where_clauses: [#(#sig_where_clauses,)*],
+                jni_field: [#jni_field],
+                jni_descriptor: [#jni_descriptor],
+            }
+        ))
     }
 
     fn struct_name(&self) -> Ident {

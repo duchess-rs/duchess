@@ -2,7 +2,7 @@ use std::{marker::PhantomData, ops::Deref, ptr::NonNull};
 
 use crate::jvm::JavaObjectExt;
 use crate::thread;
-use crate::{cast::Upcast, plumbing::ObjectPtr, raw::EnvPtr, JavaObject};
+use crate::{cast::Upcast, raw::EnvPtr, semver_unstable::ObjectPtr, JavaObject};
 
 /// An owned local reference to a non-null Java object of type `T`. The reference will be freed when
 /// dropped. Cannot be shared across threads or [`Jvm::with`] invocations.

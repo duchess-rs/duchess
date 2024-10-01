@@ -215,7 +215,7 @@ impl Driver<'_> {
                 }
             }
 
-            impl #impl_generics duchess::plumbing::ToJavaImpl<#root_class_name> for #self_ty #ty_generics #where_clause {
+            impl #impl_generics duchess::semver_unstable::ToJavaImpl<#root_class_name> for #self_ty #ty_generics #where_clause {
                 fn to_java_impl<'jvm>(rust: &Self, jvm: &mut duchess::Jvm<'jvm>) -> duchess::LocalResult<'jvm, ::core::option::Option<duchess::Local<'jvm, #root_class_name>>> {
                     Ok(Some(duchess::JvmOp::do_jni(rust, jvm)?))
                 }

@@ -10,7 +10,7 @@ macro_rules! setup_constructor {
         jni_descriptor: [$jni_descriptor:expr],
     ) => {
         pub fn new(
-            $($I : duchess::plumbing::argument_impl_trait!($I_ty),)*
+            $($I : duchess::semver_unstable::argument_impl_trait!($I_ty),)*
         ) -> impl duchess::prelude::JavaConstructor<$S<$($G,)*>> {
             struct Impl<
                 $($G,)*
@@ -44,10 +44,10 @@ macro_rules! setup_constructor {
                     self,
                     jvm: &mut duchess::Jvm<'jvm>,
                 ) -> duchess::LocalResult<'jvm, Self::Output<'jvm>> {
-                    use duchess::plumbing::once_cell::sync::OnceCell;
+                    use duchess::semver_unstable::once_cell::sync::OnceCell;
 
                     $(
-                        duchess::plumbing::prepare_input!(let $I = (self.$I: $I_ty) in jvm);
+                        duchess::semver_unstable::prepare_input!(let $I = (self.$I: $I_ty) in jvm);
                     )*
 
                     let class = <$S<$($G,)*> as duchess::JavaObject>::class(jvm)?;
@@ -55,19 +55,19 @@ macro_rules! setup_constructor {
                     // Cache the method id for the constructor -- note that we only have one cache
                     // no matter how many generic monomorphizations there are. This makes sense
                     // given Java's erased-based generics system.
-                    static CONSTRUCTOR: OnceCell<duchess::plumbing::MethodPtr> = OnceCell::new();
+                    static CONSTRUCTOR: OnceCell<duchess::semver_unstable::MethodPtr> = OnceCell::new();
                     let constructor = CONSTRUCTOR.get_or_try_init(|| {
-                        duchess::plumbing::find_constructor(jvm, &class, $jni_descriptor)
+                        duchess::semver_unstable::find_constructor(jvm, &class, $jni_descriptor)
                     })?;
 
                     let env = jvm.env();
                     let obj: ::core::option::Option<duchess::Local<$S<$($G,)*>>> = unsafe {
                         env.invoke(|env| env.NewObjectA, |env, f| f(
                             env,
-                            duchess::plumbing::JavaObjectExt::as_raw(&*class).as_ptr(),
+                            duchess::semver_unstable::JavaObjectExt::as_raw(&*class).as_ptr(),
                             constructor.as_ptr(),
                             [
-                                $(duchess::plumbing::IntoJniValue::into_jni_value($I),)*
+                                $(duchess::semver_unstable::IntoJniValue::into_jni_value($I),)*
                             ].as_ptr(),
                         ))
                     }?;
@@ -88,10 +88,10 @@ macro_rules! setup_constructor {
                 $($G: duchess::JavaObject,)*
                 $($I: $I_op,)*
             {
-                type Target = <$S<$($G,)*> as duchess::plumbing::JavaView>::OfOp<Self>;
+                type Target = <$S<$($G,)*> as duchess::semver_unstable::JavaView>::OfOp<Self>;
 
                 fn deref(&self) -> &Self::Target {
-                    <Self::Target as duchess::plumbing::FromRef<_>>::from_ref(self)
+                    <Self::Target as duchess::semver_unstable::FromRef<_>>::from_ref(self)
                 }
             }
 

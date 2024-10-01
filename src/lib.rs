@@ -53,7 +53,8 @@ pub mod prelude {
 
 /// Internal module containing non-semver protected
 /// names used by generated code.
-pub mod plumbing {
+#[doc(hidden)]
+pub mod semver_unstable {
     pub use crate::cast::Upcast;
     pub use crate::find::{find_class, find_constructor, find_field, find_method};
     pub use crate::from_ref::FromRef;

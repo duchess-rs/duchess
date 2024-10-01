@@ -10,10 +10,10 @@
 #[macro_export]
 macro_rules! argument_impl_trait {
     ($scalar:ident $(+ $lt:lifetime)?) => {
-        impl duchess::IntoScalar< duchess::plumbing::rust_ty!($scalar) > $(+ $lt)?
+        impl duchess::IntoScalar< duchess::semver_unstable::rust_ty!($scalar) > $(+ $lt)?
     };
 
     ($r:tt $(+ $lt:lifetime)?) => {
-        impl duchess::IntoJava< duchess::plumbing::rust_ty!($r) > $(+ $lt)?
+        impl duchess::IntoJava< duchess::semver_unstable::rust_ty!($r) > $(+ $lt)?
     };
 }

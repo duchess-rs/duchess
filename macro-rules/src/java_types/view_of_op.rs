@@ -9,6 +9,6 @@
 #[macro_export]
 macro_rules! view_of_op {
     ($r:tt) => {
-        <duchess::plumbing::rust_ty!($r) as duchess::plumbing::JavaView>::OfOp<Self>
+        <duchess::semver_unstable::rust_ty!($r) as duchess::semver_unstable::JavaView>::OfOp<Self>
     };
 }

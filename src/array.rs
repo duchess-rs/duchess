@@ -4,7 +4,7 @@ use crate::{
     cast::Upcast,
     java::{self, lang::Class},
     jvm::JavaView,
-    plumbing::{FromRef, JavaObjectExt},
+    semver_unstable::{FromRef, JavaObjectExt},
     to_java::ToJavaImpl,
     AsJRef, Error, IntoRust, JDeref, JavaObject, JavaType, Jvm, JvmOp, Local, Nullable,
     ScalarMethod, TryJDeref,

@@ -40,10 +40,10 @@ macro_rules! rust_ty {
         $($path)*
     };
     ((class[$($path:tt)*] $($args:tt)*)) => {
-        ($($path)* < $(duchess::plumbing::rust_ty!($args),)* >)
+        ($($path)* < $(duchess::semver_unstable::rust_ty!($args),)* >)
     };
     ((array $elem:tt)) => {
-        java::Array<duchess::plumbing::rust_ty!($elem)>
+        java::Array<duchess::semver_unstable::rust_ty!($elem)>
     };
     ((generic $name:ident)) => {
         $name

@@ -13,10 +13,10 @@ macro_rules! output_type {
     };
 
     ($lt:lifetime, $scalar:ident) => {
-        duchess::plumbing::rust_ty!($scalar)
+        duchess::semver_unstable::rust_ty!($scalar)
     };
 
     ($lt:lifetime, $r:tt) => {
-        Option<duchess::Local<$lt, duchess::plumbing::rust_ty!($r)>>
+        Option<duchess::Local<$lt, duchess::semver_unstable::rust_ty!($r)>>
     };
 }
