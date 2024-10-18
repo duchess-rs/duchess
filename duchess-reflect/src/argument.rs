@@ -5,6 +5,7 @@ use crate::{
     parse::{Parse, Parser},
 };
 
+#[derive(Debug)]
 pub struct DuchessDeclaration {
     pub packages: Vec<JavaPackage>,
 }
@@ -126,6 +127,7 @@ impl Parse for MethodSelector {
     }
 }
 
+#[derive(Debug)]
 pub struct JavaPackage {
     pub package_name: JavaPath,
     pub classes: Vec<ClassDecl>,
@@ -164,6 +166,7 @@ impl Parse for JavaPackage {
     }
 }
 
+#[derive(Debug)]
 pub struct JavaPath {
     pub ids: Vec<Ident>,
     pub span: Span,
@@ -217,6 +220,7 @@ impl std::fmt::Display for JavaPath {
     }
 }
 
+#[derive(Debug)]
 pub struct Ident {
     pub text: String,
     pub span: Span,

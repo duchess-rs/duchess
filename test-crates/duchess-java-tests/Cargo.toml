@@ -11,6 +11,8 @@ thiserror = "1.0.40"
 ui_test = "0.23"
 
 [build-dependencies]
+anyhow = "1.0.90"
+duchess-build-rs = { version = "0.3.0", path = "../../duchess-build-rs" }
 walkdir = "2.3"
 
 [[bin]]

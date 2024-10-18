@@ -3,6 +3,7 @@ use std::{
     sync::Arc,
 };
 
+use duchess_reflect::config::Configuration;
 use proc_macro2::{Span, TokenStream};
 use quote::quote_spanned;
 use syn::{spanned::Spanned, Attribute};
@@ -20,7 +21,7 @@ use crate::{
 pub fn derive_to_rust(s: synstructure::Structure) -> proc_macro2::TokenStream {
     let mut driver = Driver {
         input: &s,
-        reflector: &mut Reflector::default(),
+        reflector: &mut Reflector::new(&Configuration::default()),
     };
     match driver.try_derive_to_rust() {
         Ok(t) => {
@@ -34,7 +35,7 @@ pub fn derive_to_rust(s: synstructure::Structure) -> proc_macro2::TokenStream {
 pub fn derive_to_java(s: synstructure::Structure) -> proc_macro2::TokenStream {
     let mut driver = Driver {
         input: &s,
-        reflector: &mut Reflector::default(),
+        reflector: &mut Reflector::new(&Configuration::default()),
     };
     match driver.try_derive_to_java() {
         Ok(t) => {

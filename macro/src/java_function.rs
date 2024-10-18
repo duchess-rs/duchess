@@ -1,5 +1,6 @@
 use std::{iter::once, sync::Arc};
 
+use duchess_reflect::config::Configuration;
 use proc_macro2::{Ident, Literal, TokenStream};
 use quote::quote_spanned;
 use syn::spanned::Spanned;
@@ -36,8 +37,8 @@ use crate::{
 pub fn java_function(selector: MethodSelector, input: syn::ItemFn) -> syn::Result<TokenStream> {
     let span = selector.span();
 
-    let mut reflector = Reflector::default();
-    let (class_info, method_index) = reflected_method(&selector, &mut reflector)?;
+    let reflector = &mut Reflector::new(&Configuration::default());
+    let (class_info, method_index) = reflected_method(&selector, reflector)?;
     let driver = Driver {
         selector: &selector,
         class_info: &class_info,

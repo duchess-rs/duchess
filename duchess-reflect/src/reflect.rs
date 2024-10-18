@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::BTreeMap, env, path::PathBuf, process::Command, sync::Arc};
+use std::{cell::RefCell, collections::BTreeMap, process::Command, sync::Arc};
 
 use proc_macro2::Span;
 
@@ -7,6 +7,7 @@ use crate::{
     class_info::{
         ClassDeclKind, ClassInfo, DotId, Generic, Id, Method, RootMap, SpannedPackageInfo, Type,
     },
+    config::Configuration,
     upcasts::Upcasts,
 };
 
@@ -128,12 +129,19 @@ impl JavaPackage {
 
 /// Reflection cache. Given fully qualified java class names,
 /// look up info about their interfaces.
-#[derive(Default)]
 pub struct Reflector {
+    configuration: Configuration,
     classes: RefCell<BTreeMap<DotId, Arc<ClassInfo>>>,
 }
 
 impl Reflector {
+    pub fn new(configuration: &Configuration) -> Self {
+        Self {
+            configuration: configuration.clone(),
+            classes: Default::default(),
+        }
+    }
+
     /// Returns the (potentially cached) info about `class_name`;
     pub fn reflect(&self, class_name: &DotId, span: Span) -> syn::Result<Arc<ClassInfo>> {
         // yields an error if we cannot reflect on that class.
@@ -141,16 +149,9 @@ impl Reflector {
             return Ok(class);
         }
 
-        let mut javap_path = PathBuf::new();
-        if let Ok(java_home) = env::var("JAVA_HOME") {
-            javap_path.extend([java_home.as_str(), "bin"]);
-        }
-        javap_path.push("javap");
+        let mut command = Command::new(self.configuration.bin_path("javap"));
 
-        let mut command = Command::new(javap_path);
-
-        // If the CLASSPATH variable is set we will use it, otherwise allow javap to use its default classpath
-        if let Some(classpath) = env::var("CLASSPATH").ok() {
+        if let Some(classpath) = self.configuration.classpath() {
             command.arg("-cp").arg(classpath);
         }
 

@@ -1,0 +1,19 @@
+[package]
+name = "duchess-build-rs"
+edition = "2021"
+version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+
+[dependencies]
+anyhow = "1.0.86"
+duchess-reflect = { version = "0.3.0", path = "../duchess-reflect" }
+lazy_static = "1.5.0"
+proc-macro2 = "1.0.86"
+quote = "1.0.36"
+regex = "1.10.5"
+syn = { version = "2.0.71", features = ["full"] }
+tempfile = "3.10.1"
+walkdir = "2.5.0"
