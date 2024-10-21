@@ -65,7 +65,12 @@ impl SpannedPackageInfo {
 }
 
 #[derive(Debug)]
-pub enum ClassDecl {
+pub struct ClassDecl {
+    pub kind: ClassDeclKind,
+}
+
+#[derive(Debug)]
+pub enum ClassDeclKind {
     /// User wrote `class Foo { * }`
     Reflected(ReflectedClassInfo),
 
@@ -112,8 +117,8 @@ impl Parse for ClassDecl {
 
         // Parse the text with LALRPOP.
         let (text, span) = accum.into_accumulated_result();
-        let r = javap::parse_class_decl(span, &text)?;
-        Ok(Some(r))
+        let kind = javap::parse_class_decl(span, &text)?;
+        Ok(Some(ClassDecl { kind }))
     }
 
     fn description() -> String {

@@ -5,7 +5,7 @@ use proc_macro2::Span;
 use crate::{
     argument::{DuchessDeclaration, Ident, JavaPackage, MethodSelector},
     class_info::{
-        ClassDecl, ClassInfo, DotId, Generic, Id, Method, RootMap, SpannedPackageInfo, Type,
+        ClassDeclKind, ClassInfo, DotId, Generic, Id, Method, RootMap, SpannedPackageInfo, Type,
     },
     upcasts::Upcasts,
 };
@@ -70,8 +70,8 @@ impl JavaPackage {
         classes: &mut BTreeMap<DotId, Arc<ClassInfo>>,
     ) -> syn::Result<()> {
         for c in &self.classes {
-            let (dot_id, info) = match c {
-                ClassDecl::Reflected(c) => {
+            let (dot_id, info) = match &c.kind {
+                ClassDeclKind::Reflected(c) => {
                     let dot_id = self.make_absolute_dot_id(c.span, &c.name)?;
                     let info = reflector.reflect(&dot_id, c.span)?;
 
@@ -85,7 +85,7 @@ impl JavaPackage {
                         }),
                     )
                 }
-                ClassDecl::Specified(c) => {
+                ClassDeclKind::Specified(c) => {
                     let dot_id = self.make_absolute_dot_id(c.span, &c.name)?;
                     (
                         dot_id.clone(),

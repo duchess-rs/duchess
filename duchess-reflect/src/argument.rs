@@ -1,7 +1,7 @@
 use proc_macro2::Span;
 
 use crate::{
-    class_info::{ClassDecl, ClassInfo, DotId, Id},
+    class_info::{ClassDecl, ClassDeclKind, ClassInfo, DotId, Id},
     parse::{Parse, Parser},
 };
 
@@ -79,12 +79,12 @@ impl Parse for MethodSelector {
     fn parse(p: &mut crate::parse::Parser) -> syn::Result<Option<Self>> {
         // Check for a `class` declaration
         if let Some(c) = ClassDecl::parse(p)? {
-            return match c {
-                ClassDecl::Reflected(r) => Err(syn::Error::new(
+            return match c.kind {
+                ClassDeclKind::Reflected(r) => Err(syn::Error::new(
                     r.span,
                     format!("expected a class with a single member, not `*`"),
                 )),
-                ClassDecl::Specified(c) => {
+                ClassDeclKind::Specified(c) => {
                     let members = c.constructors.len() + c.fields.len() + c.methods.len();
                     if members != 1 {
                         Err(syn::Error::new(
