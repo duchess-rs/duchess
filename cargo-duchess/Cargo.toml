@@ -1,0 +1,12 @@
+[package]
+name = "cargo-duchess"
+edition = "2021"
+version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+
+[dependencies]
+anyhow = "1.0.89"
+structopt = "0.3.26"

@@ -1,5 +1,5 @@
 [workspace]
-members = ["duchess-build-rs", "duchess-reflect", "macro-rules"]
+members = [ "cargo-duchess","duchess-build-rs", "duchess-reflect", "macro-rules"]
 
 [workspace.package]
 version = "0.3.0"
