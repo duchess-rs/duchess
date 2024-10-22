@@ -1,20 +1,20 @@
 use std::{fmt::Display, io::Write};
 
-use duchess_reflect::class_info::ClassInfo;
+use duchess_reflect::reflect::JavapClassInfo;
 
 use crate::code_writer::CodeWriter;
 
 pub struct ShimWriter<'w> {
     cw: CodeWriter<'w>,
     shim_name: &'w str,
-    java_interface_info: &'w ClassInfo,
+    java_interface_info: &'w JavapClassInfo,
 }
 
 impl<'w> ShimWriter<'w> {
     pub fn new(
         writer: &'w mut impl Write,
         shim_name: &'w str,
-        java_interface_info: &'w ClassInfo,
+        java_interface_info: &'w JavapClassInfo,
     ) -> Self {
         ShimWriter {
             cw: CodeWriter::new(writer),

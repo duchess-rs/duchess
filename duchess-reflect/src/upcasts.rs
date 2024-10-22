@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
-    class_info::{ClassInfo, ClassRef, DotId, Id},
+    class_info::{ClassInfoAccessors, ClassRef, DotId, Id},
     substitution::{Substitute, Substitution},
 };
 
@@ -23,8 +23,11 @@ pub struct ClassUpcasts {
     extends: BTreeSet<ClassRef>,
 }
 
-impl<'a> FromIterator<&'a ClassInfo> for Upcasts {
-    fn from_iter<T: IntoIterator<Item = &'a ClassInfo>>(iter: T) -> Self {
+impl<'a, CI> FromIterator<&'a CI> for Upcasts
+where
+    CI: ClassInfoAccessors,
+{
+    fn from_iter<T: IntoIterator<Item = &'a CI>>(iter: T) -> Self {
         let mut upcasts = Upcasts::default();
 
         for class_info in iter {
@@ -48,27 +51,27 @@ impl Upcasts {
     }
 
     /// Insert the direct (declared by user) superclasses of `class` into the map.
-    fn insert_direct_upcasts(&mut self, class: &ClassInfo) {
+    fn insert_direct_upcasts(&mut self, class: &dyn ClassInfoAccessors) {
         let mut upcasts = ClassUpcasts {
-            generics: class.generics.iter().map(|g| g.id.clone()).collect(),
+            generics: class.generics().iter().map(|g| g.id.clone()).collect(),
             extends: BTreeSet::default(),
         };
 
         // Include direct upcasts declared by the user.
-        for c in class.extends.iter().chain(&class.implements) {
+        for c in class.extends().iter().chain(class.implements()) {
             upcasts.extends.insert(c.clone());
         }
 
         // Everything can be upcast to object.
         let object = DotId::object();
-        if class.name != object {
+        if *class.name() != object {
             upcasts.extends.insert(ClassRef {
                 name: object,
                 generics: vec![],
             });
         }
 
-        let old_value = self.map.insert(class.name.clone(), upcasts);
+        let old_value = self.map.insert(class.name().clone(), upcasts);
         assert!(old_value.is_none());
     }
 

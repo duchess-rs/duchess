@@ -6,6 +6,7 @@ use quote::quote_spanned;
 
 use crate::{
     parse::{Parse, TextAccum},
+    reflect::JavapClassInfo,
     upcasts::Upcasts,
 };
 
@@ -150,20 +151,72 @@ pub struct ClassInfo {
     pub methods: Vec<Method>,
 }
 
-impl ClassInfo {
-    pub fn parse(text: &str, span: Span) -> syn::Result<ClassInfo> {
-        javap::parse_class_info(span, &text)
-    }
+/// Trait that allows code to be generic over [`ClassInfo`][]
+/// or [`JavapClassInfo`][].
+pub trait ClassInfoAccessors {
+    fn flags(&self) -> &Flags;
+    fn name(&self) -> &DotId;
+    fn kind(&self) -> ClassKind;
+    fn generics(&self) -> &Vec<Generic>;
+    fn extends(&self) -> &Vec<ClassRef>;
+    fn implements(&self) -> &Vec<ClassRef>;
+    fn constructors(&self) -> &Vec<Constructor>;
+    fn fields(&self) -> &Vec<Field>;
+    fn methods(&self) -> &Vec<Method>;
 
-    pub fn this_ref(&self) -> ClassRef {
+    fn this_ref(&self) -> ClassRef {
         ClassRef {
-            name: self.name.clone(),
+            name: self.name().clone(),
             generics: self
-                .generics
+                .generics()
                 .iter()
                 .map(|g| RefType::TypeParameter(g.id.clone()))
                 .collect(),
         }
+    }
+}
+
+impl ClassInfoAccessors for ClassInfo {
+    fn flags(&self) -> &Flags {
+        &self.flags
+    }
+
+    fn name(&self) -> &DotId {
+        &self.name
+    }
+
+    fn kind(&self) -> ClassKind {
+        self.kind
+    }
+
+    fn generics(&self) -> &Vec<Generic> {
+        &self.generics
+    }
+
+    fn extends(&self) -> &Vec<ClassRef> {
+        &self.extends
+    }
+
+    fn implements(&self) -> &Vec<ClassRef> {
+        &self.implements
+    }
+
+    fn constructors(&self) -> &Vec<Constructor> {
+        &self.constructors
+    }
+
+    fn fields(&self) -> &Vec<Field> {
+        &self.fields
+    }
+
+    fn methods(&self) -> &Vec<Method> {
+        &self.methods
+    }
+}
+
+impl ClassInfo {
+    pub fn parse(text: &str, span: Span) -> syn::Result<ClassInfo> {
+        javap::parse_class_info(span, &text)
     }
 
     /// Indicates whether a member with the given privacy level should be reflected in Rust.
@@ -283,7 +336,7 @@ pub struct Constructor {
 }
 
 impl Constructor {
-    pub fn to_method_sig(&self, class: &ClassInfo) -> MethodSig {
+    pub fn to_method_sig(&self, class: &JavapClassInfo) -> MethodSig {
         MethodSig {
             name: class.name.class_name().clone(),
             generics: self.generics.clone(),

@@ -1,6 +1,6 @@
 use std::{iter::once, sync::Arc};
 
-use duchess_reflect::config::Configuration;
+use duchess_reflect::{class_info::ClassInfoAccessors, config::Configuration};
 use proc_macro2::{Ident, Literal, TokenStream};
 use quote::quote_spanned;
 use syn::spanned::Spanned;
