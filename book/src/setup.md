@@ -1,6 +1,16 @@
 # Setup instructions
 
-## JDK and JAVA_HOME
+## TL;DR
+
+You need to...
+
+* [Install the JDK](#jdk-and-java_home)
+* Install the `cargo-duchess` CLI tool with `cargo install cargo-duchess`
+* Run `cargo duchess init` in your package, which will add duches to your `build.rs` file and your `Cargo.toml`
+
+## Prequisites
+
+### JDK and JAVA_HOME
 
 You'll need to have a modern JDK installed. We recommend JDK17 or higher. Any JDK distribution will work. Here are some recommended options:
 
@@ -15,6 +25,14 @@ You'll need to have a modern JDK installed. We recommend JDK17 or higher. Any JD
 **You'll need the `javap` tool from the JDK to build with Duchess.**  You'll want to configure the `JAVA_HOME` environment variable to point to your JDK installation. Duchess will use it to locate `javap`. Otherwise, Duchess will search for it on your `PATH`.  You can configure the environment variables used at build time via Cargo by creating a `.cargo/config.toml` file (see [this example from duchess itself](https://github.com/duchess-rs/duchess/blob/main/.cargo/config.toml)).
 
 Duchess relies on `javap` to reflect Java type information at build time. It will *not* be invoked at runtime.
+
+## Basic setup
+
+To use Duchess your project requires a `build.rs` as well as a proc-macro crate. The `build.rs` does the heavy lifting, invoking javap and doing other reflection. The proc-macro crates then do final processing to generate the code.
+
+You can 
+
+## Other details
 
 ## Configuring the CLASSPATH
 

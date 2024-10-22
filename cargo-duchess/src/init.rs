@@ -41,6 +41,13 @@ pub fn init(options: InitOptions) -> anyhow::Result<()> {
 
     Command::new("cargo")
         .arg("add")
+        .arg("duchess")
+        .current_dir(&dir)
+        .spawn()?
+        .wait()?;
+
+    Command::new("cargo")
+        .arg("add")
         .arg("--build")
         .arg("duchess-build-rs")
         .current_dir(&dir)
