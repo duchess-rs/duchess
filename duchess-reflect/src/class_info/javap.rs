@@ -5,12 +5,12 @@ use std::fmt::Display;
 use lalrpop_util::{lalrpop_mod, lexer::Token};
 use proc_macro2::Span;
 
-use super::{ClassDecl, ClassInfo};
+use super::{ClassDeclKind, ClassInfo};
 
 lalrpop_mod!(pub javap_parser, "/class_info/javap_parser.rs"); // synthesized by LALRPOP
 
-pub(super) fn parse_class_decl(span: Span, input: &str) -> syn::Result<ClassDecl> {
-    match javap_parser::ClassDeclParser::new().parse(span, input) {
+pub(super) fn parse_class_decl(span: Span, input: &str) -> syn::Result<ClassDeclKind> {
+    match javap_parser::ClassDeclKindParser::new().parse(span, input) {
         Ok(v) => Ok(v),
         Err(error) => Err(syn::Error::new(span, format_lalrpop_error(input, error))),
     }

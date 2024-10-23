@@ -3,12 +3,13 @@ use std::{
     process::Command,
 };
 
+use duchess_build_rs::Configuration;
 use walkdir::WalkDir;
 
 // This controls where this script writes built files
 const TARGET_PATH: &str = "../target";
 
-fn main() -> std::io::Result<()> {
+fn main() -> anyhow::Result<()> {
     // Rerun java build if any source file changes, but then we'll check each file individually below
     let java_source_paths = vec!["java", "tests/java-to-rust/java"];
     for source_path in java_source_paths.iter() {
@@ -40,6 +41,14 @@ fn main() -> std::io::Result<()> {
             }
         }
     }
+
+    // This has to run after the compilations above
+    duchess_build_rs::DuchessBuildRs::new()
+        .with_configuration(
+            Configuration::default()
+                .with_classpath("../target/java:../target/tests/java-to-rust/java"),
+        )
+        .execute()?;
 
     Ok(())
 }

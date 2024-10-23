@@ -6,6 +6,7 @@ pub mod argument;
 pub mod check;
 pub mod class_info;
 pub mod codegen;
+pub mod config;
 pub mod parse;
 pub mod reflect;
 pub mod signature;
@@ -13,7 +14,7 @@ pub mod substitution;
 pub mod upcasts;
 
 lazy_static::lazy_static! {
-    static ref DEBUG_DIR: PathBuf = {
+    pub static ref DEBUG_DIR: PathBuf = {
         let tmp_dir = tempfile::TempDir::new().expect("failed to create temp directory");
         tmp_dir.into_path()
     };
@@ -29,7 +30,7 @@ pub fn debug_tokens(name: impl std::fmt::Display, token_stream: &proc_macro2::To
         filter => name.starts_with(&filter),
     };
     if debug_enabled {
-        let path = DEBUG_DIR.join(name.replace('.', "_")).with_extension("rs");
+        let path: PathBuf = DEBUG_DIR.join(name.replace('.', "_")).with_extension("rs");
         match rust_format::RustFmt::default().format_tokens(token_stream.clone()) {
             Ok(formatted_tokens) => {
                 std::fs::write(&path, formatted_tokens).expect("failed to write to debug file");

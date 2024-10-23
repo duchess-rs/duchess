@@ -6,6 +6,7 @@ use quote::quote_spanned;
 
 use crate::{
     parse::{Parse, TextAccum},
+    reflect::JavapClassInfo,
     upcasts::Upcasts,
 };
 
@@ -65,7 +66,12 @@ impl SpannedPackageInfo {
 }
 
 #[derive(Debug)]
-pub enum ClassDecl {
+pub struct ClassDecl {
+    pub kind: ClassDeclKind,
+}
+
+#[derive(Debug)]
+pub enum ClassDeclKind {
     /// User wrote `class Foo { * }`
     Reflected(ReflectedClassInfo),
 
@@ -112,8 +118,8 @@ impl Parse for ClassDecl {
 
         // Parse the text with LALRPOP.
         let (text, span) = accum.into_accumulated_result();
-        let r = javap::parse_class_decl(span, &text)?;
-        Ok(Some(r))
+        let kind = javap::parse_class_decl(span, &text)?;
+        Ok(Some(ClassDecl { kind }))
     }
 
     fn description() -> String {
@@ -145,20 +151,72 @@ pub struct ClassInfo {
     pub methods: Vec<Method>,
 }
 
-impl ClassInfo {
-    pub fn parse(text: &str, span: Span) -> syn::Result<ClassInfo> {
-        javap::parse_class_info(span, &text)
-    }
+/// Trait that allows code to be generic over [`ClassInfo`][]
+/// or [`JavapClassInfo`][].
+pub trait ClassInfoAccessors {
+    fn flags(&self) -> &Flags;
+    fn name(&self) -> &DotId;
+    fn kind(&self) -> ClassKind;
+    fn generics(&self) -> &Vec<Generic>;
+    fn extends(&self) -> &Vec<ClassRef>;
+    fn implements(&self) -> &Vec<ClassRef>;
+    fn constructors(&self) -> &Vec<Constructor>;
+    fn fields(&self) -> &Vec<Field>;
+    fn methods(&self) -> &Vec<Method>;
 
-    pub fn this_ref(&self) -> ClassRef {
+    fn this_ref(&self) -> ClassRef {
         ClassRef {
-            name: self.name.clone(),
+            name: self.name().clone(),
             generics: self
-                .generics
+                .generics()
                 .iter()
                 .map(|g| RefType::TypeParameter(g.id.clone()))
                 .collect(),
         }
+    }
+}
+
+impl ClassInfoAccessors for ClassInfo {
+    fn flags(&self) -> &Flags {
+        &self.flags
+    }
+
+    fn name(&self) -> &DotId {
+        &self.name
+    }
+
+    fn kind(&self) -> ClassKind {
+        self.kind
+    }
+
+    fn generics(&self) -> &Vec<Generic> {
+        &self.generics
+    }
+
+    fn extends(&self) -> &Vec<ClassRef> {
+        &self.extends
+    }
+
+    fn implements(&self) -> &Vec<ClassRef> {
+        &self.implements
+    }
+
+    fn constructors(&self) -> &Vec<Constructor> {
+        &self.constructors
+    }
+
+    fn fields(&self) -> &Vec<Field> {
+        &self.fields
+    }
+
+    fn methods(&self) -> &Vec<Method> {
+        &self.methods
+    }
+}
+
+impl ClassInfo {
+    pub fn parse(text: &str, span: Span) -> syn::Result<ClassInfo> {
+        javap::parse_class_info(span, &text)
     }
 
     /// Indicates whether a member with the given privacy level should be reflected in Rust.
@@ -278,7 +336,7 @@ pub struct Constructor {
 }
 
 impl Constructor {
-    pub fn to_method_sig(&self, class: &ClassInfo) -> MethodSig {
+    pub fn to_method_sig(&self, class: &JavapClassInfo) -> MethodSig {
         MethodSig {
             name: class.name.class_name().clone(),
             generics: self.generics.clone(),
@@ -336,13 +394,21 @@ impl Method {
     /// * `ctx` is the generics scope of the class.
     pub fn descriptor(&self, ctx: &GenericsScope<'_>) -> String {
         let ctx = &ctx.nest(&self.generics);
+        Self::descriptor_from_types(ctx, &self.argument_tys, &self.return_ty)
+    }
+
+    pub fn descriptor_from_types(
+        ctx: &GenericsScope<'_>,
+        argument_tys: &[Type],
+        return_ty: &Option<Type>,
+    ) -> String {
         format!(
             "({}){}",
-            self.argument_tys
+            argument_tys
                 .iter()
                 .map(|a| a.descriptor(ctx))
                 .collect::<String>(),
-            self.return_ty
+            return_ty
                 .as_ref()
                 .map(|r| r.descriptor(ctx))
                 .unwrap_or_else(|| format!("V")),
@@ -411,6 +477,12 @@ pub enum Type {
 impl From<ClassRef> for Type {
     fn from(value: ClassRef) -> Self {
         Type::Ref(RefType::Class(value))
+    }
+}
+
+impl From<ScalarType> for Type {
+    fn from(value: ScalarType) -> Self {
+        Type::Scalar(value)
     }
 }
 
@@ -508,16 +580,7 @@ impl NonRepeatingType {
                     format!("Ljava/lang/Object;")
                 }
             },
-            NonRepeatingType::Scalar(s) => match s {
-                ScalarType::Int => format!("I"),
-                ScalarType::Long => format!("J"),
-                ScalarType::Short => format!("S"),
-                ScalarType::Byte => format!("B"),
-                ScalarType::F64 => format!("D"),
-                ScalarType::F32 => format!("F"),
-                ScalarType::Boolean => format!("Z"),
-                ScalarType::Char => format!("C"),
-            },
+            NonRepeatingType::Scalar(s) => s.descriptor().to_string(),
         }
     }
 }
@@ -585,6 +648,19 @@ impl ScalarType {
             ScalarType::Boolean => quote_spanned!(span => bool),
         }
     }
+
+    pub fn descriptor(&self) -> &'static str {
+        match self {
+            ScalarType::Int => "I",
+            ScalarType::Long => "J",
+            ScalarType::Short => "S",
+            ScalarType::Byte => "B",
+            ScalarType::F64 => "D",
+            ScalarType::F32 => "F",
+            ScalarType::Boolean => "Z",
+            ScalarType::Char => "C",
+        }
+    }
 }
 
 /// A single identifier
@@ -594,9 +670,9 @@ pub struct Id {
 }
 
 impl std::ops::Deref for Id {
-    type Target = String;
+    type Target = str;
 
-    fn deref(&self) -> &String {
+    fn deref(&self) -> &str {
         &self.data
     }
 }
@@ -611,6 +687,14 @@ impl From<&str> for Id {
     fn from(value: &str) -> Self {
         Id {
             data: value.to_owned(),
+        }
+    }
+}
+
+impl From<&Ident> for Id {
+    fn from(value: &Ident) -> Self {
+        Id {
+            data: value.to_string(),
         }
     }
 }
@@ -678,6 +762,10 @@ impl DotId {
         }
     }
 
+    pub fn duchess() -> Self {
+        Self::parse("duchess")
+    }
+
     pub fn object() -> Self {
         Self::parse("java.lang.Object")
     }
@@ -737,13 +825,23 @@ impl DotId {
         (package, name)
     }
 
-    /// Returns a name like `java/lang/Object`
-    pub fn to_jni_name(&self) -> String {
+    /// Create a string-ified version of this name with `sep` in between each component.
+    fn with_sep(&self, sep: &str) -> String {
         self.ids
             .iter()
             .map(|id| &id[..])
             .collect::<Vec<_>>()
-            .join("/")
+            .join(sep)
+    }
+
+    /// Returns a name like `java/lang/Object`
+    pub fn to_jni_name(&self) -> String {
+        self.with_sep("/")
+    }
+
+    /// Returns a name like `java$lang$Object`
+    pub fn to_dollar_name(&self) -> String {
+        self.with_sep("$")
     }
 
     /// Returns a token stream like `java::lang::Object`
@@ -774,4 +872,5 @@ impl std::fmt::Display for DotId {
     }
 }
 
+mod from_syn;
 mod javap;

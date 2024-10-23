@@ -1,4 +1,5 @@
 use argument::{DuchessDeclaration, MethodSelector};
+use config::Configuration;
 use parse::Parser;
 use proc_macro::TokenStream;
 
@@ -27,7 +28,7 @@ pub fn java_package(input: TokenStream) -> TokenStream {
         Err(err) => return err.to_compile_error().into(),
     };
 
-    match decl.to_tokens() {
+    match decl.to_tokens(&Configuration::default()) {
         Ok(t) => return t.into(),
         Err(e) => return e.into_compile_error().into(),
     }

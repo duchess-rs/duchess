@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use crate::{
     class_info::{ClassInfo, ClassRef, Constructor, Flags, Method, RefType, RootMap, Type},
-    reflect::Reflector,
+    reflect::{JavapClassInfo, Reflector},
 };
 
 impl RootMap {
@@ -116,8 +116,10 @@ impl ClassInfo {
             &mut push_error_message,
         );
 
+        let refl = JavapClassInfo::from(self.clone());
+
         for c in &self.constructors {
-            let c_method_sig = c.to_method_sig(self);
+            let c_method_sig = c.to_method_sig(&refl);
 
             c.check(root_map, &mut |m| {
                 push_error_message(format!(

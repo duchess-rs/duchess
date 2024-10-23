@@ -1,12 +1,14 @@
-use std::{cell::RefCell, collections::BTreeMap, env, path::PathBuf, process::Command, sync::Arc};
+use std::{cell::RefCell, collections::BTreeMap, process::Command, sync::Arc};
 
 use proc_macro2::Span;
 
 use crate::{
     argument::{DuchessDeclaration, Ident, JavaPackage, MethodSelector},
     class_info::{
-        ClassDecl, ClassInfo, DotId, Generic, Id, Method, RootMap, SpannedPackageInfo, Type,
+        ClassDeclKind, ClassInfo, ClassInfoAccessors, ClassKind, ClassRef, Constructor, DotId,
+        Field, Flags, Generic, Id, Method, RootMap, SpannedPackageInfo, Type,
     },
+    config::Configuration,
     upcasts::Upcasts,
 };
 
@@ -70,8 +72,8 @@ impl JavaPackage {
         classes: &mut BTreeMap<DotId, Arc<ClassInfo>>,
     ) -> syn::Result<()> {
         for c in &self.classes {
-            let (dot_id, info) = match c {
-                ClassDecl::Reflected(c) => {
+            let (dot_id, info) = match &c.kind {
+                ClassDeclKind::Reflected(c) => {
                     let dot_id = self.make_absolute_dot_id(c.span, &c.name)?;
                     let info = reflector.reflect(&dot_id, c.span)?;
 
@@ -79,13 +81,12 @@ impl JavaPackage {
                     (
                         dot_id,
                         Arc::new(ClassInfo {
-                            span: c.span,
                             kind: c.kind,
-                            ..(*info).clone()
+                            ..info.to_class_info(c.span)
                         }),
                     )
                 }
-                ClassDecl::Specified(c) => {
+                ClassDeclKind::Specified(c) => {
                     let dot_id = self.make_absolute_dot_id(c.span, &c.name)?;
                     (
                         dot_id.clone(),
@@ -128,29 +129,29 @@ impl JavaPackage {
 
 /// Reflection cache. Given fully qualified java class names,
 /// look up info about their interfaces.
-#[derive(Default)]
 pub struct Reflector {
-    classes: RefCell<BTreeMap<DotId, Arc<ClassInfo>>>,
+    configuration: Configuration,
+    classes: RefCell<BTreeMap<DotId, Arc<JavapClassInfo>>>,
 }
 
 impl Reflector {
+    pub fn new(configuration: &Configuration) -> Self {
+        Self {
+            configuration: configuration.clone(),
+            classes: Default::default(),
+        }
+    }
+
     /// Returns the (potentially cached) info about `class_name`;
-    pub fn reflect(&self, class_name: &DotId, span: Span) -> syn::Result<Arc<ClassInfo>> {
+    pub fn reflect(&self, class_name: &DotId, span: Span) -> syn::Result<Arc<JavapClassInfo>> {
         // yields an error if we cannot reflect on that class.
         if let Some(class) = self.classes.borrow().get(class_name).map(Arc::clone) {
             return Ok(class);
         }
 
-        let mut javap_path = PathBuf::new();
-        if let Ok(java_home) = env::var("JAVA_HOME") {
-            javap_path.extend([java_home.as_str(), "bin"]);
-        }
-        javap_path.push("javap");
+        let mut command = Command::new(self.configuration.bin_path("javap"));
 
-        let mut command = Command::new(javap_path);
-
-        // If the CLASSPATH variable is set we will use it, otherwise allow javap to use its default classpath
-        if let Some(classpath) = env::var("CLASSPATH").ok() {
+        if let Some(classpath) = self.configuration.classpath() {
             command.arg("-cp").arg(classpath);
         }
 
@@ -189,11 +190,11 @@ impl Reflector {
             }
         };
 
-        let mut ci = ClassInfo::parse(&s, span)?;
+        let ci = ClassInfo::parse(&s, span)?;
+        let ci = JavapClassInfo::from(ci);
 
         // reset the span for the cached data to the call site so that when others look it up,
         // they get the same span.
-        ci.span = Span::call_site();
         Ok(self
             .classes
             .borrow_mut()
@@ -207,7 +208,7 @@ impl Reflector {
         match method_selector {
             MethodSelector::ClassName(cn) => {
                 let dot_id = cn.to_dot_id();
-                let class_info = self.reflect(&dot_id, cn.span)?;
+                let class_info = Arc::new(self.reflect(&dot_id, cn.span)?.to_class_info(cn.span));
                 match class_info.constructors.len() {
                     1 => Ok(ReflectedMethod::Constructor(class_info, 0)),
                     0 => Err(syn::Error::new(cn.span, "no constructors found".to_string())),
@@ -216,7 +217,7 @@ impl Reflector {
             }
             MethodSelector::MethodName(cn, mn) => {
                 let dot_id = cn.to_dot_id();
-                let class_info = self.reflect(&dot_id, cn.span)?;
+                let class_info = Arc::new(self.reflect(&dot_id, cn.span)?.to_class_info(cn.span));
                 let methods: Vec<(MethodIndex, &Method)> = class_info
                     .methods
                     .iter()
@@ -233,6 +234,91 @@ impl Reflector {
                 }
             }
             MethodSelector::ClassInfo(_) => todo!(),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct JavapClassInfo {
+    #[allow(dead_code)] // FIXME: replace with `#[expect]` once that stabilizes
+    pub flags: Flags,
+    pub name: DotId,
+    pub kind: ClassKind,
+    pub generics: Vec<Generic>,
+    pub extends: Vec<ClassRef>,
+    pub implements: Vec<ClassRef>,
+    pub constructors: Vec<Constructor>,
+    pub fields: Vec<Field>,
+    pub methods: Vec<Method>,
+}
+
+impl ClassInfoAccessors for JavapClassInfo {
+    fn flags(&self) -> &Flags {
+        &self.flags
+    }
+
+    fn name(&self) -> &DotId {
+        &self.name
+    }
+
+    fn kind(&self) -> ClassKind {
+        self.kind
+    }
+
+    fn generics(&self) -> &Vec<Generic> {
+        &self.generics
+    }
+
+    fn extends(&self) -> &Vec<ClassRef> {
+        &self.extends
+    }
+
+    fn implements(&self) -> &Vec<ClassRef> {
+        &self.implements
+    }
+
+    fn constructors(&self) -> &Vec<Constructor> {
+        &self.constructors
+    }
+
+    fn fields(&self) -> &Vec<Field> {
+        &self.fields
+    }
+
+    fn methods(&self) -> &Vec<Method> {
+        &self.methods
+    }
+}
+
+impl From<ClassInfo> for JavapClassInfo {
+    fn from(ci: ClassInfo) -> Self {
+        Self {
+            flags: ci.flags,
+            name: ci.name,
+            kind: ci.kind,
+            generics: ci.generics,
+            extends: ci.extends,
+            implements: ci.implements,
+            constructors: ci.constructors,
+            fields: ci.fields,
+            methods: ci.methods,
+        }
+    }
+}
+
+impl JavapClassInfo {
+    pub fn to_class_info(&self, span: Span) -> ClassInfo {
+        ClassInfo {
+            span: span,
+            flags: self.flags,
+            name: self.name.clone(),
+            kind: self.kind,
+            generics: self.generics.clone(),
+            extends: self.extends.clone(),
+            implements: self.implements.clone(),
+            constructors: self.constructors.clone(),
+            fields: self.fields.clone(),
+            methods: self.methods.clone(),
         }
     }
 }

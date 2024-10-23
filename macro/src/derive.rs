@@ -3,6 +3,9 @@ use std::{
     sync::Arc,
 };
 
+use duchess_reflect::{
+    class_info::ClassInfoAccessors, config::Configuration, reflect::JavapClassInfo,
+};
 use proc_macro2::{Span, TokenStream};
 use quote::quote_spanned;
 use syn::{spanned::Spanned, Attribute};
@@ -10,7 +13,7 @@ use synstructure::VariantInfo;
 
 use crate::{
     argument::{JavaPath, MethodSelector},
-    class_info::{ClassInfo, ClassRef, Type},
+    class_info::{ClassRef, Type},
     parse::{Parse, Parser},
     reflect::Reflector,
     signature::Signature,
@@ -20,7 +23,7 @@ use crate::{
 pub fn derive_to_rust(s: synstructure::Structure) -> proc_macro2::TokenStream {
     let mut driver = Driver {
         input: &s,
-        reflector: &mut Reflector::default(),
+        reflector: &mut Reflector::new(&Configuration::default()),
     };
     match driver.try_derive_to_rust() {
         Ok(t) => {
@@ -34,7 +37,7 @@ pub fn derive_to_rust(s: synstructure::Structure) -> proc_macro2::TokenStream {
 pub fn derive_to_java(s: synstructure::Structure) -> proc_macro2::TokenStream {
     let mut driver = Driver {
         input: &s,
-        reflector: &mut Reflector::default(),
+        reflector: &mut Reflector::new(&Configuration::default()),
     };
     match driver.try_derive_to_java() {
         Ok(t) => {
@@ -189,10 +192,10 @@ impl Driver<'_> {
 
     fn try_derive_to_java_variants<'a>(
         &self,
-        root_class: &ClassInfo,
+        root_class: &JavapClassInfo,
         variants: impl IntoIterator<Item = &'a VariantInfo<'a>>,
     ) -> Result<proc_macro2::TokenStream, syn::Error> {
-        let root_class_name = root_class.name.to_module_name(root_class.span);
+        let root_class_name = root_class.name.to_module_name(Span::call_site());
 
         let to_java_bodies = variants
             .into_iter()
@@ -439,7 +442,7 @@ impl Driver<'_> {
 }
 
 fn check_all_extend_root<'a>(
-    root: &ClassInfo,
+    root: &JavapClassInfo,
     variants: impl IntoIterator<Item = &'a MethodSelector>,
     upcasts: &Upcasts,
 ) -> Result<(), syn::Error> {
@@ -522,5 +525,5 @@ fn unique_variant_classes<'a, 'i>(
 struct ToRustVariant<'i> {
     variant: &'i VariantInfo<'i>,
     selector: MethodSelector,
-    class: Arc<ClassInfo>,
+    class: Arc<JavapClassInfo>,
 }

@@ -3,9 +3,9 @@ use proc_macro2::Span;
 
 grammar(span: Span);
 
-pub ClassDecl: ClassDecl = {
-    ReflectedClassInfo => ClassDecl::Reflected(<>),
-    ClassInfoInline => ClassDecl::Specified(<>),
+pub ClassDeclKind: ClassDeclKind = {
+    ReflectedClassInfo => ClassDeclKind::Reflected(<>),
+    ClassInfoInline => ClassDeclKind::Specified(<>),
 };
 
 pub ClassInfo: ClassInfo = {
