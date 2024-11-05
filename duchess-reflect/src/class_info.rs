@@ -3,6 +3,7 @@ use std::{collections::BTreeMap, sync::Arc};
 use inflector::Inflector;
 use proc_macro2::{Delimiter, Ident, Span, TokenStream, TokenTree};
 use quote::quote_spanned;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     parse::{Parse, TextAccum},
@@ -130,16 +131,15 @@ impl Parse for ClassDecl {
 #[derive(Clone, Debug)]
 pub struct ReflectedClassInfo {
     pub span: Span,
-    #[allow(dead_code)] // FIXME: replace with `#[expect]` once that stabilizes
     pub flags: Flags,
     pub name: DotId,
     pub kind: ClassKind,
 }
 
+/// ClassInfo that was parsed from a hand written declaration
 #[derive(Clone, Debug)]
 pub struct ClassInfo {
     pub span: Span,
-    #[allow(dead_code)] // FIXME: replace with `#[expect]` once that stabilizes
     pub flags: Flags,
     pub name: DotId,
     pub kind: ClassKind,
@@ -238,7 +238,7 @@ impl ClassInfo {
     }
 }
 
-#[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
+#[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug, Deserialize, Serialize)]
 pub struct Generic {
     pub id: Id,
     pub extends: Vec<ClassRef>,
@@ -263,13 +263,13 @@ impl std::fmt::Display for Generic {
     }
 }
 
-#[derive(Eq, Ord, PartialEq, PartialOrd, Copy, Clone, Debug)]
+#[derive(Eq, Ord, PartialEq, PartialOrd, Copy, Clone, Debug, Deserialize, Serialize)]
 pub enum ClassKind {
     Class,
     Interface,
 }
 
-#[derive(Eq, Ord, PartialEq, PartialOrd, Copy, Clone, Debug)]
+#[derive(Eq, Ord, PartialEq, PartialOrd, Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct Flags {
     pub privacy: Privacy,
     pub is_final: bool,
@@ -298,7 +298,7 @@ impl Flags {
     }
 }
 
-#[derive(Eq, Ord, PartialEq, PartialOrd, Copy, Clone, Debug)]
+#[derive(Eq, Ord, PartialEq, PartialOrd, Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum Privacy {
     Public,
     Protected,
@@ -327,7 +327,7 @@ pub enum MemberFunction {
     Method(Method),
 }
 
-#[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
+#[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug, Serialize, Deserialize)]
 pub struct Constructor {
     pub flags: Flags,
     pub generics: Vec<Generic>,
@@ -361,14 +361,14 @@ impl Constructor {
     }
 }
 
-#[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
+#[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug, Serialize, Deserialize)]
 pub struct Field {
     pub flags: Flags,
     pub name: Id,
     pub ty: Type,
 }
 
-#[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
+#[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug, Serialize, Deserialize)]
 pub struct Method {
     pub flags: Flags,
     pub name: Id,
@@ -447,7 +447,7 @@ impl std::fmt::Display for MethodSig {
     }
 }
 
-#[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
+#[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug, Deserialize, Serialize)]
 pub struct ClassRef {
     pub name: DotId,
     pub generics: Vec<RefType>,
@@ -467,7 +467,7 @@ impl std::fmt::Display for ClassRef {
     }
 }
 
-#[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
+#[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug, Serialize, Deserialize)]
 pub enum Type {
     Ref(RefType),
     Scalar(ScalarType),
@@ -585,7 +585,7 @@ impl NonRepeatingType {
     }
 }
 
-#[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
+#[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug, Serialize, Deserialize)]
 pub enum RefType {
     Class(ClassRef),
     Array(Arc<Type>),
@@ -608,7 +608,7 @@ impl std::fmt::Display for RefType {
     }
 }
 
-#[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug)]
+#[derive(Eq, Ord, PartialEq, PartialOrd, Clone, Debug, Serialize, Deserialize)]
 pub enum ScalarType {
     Int,
     Long,
@@ -664,7 +664,7 @@ impl ScalarType {
 }
 
 /// A single identifier
-#[derive(Eq, Hash, Ord, PartialEq, PartialOrd, Clone, Debug)]
+#[derive(Eq, Hash, Ord, PartialEq, PartialOrd, Clone, Debug, Serialize, Deserialize)]
 pub struct Id {
     pub data: String,
 }
@@ -723,7 +723,7 @@ impl std::fmt::Display for Id {
 }
 
 /// A dotted identifier
-#[derive(Eq, Hash, Ord, PartialEq, PartialOrd, Clone, Debug)]
+#[derive(Eq, Hash, Ord, PartialEq, PartialOrd, Clone, Debug, Deserialize, Serialize)]
 pub struct DotId {
     /// Dotted components. Invariant: len >= 1.
     ids: Vec<Id>,

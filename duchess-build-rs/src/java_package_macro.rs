@@ -34,8 +34,8 @@ impl JavaPackageMacro {
         let input = self.invocation.mac.tokens;
         let decl = Parser::from(input).parse::<DuchessDeclaration>()?;
         let mut reflector = Reflector::new(compiler.configuration());
-        let _root_map = decl.to_root_map(&mut reflector)?;
-        // FIXME: next step is to dump the data from the reflector into OUT_DIR
+        let root_map = decl.to_root_map(&mut reflector)?;
+        root_map.
         Ok(())
     }
 }

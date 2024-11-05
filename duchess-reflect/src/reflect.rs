@@ -1,6 +1,7 @@
 use std::{cell::RefCell, collections::BTreeMap, process::Command, sync::Arc};
 
 use proc_macro2::Span;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     argument::{DuchessDeclaration, Ident, JavaPackage, MethodSelector},
@@ -238,7 +239,7 @@ impl Reflector {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct JavapClassInfo {
     #[allow(dead_code)] // FIXME: replace with `#[expect]` once that stabilizes
     pub flags: Flags,
