@@ -31,6 +31,9 @@ libloading = { version = "0.8.0", optional = true }
 derive-where = "1.2.1"
 serde = { version = "1.0.214", features = ["derive"] }
 
+[build-dependencies]
+duchess-build-rs = { path = "duchess-build-rs" }
+
 
 [features]
 default = ["dylibjvm"]

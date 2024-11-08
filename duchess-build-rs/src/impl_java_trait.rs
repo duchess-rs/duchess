@@ -1,4 +1,7 @@
-use duchess_reflect::{class_info::ClassRef, reflect::Reflector};
+use duchess_reflect::{
+    class_info::ClassRef,
+    reflect::{JavapReflector, Reflect},
+};
 use proc_macro2::{Span, TokenStream};
 use syn::spanned::Spanned;
 
@@ -29,7 +32,7 @@ impl syn::parse::Parse for JavaInterfaceImpl {
 
 impl JavaInterfaceImpl {
     fn generate_shim(&self, compiler: &JavaCompiler) -> anyhow::Result<()> {
-        let reflector = Reflector::new(compiler.configuration());
+        let mut reflector = JavapReflector::new(compiler.configuration());
         let (java_interface_ref, java_interface_span) = self.java_interface()?;
         let java_interface_info =
             reflector.reflect(&java_interface_ref.name, java_interface_span)?;

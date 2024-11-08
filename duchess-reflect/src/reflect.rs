@@ -1,5 +1,10 @@
-use std::{cell::RefCell, collections::BTreeMap, process::Command, sync::Arc};
+use std::{
+    collections::BTreeMap,
+    path::{absolute, Path, PathBuf},
+    sync::Arc,
+};
 
+use anyhow::{bail, Context};
 use proc_macro2::Span;
 use serde::{Deserialize, Serialize};
 
@@ -9,12 +14,16 @@ use crate::{
         ClassDeclKind, ClassInfo, ClassInfoAccessors, ClassKind, ClassRef, Constructor, DotId,
         Field, Flags, Generic, Id, Method, RootMap, SpannedPackageInfo, Type,
     },
-    config::Configuration,
     upcasts::Upcasts,
 };
 
+#[cfg(feature = "javap-reflection")]
+mod javap;
+#[cfg(feature = "javap-reflection")]
+pub use javap::JavapReflector;
+
 impl DuchessDeclaration {
-    pub fn to_root_map(&self, reflector: &mut Reflector) -> syn::Result<RootMap> {
+    pub fn to_root_map(&self, reflector: &mut dyn Reflect) -> syn::Result<RootMap> {
         let mut subpackages = BTreeMap::new();
         let mut classes = BTreeMap::new();
         for package in &self.packages {
@@ -40,7 +49,7 @@ impl JavaPackage {
     fn to_spanned_packages(
         &self,
         name: &[Ident],
-        reflector: &mut Reflector,
+        reflector: &mut dyn Reflect,
         map: &mut BTreeMap<Id, SpannedPackageInfo>,
         classes: &mut BTreeMap<DotId, Arc<ClassInfo>>,
     ) -> syn::Result<()> {
@@ -68,7 +77,7 @@ impl JavaPackage {
 
     fn insert_classes_into_root_map(
         &self,
-        reflector: &mut Reflector,
+        reflector: &mut dyn Reflect,
         package: &mut SpannedPackageInfo,
         classes: &mut BTreeMap<DotId, Arc<ClassInfo>>,
     ) -> syn::Result<()> {
@@ -128,104 +137,52 @@ impl JavaPackage {
     }
 }
 
-/// Reflection cache. Given fully qualified java class names,
-/// look up info about their interfaces.
-pub struct Reflector {
-    configuration: Configuration,
-    classes: RefCell<BTreeMap<DotId, Arc<JavapClassInfo>>>,
+/// Reflector parsed from a JSON file
+#[derive(Debug)]
+pub struct PrecomputedReflector {
+    classes: BTreeMap<DotId, Arc<JavapClassInfo>>,
 }
 
-impl Reflector {
-    pub fn new(configuration: &Configuration) -> Self {
-        Self {
-            configuration: configuration.clone(),
-            classes: Default::default(),
-        }
+fn reflection_cache(out_dir: impl AsRef<Path>) -> PathBuf {
+    out_dir.as_ref().join("reflection-cache.json")
+}
+
+pub trait Reflect {
+    fn reflect(&mut self, dot_id: &DotId, span: Span) -> syn::Result<Arc<JavapClassInfo>>;
+}
+
+impl Reflect for PrecomputedReflector {
+    fn reflect(&mut self, dot_id: &DotId, span: Span) -> syn::Result<Arc<JavapClassInfo>> {
+        PrecomputedReflector::reflect(&self, dot_id, span)
     }
+}
 
-    /// Returns the (potentially cached) info about `class_name`;
-    pub fn reflect(&self, class_name: &DotId, span: Span) -> syn::Result<Arc<JavapClassInfo>> {
-        // yields an error if we cannot reflect on that class.
-        if let Some(class) = self.classes.borrow().get(class_name).map(Arc::clone) {
-            return Ok(class);
-        }
-
-        let mut command = Command::new(self.configuration.bin_path("javap"));
-
-        if let Some(classpath) = self.configuration.classpath() {
-            command.arg("-cp").arg(classpath);
-        }
-
-        command.arg("-p").arg(format!("{}", class_name));
-
-        let output_or_err = command.output();
-
-        let output = match output_or_err {
-            Ok(o) => o,
-            Err(err) => {
-                return Err(syn::Error::new(
-                    span,
-                    format!("failed to execute `{command:?}`: {err}"),
-                ));
-            }
-        };
-
-        if !output.status.success() {
-            return Err(syn::Error::new(
-                span,
+fn reflect_method(
+    class_info: Arc<ClassInfo>,
+    method_selector: &MethodSelector,
+) -> syn::Result<ReflectedMethod> {
+    match method_selector {
+        MethodSelector::ClassName(cn) => match class_info.constructors.len() {
+            1 => Ok(ReflectedMethod::Constructor(class_info, 0)),
+            0 => Err(syn::Error::new(
+                cn.span,
+                "no constructors found".to_string(),
+            )),
+            n => Err(syn::Error::new(
+                cn.span,
                 format!(
-                    "unsuccessful execution of `{command:?}` (exit status: {}): {}",
-                    output.status,
-                    String::from_utf8(output.stderr).unwrap_or(String::from("error"))
+                    "{n} constructors found, use an explicit class declaration to disambiguate"
                 ),
-            ));
-        }
-
-        let s = match String::from_utf8(output.stdout) {
-            Ok(o) => o,
-            Err(err) => {
-                return Err(syn::Error::new(
-                    span,
-                    format!("failed to parse output of `{command:?}` as utf-8: {err}"),
-                ));
-            }
-        };
-
-        let ci = ClassInfo::parse(&s, span)?;
-        let ci = JavapClassInfo::from(ci);
-
-        // reset the span for the cached data to the call site so that when others look it up,
-        // they get the same span.
-        Ok(self
-            .classes
-            .borrow_mut()
-            .entry(class_name.clone())
-            .or_insert(Arc::new(ci))
-            .clone())
-    }
-
-    ///
-    pub fn reflect_method(&self, method_selector: &MethodSelector) -> syn::Result<ReflectedMethod> {
-        match method_selector {
-            MethodSelector::ClassName(cn) => {
-                let dot_id = cn.to_dot_id();
-                let class_info = Arc::new(self.reflect(&dot_id, cn.span)?.to_class_info(cn.span));
-                match class_info.constructors.len() {
-                    1 => Ok(ReflectedMethod::Constructor(class_info, 0)),
-                    0 => Err(syn::Error::new(cn.span, "no constructors found".to_string())),
-                    n => Err(syn::Error::new(cn.span, format!("{n} constructors found, use an explicit class declaration to disambiguate")))
-                }
-            }
-            MethodSelector::MethodName(cn, mn) => {
-                let dot_id = cn.to_dot_id();
-                let class_info = Arc::new(self.reflect(&dot_id, cn.span)?.to_class_info(cn.span));
-                let methods: Vec<(MethodIndex, &Method)> = class_info
-                    .methods
-                    .iter()
-                    .enumerate()
-                    .filter(|(_i, m)| &m.name[..] == &mn.text[..])
-                    .collect();
-                match methods.len() {
+            )),
+        },
+        MethodSelector::MethodName(cn, mn) => {
+            let methods: Vec<(MethodIndex, &Method)> = class_info
+                .methods
+                .iter()
+                .enumerate()
+                .filter(|(_i, m)| &m.name[..] == &mn.text[..])
+                .collect();
+            match methods.len() {
                     1 => {
                         let (id, _method) = methods[0];
                         Ok(ReflectedMethod::Method(class_info, id))
@@ -233,15 +190,57 @@ impl Reflector {
                     0 => Err(syn::Error::new(cn.span,  format!("no methods named `{mn}` found"))),
                     n => Err(syn::Error::new(cn.span, format!("{n} methods named `{mn}` found, use an explicit class declaration to disambiguate") )),
                 }
-            }
-            MethodSelector::ClassInfo(_) => todo!(),
         }
+        MethodSelector::ClassInfo(_) => todo!(),
+    }
+}
+
+impl PrecomputedReflector {
+    pub fn new() -> anyhow::Result<Self> {
+        let Ok(out_dir) = std::env::var("DUCHESS_OUT_DIR") else {
+            bail!("DUCHESS_OUT_DIR not set");
+        };
+        let out_dir = std::path::Path::new(&out_dir);
+        if !out_dir.exists() {
+            bail!("DUCHESS_OUT_DIR does not exist: {out_dir:?}");
+        }
+        Self::new_from_path(reflection_cache(out_dir))
+    }
+
+    pub fn new_from_path(serialized_class: impl AsRef<Path>) -> anyhow::Result<Self> {
+        let abs_path = absolute(&serialized_class);
+        Self::new_from_contents(
+            &std::fs::read(serialized_class)
+                .with_context(|| format!("loading reflection cache from {:?}", abs_path))?,
+        )
+    }
+
+    pub fn new_from_contents(contents: &[u8]) -> anyhow::Result<Self> {
+        let classes = serde_json::from_slice(contents)
+            .context("deserializing serialized reflection cache")?;
+        Ok(Self { classes })
+    }
+    /// Returns the (potentially cached) info about `class_name`;
+    pub fn reflect(&self, class_name: &DotId, span: Span) -> syn::Result<Arc<JavapClassInfo>> {
+        // yields an error if we cannot reflect on that class.
+        self.classes.get(class_name).map(Arc::clone).ok_or_else(|| {
+            syn::Error::new(
+                span,
+                format!("no reflected value for {class_name} this is a bug"),
+            )
+        })
+    }
+
+    pub fn reflect_method(&self, method_selector: &MethodSelector) -> syn::Result<ReflectedMethod> {
+        let class_info = self
+            .reflect(&method_selector.class_name(), method_selector.class_span())?
+            .to_class_info(method_selector.class_span());
+        Ok(reflect_method(Arc::new(class_info), method_selector)?)
     }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct JavapClassInfo {
-    #[allow(dead_code)] // FIXME: replace with `#[expect]` once that stabilizes
     pub flags: Flags,
     pub name: DotId,
     pub kind: ClassKind,
@@ -370,5 +369,30 @@ impl ReflectedMethod {
             ReflectedMethod::Constructor(c, t) => &c.constructors[*t].argument_tys,
             ReflectedMethod::Method(c, m) => &c.methods[*m].argument_tys,
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use serde::Serialize;
+
+    use crate::class_info::DotId;
+    use crate::reflect::Configuration;
+
+    use super::{JavapReflector, PrecomputedReflector, Reflector};
+
+    #[test]
+    fn reflector_rountrips() {
+        let mut reflector = Reflector::new_javap(&Configuration::default());
+        let _class = reflector
+            .reflect_and_cache(
+                &DotId::parse("java.lang.String"),
+                proc_macro2::Span::call_site(),
+            )
+            .unwrap();
+
+        let serialized = reflector.serialize();
+        let parsed = PrecomputedReflector::new_from_contents(serialized.as_bytes());
+        assert_eq!(parsed.classes.len(), 1);
     }
 }

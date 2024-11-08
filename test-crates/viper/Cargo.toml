@@ -8,6 +8,7 @@ duchess = { path = "../.." }
 
 [build-dependencies]
 ureq = "2.1"
+duchess-build-rs = { path = "../../duchess-build-rs" }
 
 [features]
 jni_1_6 = ["duchess/jni_1_6"]

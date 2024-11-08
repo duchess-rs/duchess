@@ -723,10 +723,29 @@ impl std::fmt::Display for Id {
 }
 
 /// A dotted identifier
-#[derive(Eq, Hash, Ord, PartialEq, PartialOrd, Clone, Debug, Deserialize, Serialize)]
+#[derive(Eq, Hash, Ord, PartialEq, PartialOrd, Clone, Debug)]
 pub struct DotId {
     /// Dotted components. Invariant: len >= 1.
     ids: Vec<Id>,
+}
+
+impl Serialize for DotId {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&self.with_sep("."))
+    }
+}
+
+impl<'de> Deserialize<'de> for DotId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Ok(DotId::parse(&s))
+    }
 }
 
 impl From<Id> for DotId {
