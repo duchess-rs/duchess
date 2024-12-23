@@ -226,7 +226,7 @@ impl PrecomputedReflector {
         self.classes.get(class_name).map(Arc::clone).ok_or_else(|| {
             syn::Error::new(
                 span,
-                format!("no reflected value for {class_name} this is a bug"),
+                format!("no reflected value for `{class_name}` this is a bug"),
             )
         })
     }

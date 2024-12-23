@@ -91,17 +91,15 @@ fn cache_all_classes(
 
 #[cfg(test)]
 mod test {
-    use crate::JavaCompiler;
-    use duchess_reflect::config::Configuration;
-    use tempfile::tempdir;
+    use duchess_reflect::{config::Configuration, reflect::JavapReflector};
 
     #[test]
     fn process_file() {
-        let compiler = &JavaCompiler::new(&Configuration::new(), None).unwrap();
+        let mut compiler = JavapReflector::new(&Configuration::new());
         let rs_file = crate::files::File {
             path: "test-files/java_package_1.rs".into(),
             contents: include_str!("../test-files/java_package_1.rs").to_string(),
         };
-        super::process_file(&rs_file, &compiler).unwrap();
+        super::process_file(&rs_file, &mut compiler).unwrap();
     }
 }

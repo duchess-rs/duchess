@@ -9,6 +9,7 @@ mod files;
 mod impl_java_trait;
 mod java_compiler;
 mod java_package_macro;
+mod derive_java;
 mod re;
 mod shim_writer;
 
@@ -101,6 +102,7 @@ impl DuchessBuildRs {
 
             eprintln!("looking for java macros in {:?}", rs_file.path);
             watch_file |= java_package_macro::process_file(&rs_file, &mut reflector)?;
+            watch_file |= derive_java::process_file(&rs_file, &mut reflector)?;
 
             for capture in re::impl_java_interface().captures_iter(&rs_file.contents) {
                 let std::ops::Range { start, end: _ } = capture.get(0).unwrap().range();

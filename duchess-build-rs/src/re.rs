@@ -14,6 +14,8 @@ declare_regex!(impl_java_interface() = r"#\[duchess::impl_java_interface\]");
 
 declare_regex!(java_package() = r"(?m)^\s*(duchess|duchess_macro)::java_package! *\{");
 
+declare_regex!(java_derive() = r"#\[java\(([\w.]+)(?:::\w+)?\)\]");
+
 #[cfg(test)]
 mod test {
     #[test]
@@ -33,5 +35,11 @@ mod test {
             public final native void notify();
             public final native void notifyAll();"#;
         assert!(super::java_package().is_match(java_file));
+    }
+
+    #[test]
+    fn test_java_derive() {
+        assert!(super::java_derive().is_match("#[java(java.lang.Long::decode)]"));
+        assert!(super::java_derive().is_match("#[java(java.lang.Throwable)]"));
     }
 }
