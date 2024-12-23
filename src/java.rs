@@ -235,7 +235,7 @@ mod auto {
             public java.lang.Object clone();
         }
 
-        public class java.util.Date { // implements java.io.Serializable, java.lang.Cloneable, java.lang.Comparable<java.util.Date> {
+        public class java.util.Date {
             public java.util.Date();
             //   public java.util.Date(long);
             //   public java.util.Date(int, int, int);
@@ -385,16 +385,16 @@ mod auto {
             public static final java.lang.management.MemoryType HEAP;
             public static final java.lang.management.MemoryType NON_HEAP;
             private final java.lang.String description;
-            private static final java.lang.management.MemoryType[] $VALUES;
-            public static java.lang.management.MemoryType[] values();
+            //private static final java.lang.management.MemoryType[] $VALUES;
+            //public static java.lang.management.MemoryType[] values();
             public static java.lang.management.MemoryType valueOf(java.lang.String);
             private java.lang.management.MemoryType(java.lang.String);
             public java.lang.String toString();
-            private static java.lang.management.MemoryType[] $values();
+            //private static java.lang.management.MemoryType[] $values();
             static {};
-          }
-    }
-}
+        } // end of memory type
+    } // end of java package
+} // end of mod auto
 
 pub use auto::java::*;
 

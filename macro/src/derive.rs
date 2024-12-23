@@ -4,7 +4,8 @@ use std::{
 };
 
 use duchess_reflect::{
-    class_info::ClassInfoAccessors, config::Configuration, reflect::JavapClassInfo,
+    class_info::ClassInfoAccessors,
+    reflect::{JavapClassInfo, PrecomputedReflector},
 };
 use proc_macro2::{Span, TokenStream};
 use quote::quote_spanned;
@@ -15,7 +16,6 @@ use crate::{
     argument::{JavaPath, MethodSelector},
     class_info::{ClassRef, Type},
     parse::{Parse, Parser},
-    reflect::Reflector,
     signature::Signature,
     upcasts::Upcasts,
 };
@@ -23,7 +23,7 @@ use crate::{
 pub fn derive_to_rust(s: synstructure::Structure) -> proc_macro2::TokenStream {
     let mut driver = Driver {
         input: &s,
-        reflector: &mut Reflector::new(&Configuration::default()),
+        reflector: &PrecomputedReflector::new().unwrap(),
     };
     match driver.try_derive_to_rust() {
         Ok(t) => {
@@ -37,7 +37,7 @@ pub fn derive_to_rust(s: synstructure::Structure) -> proc_macro2::TokenStream {
 pub fn derive_to_java(s: synstructure::Structure) -> proc_macro2::TokenStream {
     let mut driver = Driver {
         input: &s,
-        reflector: &mut Reflector::new(&Configuration::default()),
+        reflector: &PrecomputedReflector::new().unwrap(),
     };
     match driver.try_derive_to_java() {
         Ok(t) => {
@@ -50,7 +50,7 @@ pub fn derive_to_java(s: synstructure::Structure) -> proc_macro2::TokenStream {
 
 struct Driver<'a> {
     input: &'a synstructure::Structure<'a>,
-    reflector: &'a mut Reflector,
+    reflector: &'a PrecomputedReflector,
 }
 
 impl Driver<'_> {

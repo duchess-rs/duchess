@@ -27,6 +27,7 @@ impl Parse for DuchessDeclaration {
 /// such method), a class + method name, or a little mini class declaration
 /// that includes the full details (which accommodates the case where it is
 /// overloaded).
+#[derive(Debug)]
 pub enum MethodSelector {
     /// User wrote `foo.bar.Baz`
     ClassName(JavaPath),

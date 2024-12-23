@@ -17,7 +17,10 @@ integration-test-jni-1_6:
 integration-test-jni-1_8:
     (cd test-crates && cargo test --features jni_1_8)
 
-test: unit-test integration-test
+build-rs-tests:
+  (cd duchess-build-rs && cargo test)
+
+test: build-rs-tests unit-test integration-test
 
 test-jni-1_8: unit-test-jni-1_8 integration-test-jni-1_8
 

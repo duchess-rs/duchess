@@ -1,6 +1,6 @@
 use std::{iter::once, sync::Arc};
 
-use duchess_reflect::{class_info::ClassInfoAccessors, config::Configuration};
+use duchess_reflect::{class_info::ClassInfoAccessors, reflect::PrecomputedReflector};
 use proc_macro2::{Ident, Literal, TokenStream};
 use quote::quote_spanned;
 use syn::spanned::Spanned;
@@ -8,7 +8,7 @@ use syn::spanned::Spanned;
 use crate::{
     argument::MethodSelector,
     class_info::{self, ClassInfo, Method, Type},
-    reflect::{MethodIndex, Reflector},
+    reflect::MethodIndex,
     signature::Signature,
 };
 
@@ -37,8 +37,9 @@ use crate::{
 pub fn java_function(selector: MethodSelector, input: syn::ItemFn) -> syn::Result<TokenStream> {
     let span = selector.span();
 
-    let reflector = &mut Reflector::new(&Configuration::default());
-    let (class_info, method_index) = reflected_method(&selector, reflector)?;
+    let reflector =
+        PrecomputedReflector::new().map_err(|err| syn::Error::new(span, format!("{:?}", err)))?;
+    let (class_info, method_index) = reflected_method(&selector, &reflector)?;
     let driver = Driver {
         selector: &selector,
         class_info: &class_info,
@@ -150,7 +151,7 @@ pub fn java_function(selector: MethodSelector, input: syn::ItemFn) -> syn::Resul
 
 fn reflected_method(
     selector: &MethodSelector,
-    reflector: &mut Reflector,
+    reflector: &PrecomputedReflector,
 ) -> syn::Result<(Arc<ClassInfo>, MethodIndex)> {
     let reflected_method = reflector.reflect_method(selector)?;
 

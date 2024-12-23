@@ -21,10 +21,7 @@ pub enum State {
     Detached,
 }
 
-fn attached_or(
-    jvm: JvmPtr,
-    f: impl FnOnce() -> Result<AttachGuard>,
-) -> Result<AttachGuard> {
+fn attached_or(jvm: JvmPtr, f: impl FnOnce() -> Result<AttachGuard>) -> Result<AttachGuard> {
     STATE.with(|state| match state.replace(State::InUse) {
         State::AttachedPermanently(env) => Ok(AttachGuard {
             jvm,

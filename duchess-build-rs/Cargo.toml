@@ -9,7 +9,7 @@ documentation.workspace = true
 
 [dependencies]
 anyhow = "1.0.86"
-duchess-reflect = { version = "0.3.0", path = "../duchess-reflect" }
+duchess-reflect = { version = "0.3.0", path = "../duchess-reflect", features = ["javap-reflection"] }
 lazy_static = "1.5.0"
 proc-macro2 = "1.0.86"
 quote = "1.0.36"
