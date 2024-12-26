@@ -1,8 +1,11 @@
-use duchess_reflect::{class_info::ClassRef, reflect::Reflector};
+use duchess_reflect::{
+    class_info::ClassRef,
+    reflect::{JavapReflector, Reflect},
+};
 use proc_macro2::{Span, TokenStream};
 use syn::spanned::Spanned;
 
-use crate::{files::File, java_compiler::JavaCompiler, shim_writer::ShimWriter};
+use crate::{files::File, java_compiler::JavaCompiler, log, shim_writer::ShimWriter};
 
 pub fn process_impl(compiler: &JavaCompiler, file: &File, offset: usize) -> anyhow::Result<()> {
     let the_impl: JavaInterfaceImpl = syn::parse_str(file.rust_slice_from(offset))?;
@@ -29,7 +32,7 @@ impl syn::parse::Parse for JavaInterfaceImpl {
 
 impl JavaInterfaceImpl {
     fn generate_shim(&self, compiler: &JavaCompiler) -> anyhow::Result<()> {
-        let reflector = Reflector::new(compiler.configuration());
+        let mut reflector = JavapReflector::new(compiler.configuration());
         let (java_interface_ref, java_interface_span) = self.java_interface()?;
         let java_interface_info =
             reflector.reflect(&java_interface_ref.name, java_interface_span)?;
@@ -45,7 +48,7 @@ impl JavaInterfaceImpl {
 
         compiler.compile_to_rs_file(&java_file)?;
 
-        eprintln!("compiled to {}", java_file.rs_path.display());
+        log!("compiled to {}", java_file.rs_path.display());
 
         Ok(())
     }

@@ -2,7 +2,7 @@ use crate::{
     argument::DuchessDeclaration,
     class_info::{ClassInfo, Constructor, DotId, Field, Id, Method, RootMap, SpannedPackageInfo},
     config::Configuration,
-    reflect::Reflector,
+    reflect::PrecomputedReflector,
     signature::Signature,
     upcasts::Upcasts,
 };
@@ -10,16 +10,17 @@ use proc_macro2::{Ident, Literal, Span, TokenStream};
 use quote::{quote, quote_spanned};
 
 impl DuchessDeclaration {
-    pub fn to_tokens(&self, configuration: &Configuration) -> syn::Result<TokenStream> {
-        let reflector = &mut Reflector::new(configuration);
-        let root_map = self.to_root_map(reflector)?;
-        let () = root_map.check(reflector)?;
-        root_map.to_tokens(reflector)
+    pub fn to_tokens(&self, _configuration: &Configuration) -> syn::Result<TokenStream> {
+        let mut reflector = PrecomputedReflector::new()
+            .map_err(|err| syn::Error::new(Span::call_site(), format!("{:?}", err)))?;
+        let root_map = self.to_root_map(&mut reflector)?;
+        let () = root_map.check(&reflector)?;
+        root_map.to_tokens(&reflector)
     }
 }
 
 impl RootMap {
-    fn to_tokens(self, reflector: &mut Reflector) -> syn::Result<TokenStream> {
+    fn to_tokens(self, reflector: &PrecomputedReflector) -> syn::Result<TokenStream> {
         self.to_packages()
             .map(|p| p.to_tokens(&[], &self, reflector))
             .collect()
@@ -31,7 +32,7 @@ impl SpannedPackageInfo {
         &self,
         parents: &[Id],
         root_map: &RootMap,
-        reflector: &mut Reflector,
+        reflector: &PrecomputedReflector,
     ) -> syn::Result<TokenStream> {
         let package_id = DotId::new(parents, &self.name);
         let name = self.name.to_ident(self.span);

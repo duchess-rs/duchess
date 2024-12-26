@@ -3,11 +3,8 @@ use duchess::{java, Java, JvmOp, ToJava};
 macro_rules! test_array {
     ($type: ty, $item: expr) => {
         for test_array in [vec![$item], vec![], vec![$item, $item, $item]] {
-            let java: Java<java::Array<$type>> = test_array
-                .to_java()
-                .assert_not_null()
-                .execute()
-                .unwrap();
+            let java: Java<java::Array<$type>> =
+                test_array.to_java().assert_not_null().execute().unwrap();
             let and_back: Vec<_> = (&*java).execute().unwrap();
             assert_eq!(test_array, and_back);
         }

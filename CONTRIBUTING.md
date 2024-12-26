@@ -16,7 +16,9 @@ TESTNAME=log_global_ref_and_chained_calls just test
 ```
 
 ### Debugging
-Duchess looks for the `DUCHESS_DEBUG` environment variable during proc-macro expansion. When this variable is set, if it is `true` or `1`, **all** generated code will be formatted and dumped to a directory. Clickable links are printed to stderr:
+Duchess looks for the `DUCHESS_DEBUG` environment variable during proc-macro expansion and `build.rs` execution. When this variable is set, if it is `true` or `1`, **all** generated code will be formatted and dumped to a directory. Additionally, this emits output from the buildscript as `warning` lines for cargo so they become visible.
+
+For proc macro expansion, clickable links are printed to stderr:
 
 For example:
 ```

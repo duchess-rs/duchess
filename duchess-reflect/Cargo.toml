@@ -8,6 +8,9 @@ homepage.workspace = true
 documentation.workspace = true
 description = "Internal component of duchess crate"
 
+[features]
+javap-reflection = []
+
 [dependencies]
 anyhow = "1.0.70"
 lalrpop-util = { version = "0.19.9", features = ["lexer"] }
@@ -15,6 +18,8 @@ lazy_static = "1.4.0"
 proc-macro2 = "1.0.56"
 quote = "1.0.26"
 rust-format = { version = "0.3.4", features = ["token_stream"] }
+serde = { version = "1.0.214", features = ["derive", "rc"] }
+serde_json = "1.0.132"
 str_inflector = "0.12.0"
 syn = "2.0.15"
 tempfile = "3.8.1"

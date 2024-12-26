@@ -3,12 +3,12 @@ use std::{
     sync::Arc,
 };
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Configuration {
     data: Arc<Data>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct Data {
     classpath: String,
     java_home: Option<PathBuf>,

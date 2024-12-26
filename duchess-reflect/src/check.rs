@@ -2,11 +2,11 @@ use std::collections::HashSet;
 
 use crate::{
     class_info::{ClassInfo, ClassRef, Constructor, Flags, Method, RefType, RootMap, Type},
-    reflect::{JavapClassInfo, Reflector},
+    reflect::{JavapClassInfo, PrecomputedReflector},
 };
 
 impl RootMap {
-    pub fn check(&self, reflector: &mut Reflector) -> syn::Result<()> {
+    pub fn check(&self, reflector: &PrecomputedReflector) -> syn::Result<()> {
         let mut errors = vec![];
 
         for class_name in &self.class_names() {
@@ -28,7 +28,7 @@ impl ClassInfo {
     fn check(
         &self,
         root_map: &RootMap,
-        reflector: &mut Reflector,
+        reflector: &PrecomputedReflector,
         push_error: &mut dyn FnMut(syn::Error),
     ) -> syn::Result<()> {
         let info = reflector.reflect(&self.name, self.span)?;
