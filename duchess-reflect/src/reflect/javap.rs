@@ -17,6 +17,7 @@ pub struct JavapReflector {
     classes: BTreeMap<DotId, Arc<JavapClassInfo>>,
 }
 
+// This impl is required because we must use the Javap reflector in the main code path for dealing with `*`
 impl Reflect for JavapReflector {
     fn reflect(&mut self, dot_id: &DotId, span: Span) -> syn::Result<Arc<JavapClassInfo>> {
         JavapReflector::reflect_and_cache(self, dot_id, span)
@@ -84,7 +85,8 @@ impl JavapReflector {
         Ok(JavapClassInfo::from(ci))
     }
 
-    fn reflect_and_cache(
+    pub fn reflect_and_cache(
+        // consider using a concurrent map and using `&self` instead. This will eventually allow parallizing the javap invocations
         &mut self,
         class_name: &DotId,
         span: Span,
@@ -93,11 +95,11 @@ impl JavapReflector {
             return Ok(Arc::clone(ci));
         }
 
-        let ci = self
+        let class_info = self
             .reflect_via_javap(class_name, span)
             .map_err(|err| syn::Error::new(span, format!("{}", err)))?;
 
-        let ci = Arc::new(ci);
+        let ci = Arc::new(class_info);
 
         self.classes.insert(class_name.clone(), Arc::clone(&ci));
 

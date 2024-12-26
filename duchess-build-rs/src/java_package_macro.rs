@@ -1,14 +1,20 @@
+use std::time::Instant;
+
 use anyhow::Context;
 use duchess_reflect::{argument::DuchessDeclaration, parse::Parser, reflect::JavapReflector};
 use proc_macro2::{Span, TokenStream};
 
-use crate::{files::File, java_package_macro, re};
+use crate::{files::File, java_package_macro, log, re};
 
 pub fn process_file(rs_file: &File, reflector: &mut JavapReflector) -> anyhow::Result<bool> {
     let mut watch_file = false;
     for capture in re::java_package().captures_iter(&rs_file.contents) {
-        eprintln!("Debug: found java macro in {:?}", rs_file.path);
         let std::ops::Range { start, end: _ } = capture.get(0).unwrap().range();
+        log!(
+            "Found `java_package!` macro at {}:{}",
+            rs_file.path.display(),
+            rs_file.contents[..start].lines().count()
+        );
         java_package_macro::process_macro(reflector, &rs_file, start)
             .with_context(|| format!("failed to process macro {}", rs_file.slug(start)))?;
         watch_file = true;
@@ -29,7 +35,7 @@ fn process_macro(reflector: &mut JavapReflector, file: &File, offset: usize) -> 
         Ok(package) => package,
         Err(e) => {
             // we'll let rustc deal with this later
-            eprintln!(
+            log!(
                 "Warning: failed to parse java_package macro as Rust code, ignoring it. Error: {}",
                 e
             );
@@ -41,8 +47,8 @@ fn process_macro(reflector: &mut JavapReflector, file: &File, offset: usize) -> 
         Ok(decl) => decl,
         Err(e) => {
             // we'll let rustc deal with this later
-            eprintln!(
-                "Warning: failed to parse java_package macro as Duchess code, ignoring it. Error: {}",
+            log!(
+                "Warning: failed to parse java_package macro as Duchess code, ignoring it. Error: {:?}",
                 e
             );
             return Ok(());
@@ -83,8 +89,9 @@ fn cache_all_classes(
     let _root_map = decl.to_root_map(reflector)?;
     for class in _root_map.class_names() {
         // forcibly reflect every class
-        use duchess_reflect::reflect::Reflect;
-        reflector.reflect(&class, Span::call_site())?;
+        let now = Instant::now();
+        reflector.reflect_and_cache(&class, Span::call_site())?;
+        log!("Reflecting {} took {:?}", class, now.elapsed());
     }
     Ok(())
 }

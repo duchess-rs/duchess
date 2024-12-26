@@ -1,15 +1,19 @@
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    time::Instant,
+};
 
 use anyhow::Context;
 use duchess_reflect::reflect::JavapReflector;
 use java_compiler::JavaCompiler;
 
 mod code_writer;
+mod derive_java;
 mod files;
 mod impl_java_trait;
 mod java_compiler;
 mod java_package_macro;
-mod derive_java;
+mod log;
 mod re;
 mod shim_writer;
 
@@ -88,6 +92,7 @@ impl DuchessBuildRs {
         // in the reflection cache.
 
         // You can see this failure currently if you run `just test`.
+        let start_time = Instant::now();
 
         let compiler = &JavaCompiler::new(&self.configuration, self.temporary_dir.as_ref())?;
         eprintln!(
@@ -116,7 +121,7 @@ impl DuchessBuildRs {
             }
         }
         let out_dir = std::env::var("OUT_DIR").unwrap();
-        eprintln!("dumping {} classes to {out_dir}", reflector.len());
+        log!("dumping {} classes to {out_dir}", reflector.len());
         reflector.dump_to(Path::new(&out_dir))?;
         println!("cargo::rustc-env=DUCHESS_OUT_DIR={}", out_dir);
         if let Some(classpath) = self.configuration.classpath() {
@@ -124,6 +129,8 @@ impl DuchessBuildRs {
         } else {
             println!("cargo::rustc-env=CLASSPATH={}", out_dir);
         }
+        let elapsed = start_time.elapsed();
+        log!("duchess build-rs complete in {:?}", elapsed);
         Ok(())
     }
 }

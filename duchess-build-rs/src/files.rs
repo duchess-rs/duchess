@@ -2,6 +2,8 @@ use std::path::{Path, PathBuf};
 
 use walkdir::WalkDir;
 
+use crate::log;
+
 pub(crate) struct File {
     pub(crate) path: PathBuf,
     pub(crate) contents: String,
@@ -68,7 +70,7 @@ impl File {
             false
         });
         if terminator.is_none() {
-            eprintln!("rust slice ran to end of file {counter}");
+            log!("rust slice ran to end of file {counter}");
         }
         match terminator {
             Some((i, _)) => &self.contents[offset..offset + i + 1],

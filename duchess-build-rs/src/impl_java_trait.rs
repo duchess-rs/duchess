@@ -5,7 +5,7 @@ use duchess_reflect::{
 use proc_macro2::{Span, TokenStream};
 use syn::spanned::Spanned;
 
-use crate::{files::File, java_compiler::JavaCompiler, shim_writer::ShimWriter};
+use crate::{files::File, java_compiler::JavaCompiler, log, shim_writer::ShimWriter};
 
 pub fn process_impl(compiler: &JavaCompiler, file: &File, offset: usize) -> anyhow::Result<()> {
     let the_impl: JavaInterfaceImpl = syn::parse_str(file.rust_slice_from(offset))?;
@@ -48,7 +48,7 @@ impl JavaInterfaceImpl {
 
         compiler.compile_to_rs_file(&java_file)?;
 
-        eprintln!("compiled to {}", java_file.rs_path.display());
+        log!("compiled to {}", java_file.rs_path.display());
 
         Ok(())
     }

@@ -1,31 +1,34 @@
 use duchess_reflect::{
     argument::MethodSelector,
     parse::{Parse, Parser},
-    reflect::Reflect,
 };
 use proc_macro2::Span;
 use syn::{parse::ParseStream, Attribute};
 
-use crate::re;
+use crate::{log, re};
 
+/// Process a file and reflect any `#[java(...)]` attributes that were found
 pub(crate) fn process_file(
     rs_file: &crate::files::File,
     reflector: &mut duchess_reflect::reflect::JavapReflector,
 ) -> anyhow::Result<bool> {
     let mut watch_file = false;
-    eprintln!("Looking for derive(java) in {:?}", rs_file.path);
     for capture in re::java_derive().captures_iter(&rs_file.contents) {
-        eprintln!("Debug: found derive(java) in {:?}", rs_file.path);
         let std::ops::Range { start, end: _ } = capture.get(0).unwrap().range();
+        log!(
+            "Found derive(java) in {}:{}",
+            rs_file.path.display(),
+            rs_file.contents[..start].lines().count()
+        );
         let derive_java_attr: DeriveJavaAttr = match syn::parse_str(rs_file.rust_slice_from(start))
         {
             Ok(attr) => attr,
             Err(e) => {
-                eprintln!("Error: failed to parse derive(java) attribute: {}", e);
+                log!("Error: failed to parse derive(java) attribute: {}", e);
                 return Ok(true);
             }
         };
-        reflector.reflect(
+        reflector.reflect_and_cache(
             &derive_java_attr.method_selector.class_name(),
             Span::call_site(),
         )?;
@@ -34,6 +37,7 @@ pub(crate) fn process_file(
     Ok(watch_file)
 }
 
+/// Representation of attributes like `#[java(java.lang.Long)]`
 #[derive(Debug)]
 struct DeriveJavaAttr {
     method_selector: MethodSelector,
