@@ -73,9 +73,9 @@ pub mod semver_unstable {
     pub use duchess_macro_rules::{
         argument_impl_trait, field_output_trait, jni_call_fn, jni_static_call_fn,
         jni_static_field_get_fn, macro_if, mro, output_trait, output_type, prepare_input, rust_ty,
-        setup_class, setup_constructor, setup_inherent_object_method, setup_obj_method,
-        setup_op_method, setup_static_field_getter, setup_static_method, view_of_obj, view_of_op,
-        setup_java_function,
+        setup_class, setup_constructor, setup_inherent_object_method, setup_java_function,
+        setup_obj_method, setup_op_method, setup_static_field_getter, setup_static_method,
+        view_of_obj, view_of_op,
     };
     pub use jni_sys;
     pub use once_cell;

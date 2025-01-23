@@ -1,7 +1,7 @@
 use std::{iter::once, sync::Arc};
 
 use duchess_reflect::{class_info::ClassInfoAccessors, reflect::PrecomputedReflector};
-use proc_macro2::{ Literal, TokenStream};
+use proc_macro2::{Literal, TokenStream};
 use quote::quote_spanned;
 use syn::spanned::Spanned;
 
@@ -83,8 +83,8 @@ pub fn java_function(selector: MethodSelector, input: syn::ItemFn) -> syn::Resul
 
     // Return types...
     let abi_return_ty; // ...that JNI expects
-    let rust_return_ty ; // ...that Rust code should provide
-    let native_function_returning;  // ...and the function that converts into the former from the latter
+    let rust_return_ty; // ...that Rust code should provide
+    let native_function_returning; // ...and the function that converts into the former from the latter
     match &driver.method_info.return_ty {
         Some(class_info::Type::Scalar(ty)) => {
             let output_rust_ty = ty.to_tokens(span);
@@ -221,11 +221,20 @@ impl Driver<'_> {
         let selector_span = self.selector.span();
         let mut arguments = vec![];
 
-        let rust_offset = if self.method_info.flags.is_static { 0 } else { 1 };
+        let rust_offset = if self.method_info.flags.is_static {
+            0
+        } else {
+            1
+        };
 
         for (argument_ty, index) in self.method_info.argument_tys.iter().zip(0..) {
             // Try to get the span for the Nth argument from the Rust code.
-            let arg_span = input.sig.inputs.iter().nth(index + rust_offset).map_or(selector_span, |arg| arg.span());
+            let arg_span = input
+                .sig
+                .inputs
+                .iter()
+                .nth(index + rust_offset)
+                .map_or(selector_span, |arg| arg.span());
 
             let name = syn::Ident::new(&format!("arg{index}"), arg_span);
 

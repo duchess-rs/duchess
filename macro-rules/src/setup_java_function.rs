@@ -11,7 +11,7 @@ macro_rules! setup_java_function {
 
         // The type of the class this method is defined on as a Rust type (e.g., `java::lang::Object`).
         rust_owner_ty: $rust_owner_ty:ty,
-        
+
         // The type of `this` we expect to come from Java.
         // For static methods, this is `duchess::semver_unstable::jni_sys::jclass`.
         // For instance methods, this will be the type of the Java object,
@@ -34,7 +34,7 @@ macro_rules! setup_java_function {
         // The return type expected by the C code (e.g., `jobject` or `i32`)
         abi_return_ty: $abi_return_ty:ty,
 
-        // The return type taken from `javap` and 
+        // The return type taken from `javap` and
         rust_return_ty: $rust_return_ty:ty,
 
         // The appropriate function from `semver_unstable` to call.
