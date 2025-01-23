@@ -13,9 +13,9 @@ duchess::java_package! {
 #[duchess::java_function(native_greeting.Native::baseGreeting)]
 fn base_greeting<'n>(
     _this: &native_greeting::Native,
-    name: &'n java::lang::String,
+    name: Option<&'n java::lang::String>,
 ) -> duchess::Result<duchess::Local<'n, java::lang::String>> {
-    name.execute() //~ ERROR: trait bound
+    name.assert_not_null().execute() //~ ERROR: trait bound
 }
 
 fn main() -> duchess::Result<()> {

@@ -266,6 +266,29 @@ where
 }
 
 /// Invoked as the body from a JNI native function when it is called by the JVM.
+/// Initializes the environment and invokes `op`. Converts the result into a java
+/// object and returns it. Caller should then return this to the JVM.
+///
+/// # Safety condition
+///
+/// Must be invoked as the entire body of a JNI native function, with
+/// `env` being the `EnvPtr` argument provided.
+pub unsafe fn native_function_returning_unit<J, R>(
+    env: EnvPtr<'_>,
+    op: impl FnOnce(),
+) {
+    init_jvm_from_native_function(env);
+    let _callback_guard = thread::attach_from_jni_callback(env);
+
+    match std::panic::catch_unwind(AssertUnwindSafe(|| op())) {
+        Ok(()) => (),
+        Err(e) => {
+            let () = rust_panic_to_java_exception(env, e);
+        }
+    }
+}
+
+/// Invoked as the body from a JNI native function when it is called by the JVM.
 /// Initializes the environment and invokes `op`, returning the result, which should
 /// then be returned to the JVM.
 ///

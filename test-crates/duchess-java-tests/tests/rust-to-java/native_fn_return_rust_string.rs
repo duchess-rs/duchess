@@ -15,9 +15,9 @@ duchess::java_package! {
 #[duchess::java_function(native_greeting.Native::baseGreeting)]
 fn base_greeting(
     _this: &native_greeting::Native,
-    name: &java::lang::String,
+    name: Option<&java::lang::String>,
 ) -> duchess::Result<String> {
-    let name: String = name.execute()?;
+    let name: String = name.assert_not_null().execute()?;
     Ok(format!("Hello, {name}"))
 }
 

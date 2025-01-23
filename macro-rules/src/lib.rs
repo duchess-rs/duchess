@@ -8,3 +8,4 @@ mod setup_obj_method;
 mod setup_op_method;
 mod setup_static_field_getter;
 mod setup_static_method;
+mod setup_java_function;

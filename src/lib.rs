@@ -60,6 +60,7 @@ pub mod semver_unstable {
     pub use crate::from_ref::FromRef;
     pub use crate::jvm::native_function_returning_object;
     pub use crate::jvm::native_function_returning_scalar;
+    pub use crate::jvm::native_function_returning_unit;
     pub use crate::jvm::JavaObjectExt;
     pub use crate::jvm::JavaView;
     pub use crate::jvm::JvmRefOp;
@@ -74,6 +75,7 @@ pub mod semver_unstable {
         jni_static_field_get_fn, macro_if, mro, output_trait, output_type, prepare_input, rust_ty,
         setup_class, setup_constructor, setup_inherent_object_method, setup_obj_method,
         setup_op_method, setup_static_field_getter, setup_static_method, view_of_obj, view_of_op,
+        setup_java_function,
     };
     pub use jni_sys;
     pub use once_cell;
