@@ -1,4 +1,4 @@
-use crate::{Error, JavaObject, JvmOp, Local};
+use crate::{JavaObject, JvmOp, Local, TryJDeref};
 
 #[derive_where::derive_where(Clone)]
 #[derive_where(Copy; J: Copy)]
@@ -8,7 +8,7 @@ pub struct NotNull<J: JvmOp> {
 
 impl<J, T> NotNull<J>
 where
-    J: for<'jvm> JvmOp<Output<'jvm> = Option<Local<'jvm, T>>>,
+    for<'jvm> J: JvmOp<Output<'jvm>: TryJDeref<Java = T>>,
     T: JavaObject,
 {
     pub(crate) fn new(j: J) -> NotNull<J> {
@@ -18,7 +18,7 @@ where
 
 impl<J, T> JvmOp for NotNull<J>
 where
-    J: for<'jvm> JvmOp<Output<'jvm> = Option<Local<'jvm, T>>>,
+    for<'jvm> J: JvmOp<Output<'jvm>: TryJDeref<Java = T>>,
     T: JavaObject,
 {
     type Output<'jvm> = Local<'jvm, T>;
@@ -27,7 +27,8 @@ where
         self,
         jvm: &mut crate::Jvm<'jvm>,
     ) -> crate::LocalResult<'jvm, Self::Output<'jvm>> {
-        let j = self.j.do_jni(jvm)?;
-        j.ok_or(Error::NullDeref)
+        let deref = self.j.do_jni(jvm)?;
+        let j = deref.try_jderef()?;
+        Ok(jvm.local(j))
     }
 }

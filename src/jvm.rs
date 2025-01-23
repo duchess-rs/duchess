@@ -15,7 +15,7 @@ use crate::{
 use std::{
     any::Any,
     collections::HashMap,
-    ffi::{c_char, c_void, CStr, CString},
+    ffi::{c_char, c_void, CString},
     fmt::Display,
     panic::AssertUnwindSafe,
 };
@@ -40,7 +40,7 @@ pub trait JvmOp: Clone {
     fn assert_not_null<T>(self) -> NotNull<Self>
     where
         T: JavaObject,
-        for<'jvm> Self: JvmOp<Output<'jvm> = Option<Local<'jvm, T>>>,
+        for<'jvm> Self: JvmOp<Output<'jvm>: TryJDeref<Java = T>>
     {
         NotNull::new(self)
     }
@@ -633,6 +633,7 @@ macro_rules! scalar {
             unsafe impl JavaType for $rust {
                 fn array_class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, Local<'jvm, Class>> {
                     // XX: Safety
+                    use std::ffi::CStr;
                     const CLASS_NAME: &CStr = unsafe { CStr::from_bytes_with_nul_unchecked($array_class) };
                     static CLASS: OnceCell<Java<crate::java::lang::Class>> = OnceCell::new();
 
