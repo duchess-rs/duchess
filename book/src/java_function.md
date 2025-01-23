@@ -9,7 +9,11 @@ check out [the `gluegun` crate](gluegun).
 
 ## Examples
 
-Just want to see the code? Read [the `greeting` example](https://github.com/duchess-rs/duchess/blob/main/test-crates/duchess-java-tests/tests/ui/examples/greeting.rs) to see the setup in action.
+Just want to see the code? Read some of the tests:
+
+* https://github.com/duchess-rs/duchess/tree/main/test-crates/duchess-java-tests/tests/java-to-rust/rust-libraries
+
+[the `greeting` example](https://github.com/duchess-rs/duchess/blob/main/test-crates/duchess-java-tests/tests/ui/examples/greeting.rs) to see the setup in action.
 
 ## Specifying which function you are defining
 
