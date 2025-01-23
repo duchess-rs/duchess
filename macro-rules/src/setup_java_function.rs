@@ -21,7 +21,7 @@ macro_rules! setup_java_function {
         // Name we will use for the "this" argument given from Java (of type `$abi_this_ty`).
         abi_this_name: $abi_this_name:ident,
 
-        // Argument we will supply as "this" tot he Rust code (if any).
+        // Argument we will supply as "this" to the Rust code (if any).
         // If this is a static method, then this is not present,
         // but otherwise it is the same as `$abi_this_name`.
         call_this_name: $($call_this_name:ident)?,
