@@ -62,9 +62,6 @@ macro_rules! setup_java_function {
                 // callable otherwise (presuming user doesn't directly invoke it
                 // thanks to the `#[no_mangle]` attribute, in which case I'd say they are
                 // asking for a problem).
-                //
-                // **NB.** It's important that #rust_invocation does not contain any user-given
-                // code. If it did, that code could do unsafe things.
                 unsafe {
                     duchess::semver_unstable::$native_function_returning::<
                         $rust_return_ty,
