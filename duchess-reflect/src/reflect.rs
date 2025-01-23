@@ -372,27 +372,27 @@ impl ReflectedMethod {
     }
 }
 
-// #[cfg(test)]
-// mod test {
-//     use serde::Serialize;
+#[cfg(test)]
+mod test {
+    use serde::Serialize;
 
-//     use crate::class_info::DotId;
-//     use crate::config::Configuration;
+    use crate::class_info::DotId;
+    use crate::config::Configuration;
 
-//     use super::{JavapReflector, PrecomputedReflector};
+    use super::{JavapReflector, PrecomputedReflector};
 
-//     #[test]
-//     fn reflector_rountrips() {
-//         let mut reflector = Reflector::new_javap(&Configuration::default());
-//         let _class = reflector
-//             .reflect_and_cache(
-//                 &DotId::parse("java.lang.String"),
-//                 proc_macro2::Span::call_site(),
-//             )
-//             .unwrap();
+    #[test]
+    fn reflector_rountrips() {
+        let mut reflector = Reflector::new_javap(&Configuration::default());
+        let _class = reflector
+            .reflect_and_cache(
+                &DotId::parse("java.lang.String"),
+                proc_macro2::Span::call_site(),
+            )
+            .unwrap();
 
-//         let serialized = reflector.serialize();
-//         let parsed = PrecomputedReflector::new_from_contents(serialized.as_bytes());
-//         assert_eq!(parsed.classes.len(), 1);
-//     }
-// }
+        let serialized = reflector.serialize();
+        let parsed = PrecomputedReflector::new_from_contents(serialized.as_bytes());
+        assert_eq!(parsed.classes.len(), 1);
+    }
+}
