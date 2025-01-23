@@ -377,9 +377,9 @@ mod test {
     use serde::Serialize;
 
     use crate::class_info::DotId;
-    use crate::reflect::Configuration;
+    use crate::config::Configuration;
 
-    use super::{JavapReflector, PrecomputedReflector, Reflector};
+    use super::{JavapReflector, PrecomputedReflector};
 
     #[test]
     fn reflector_rountrips() {

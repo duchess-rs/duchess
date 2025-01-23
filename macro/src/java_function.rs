@@ -1,7 +1,7 @@
 use std::{iter::once, sync::Arc};
 
 use duchess_reflect::{class_info::ClassInfoAccessors, reflect::PrecomputedReflector};
-use proc_macro2::{Ident, Literal, TokenStream};
+use proc_macro2::{Literal, TokenStream};
 use quote::quote_spanned;
 use syn::spanned::Spanned;
 
@@ -44,49 +44,36 @@ pub fn java_function(selector: MethodSelector, input: syn::ItemFn) -> syn::Resul
         selector: &selector,
         class_info: &class_info,
         method_info: &class_info.methods[method_index],
-        input: &input,
     };
 
+    let vis = &input.vis;
     let java_fn_name = driver.java_name();
     let input_fn_name = &input.sig.ident;
 
-    // The first 2 arguments we expected from Java are always
-    // a JVM environment and a `this` (or `class`, if static) pointer.
-    let (
-        Argument {
-            name: env_name,
-            ty: env_ty,
-        },
-        Argument {
-            name: this_name,
-            ty: this_ty,
-        },
-    ) = driver.default_arguments()?;
+    // The Rust type of the class this method is defined on.
+    let rust_owner_ty = driver.convert_ty(&class_info.this_ref().into())?;
 
-    // The next set of arguments ("user arguments") are based on the declared
-    // arguments types from the Java class definition.
-    let user_arguments = driver.user_arguments()?;
-    let user_argument_names: Vec<_> = user_arguments.iter().map(|ua| &ua.name).collect();
-    let user_argument_tys: Vec<_> = user_arguments.iter().map(|ua| &ua.ty).collect();
+    // For instance methods, JNI provides the Java object reference, we type this as `&java::lang::String`
+    // or whatever. Note that it cannot be null. We then pass this to the Rust function.
+    //
+    // For static methods, JNI provides a "this" argument whose value is the jclass.
+    // We do not pass this to the Rust user and hence `call_this_name` is `None`.
+    let abi_this_name = syn::Ident::new("this", span);
+    let (abi_this_ty, call_this_name);
+    if !driver.method_info.flags.is_static {
+        abi_this_ty = quote_spanned!(span => &#rust_owner_ty);
+        call_this_name = vec![&abi_this_name];
+    } else {
+        abi_this_ty = quote_spanned!(span => duchess::semver_unstable::jni_sys::jclass);
+        call_this_name = vec![];
+    };
 
-    // The "rust arguments" vector contains Rust expressions that convert from the
-    // `this_name` and `user_argument_names` into the Rust types declared on the decorated function.
-    let rust_arguments = driver.rust_arguments(&this_name, &user_argument_names)?;
+    // Assemble the arguments that will be given by JNI code.
+    let user_arguments = driver.user_arguments(&input)?;
+    let abi_argument_names: Vec<_> = user_arguments.iter().map(|ua| &ua.name).collect();
+    let abi_argument_tys: Vec<_> = user_arguments.iter().map(|ua| &ua.ty).collect();
 
-    // The "main body" of the call -- invoke the decorated function with the appropriate arguments.
-    let rust_invocation = quote_spanned!(span =>
-        #input_fn_name(
-            #(#rust_arguments),*
-        )
-    );
-
-    // Wrap that "main body" with whatever we need to convert the returned value back
-    // to the return type Java expects (`return_ty` is the Rust representation of that type)
-    let (return_ty, rust_invocation) = driver.return_ty_and_expr(rust_invocation, &env_name)?;
-
-    let vis = &input.vis;
-
-    let rust_this_ty = driver.convert_ty(&class_info.this_ref().into())?;
+    // Literals for giving to JNI.
     let method_name_literal = Literal::string(&selector.method_name());
     let signature_literal = Literal::string(
         &driver
@@ -94,50 +81,47 @@ pub fn java_function(selector: MethodSelector, input: syn::ItemFn) -> syn::Resul
             .descriptor(&class_info.as_ref().generics_scope()),
     );
 
+    // Return types...
+    let abi_return_ty; // ...that JNI expects
+    let rust_return_ty; // ...that Rust code should provide
+    let native_function_returning; // ...and the function that converts into the former from the latter
+    match &driver.method_info.return_ty {
+        Some(class_info::Type::Scalar(ty)) => {
+            let output_rust_ty = ty.to_tokens(span);
+            rust_return_ty = quote_spanned!(span => #output_rust_ty);
+            abi_return_ty = quote_spanned!(span => #output_rust_ty);
+            native_function_returning = quote_spanned!(span => native_function_returning_scalar);
+        }
+        Some(ty @ class_info::Type::Ref(_)) | Some(ty @ class_info::Type::Repeat(_)) => {
+            rust_return_ty = driver.convert_ty(ty)?;
+            abi_return_ty = quote_spanned!(span => duchess::semver_unstable::jni_sys::jobject);
+            native_function_returning = quote_spanned!(span => native_function_returning_object);
+        }
+        None => {
+            rust_return_ty = quote_spanned!(span => ());
+            abi_return_ty = quote_spanned!(span => ());
+            native_function_returning = quote_spanned!(span => native_function_returning_unit);
+        }
+    }
+
     let tokens = quote_spanned!(span =>
-        // Declare a function with no-mangle linkage as expected by Java.
-        // The function is declared inside a `const _` block so that it is not nameable from Rust code.
-        #[allow(unused_variables, nonstandard_style)]
-        const _: () = {
-            #[no_mangle]
-            fn #java_fn_name(
-                #env_name: #env_ty,
-                #this_name: #this_ty,
-                #(#user_argument_names: #user_argument_tys,)*
-            ) -> #return_ty {
-                // Covers the calls to the two `duchess::plumbing` functions,
-                // both of which assume they are being invoked from within a JNI
-                // method invoked by JVM. This function is anonymous and not
-                // callable otherwise (presuming user doesn't directly invoke it
-                // thanks to the `#[no_mangle]` attribute, in which case I'd say they are
-                // asking for a problem).
-                //
-                // **NB.** It's important that #rust_invocation does not contain any user-given
-                // code. If it did, that code could do unsafe things.
-                unsafe {
-                    #rust_invocation
-                }
-            }
+        duchess::semver_unstable::setup_java_function! {
+            vis: #vis,
+            input_fn_name: #input_fn_name,
+            java_fn_name: #java_fn_name,
+            rust_owner_ty: #rust_owner_ty,
+            abi_this_ty: #abi_this_ty,
+            abi_this_name: #abi_this_name,
+            call_this_name: #(#call_this_name)*,
+            abi_argument_names: [#(#abi_argument_names),*],
+            abi_argument_tys: [#(#abi_argument_tys),*],
+            abi_return_ty: #abi_return_ty,
+            rust_return_ty: #rust_return_ty,
+            native_function_returning: #native_function_returning,
+            method_name_literal: #method_name_literal,
+            signature_literal: #signature_literal,
+        }
 
-            impl duchess::semver_unstable::JavaFn for #input_fn_name {
-                fn java_fn() -> duchess::semver_unstable::JavaFunction {
-                    unsafe {
-                        duchess::semver_unstable::JavaFunction::new(
-                            #method_name_literal,
-                            #signature_literal,
-                            std::ptr::NonNull::new_unchecked(#java_fn_name as *mut ()),
-                            <#rust_this_ty as duchess::JavaObject>::class,
-                        )
-                    }
-                }
-            }
-        };
-
-        // Create a dummy type to represent this function (uninstantiable)
-        #[allow(non_camel_case_types)]
-        #vis struct #input_fn_name { _private: ::core::convert::Infallible }
-
-        // Include the input from the user unchanged.
         #input
     );
 
@@ -168,7 +152,6 @@ struct Driver<'a> {
     selector: &'a MethodSelector,
     class_info: &'a ClassInfo,
     method_info: &'a Method,
-    input: &'a syn::ItemFn,
 }
 
 struct Argument {
@@ -225,29 +208,6 @@ impl Driver<'_> {
         syn::Ident::new(&symbol_name, self.selector.span())
     }
 
-    fn default_arguments(&self) -> syn::Result<(Argument, Argument)> {
-        let span = self.selector.span();
-
-        let env_arg = Argument {
-            name: syn::Ident::new("jni_env", span),
-            ty: quote_spanned!(span => duchess::semver_unstable::EnvPtr<'_>),
-        };
-
-        let this_ty = if self.method_info.flags.is_static {
-            quote_spanned!(span => duchess::semver_unstable::jni_sys::jclass)
-        } else {
-            let rust_this_ty = self.convert_ty(&self.class_info.this_ref().into())?;
-            quote_spanned!(span => &#rust_this_ty)
-        };
-
-        let this_arg = Argument {
-            name: syn::Ident::new("this", span),
-            ty: this_ty,
-        };
-
-        Ok((env_arg, this_arg))
-    }
-
     fn convert_ty(&self, ty: &Type) -> syn::Result<TokenStream> {
         Ok(Signature::new(
             &self.method_info.name,
@@ -257,17 +217,31 @@ impl Driver<'_> {
         .forbid_capture(|sig| sig.java_ty_rs(ty))?)
     }
 
-    fn user_arguments(&self) -> syn::Result<Vec<Argument>> {
-        let span = self.selector.span();
+    fn user_arguments(&self, input: &syn::ItemFn) -> syn::Result<Vec<Argument>> {
+        let selector_span = self.selector.span();
         let mut arguments = vec![];
 
+        let rust_offset = if self.method_info.flags.is_static {
+            0
+        } else {
+            1
+        };
+
         for (argument_ty, index) in self.method_info.argument_tys.iter().zip(0..) {
-            let name = syn::Ident::new(&format!("arg{index}"), span);
+            // Try to get the span for the Nth argument from the Rust code.
+            let arg_span = input
+                .sig
+                .inputs
+                .iter()
+                .nth(index + rust_offset)
+                .map_or(selector_span, |arg| arg.span());
+
+            let name = syn::Ident::new(&format!("arg{index}"), arg_span);
 
             let java_ty = self.convert_ty(argument_ty)?;
             let ty = match argument_ty {
                 class_info::Type::Ref(_) | class_info::Type::Repeat(_) => {
-                    quote_spanned!(span => &#java_ty)
+                    quote_spanned!(arg_span => Option<&#java_ty>)
                 }
 
                 class_info::Type::Scalar(_) => java_ty,
@@ -277,150 +251,5 @@ impl Driver<'_> {
         }
 
         Ok(arguments)
-    }
-
-    fn rust_arguments(
-        &self,
-        this_name: &Ident,
-        user_names: &[&Ident],
-    ) -> syn::Result<Vec<TokenStream>> {
-        // Extract the `syn::PatType` version of the inputs. Error if `&self` etc is used.
-        let mut input_rust_arguments = vec![];
-        for fn_arg in &self.input.sig.inputs {
-            match fn_arg {
-                syn::FnArg::Receiver(r) => {
-                    return Err(syn::Error::new(
-                        r.span(),
-                        "Rust methods cannot be mapped to Java native functions",
-                    ));
-                }
-                syn::FnArg::Typed(t) => {
-                    input_rust_arguments.push(t);
-                }
-            }
-        }
-
-        // Check that we have the right number of arguments and give a useful error otherwise.
-        let expected_num_rust_arguments = if self.method_info.flags.is_static {
-            0
-        } else {
-            1 // we expect a `this` argument
-        } + user_names.len();
-        if input_rust_arguments.len() > expected_num_rust_arguments {
-            let extra_span = input_rust_arguments[expected_num_rust_arguments].span();
-            return Err(syn::Error::new(
-                extra_span,
-                &format!(
-                    "extra argument(s) on Rust function, only {} argument(s) are expected",
-                    expected_num_rust_arguments
-                ),
-            ));
-        } else if input_rust_arguments.len() < expected_num_rust_arguments {
-            // Heuristic: try to remind user about `this`
-            if !self.method_info.flags.is_static && input_rust_arguments.len() == 0 {
-                return Err(syn::Error::new(
-                    self.input.sig.ident.span(),
-                    &format!(
-                        "Rust function should have {} argument(s); don't forget about `this`",
-                        expected_num_rust_arguments
-                    ),
-                ));
-            } else if !self.method_info.flags.is_static {
-                return Err(syn::Error::new(
-                    self.input.sig.ident.span(),
-                    &format!(
-                        "Rust function should have {} argument(s); don't forget about `this`",
-                        expected_num_rust_arguments
-                    ),
-                ));
-            } else {
-                return Err(syn::Error::new(
-                    self.input.sig.ident.span(),
-                    &format!(
-                        "Rust function should have {} argument(s)",
-                        expected_num_rust_arguments
-                    ),
-                ));
-            }
-        }
-
-        // Output accumulator
-        let mut output = vec![];
-
-        let mut inputs = input_rust_arguments.iter();
-
-        // Push the `this` argument onto `output`
-        if !self.method_info.flags.is_static {
-            output.push(self.rust_argument(this_name, false, inputs.next().unwrap())?);
-        }
-
-        // Push each subsequent argument
-        for (user_name, argument_ty) in user_names.iter().zip(&self.method_info.argument_tys) {
-            output.push(self.rust_argument(
-                user_name,
-                argument_ty.is_scalar(),
-                inputs.next().unwrap(),
-            )?);
-        }
-
-        Ok(output)
-    }
-
-    fn rust_argument(
-        &self,
-        arg_name: &Ident,
-        java_ty_is_scalar: bool,
-        rust_ty: &syn::PatType,
-    ) -> syn::Result<TokenStream> {
-        // Case 1. Decorated Rust function has a `&J` type for this argument.
-        // In that case, we provide the Java object unchanged.
-        if let syn::Type::Reference(_) = &*rust_ty.ty {
-            // If the decorated Rust function argument type is a Rust reference
-            // (`&J`), then just pass the Java type directly.
-            if java_ty_is_scalar {
-                return Err(syn::Error::new(
-                        rust_ty.ty.span(),
-                        &format!("unexpected Rust reference; Java function declares a scalar type for this argument"),
-                    ));
-            }
-
-            return Ok(quote_spanned!(rust_ty.span() => #arg_name));
-        }
-
-        // Case 2. Java type is scalar. Then just pass it.
-        if java_ty_is_scalar {
-            return Ok(quote_spanned!(rust_ty.span() => #arg_name));
-        }
-
-        // Case 3. Decorated Rust function has some Rust type; convert Java reference to that.
-        Ok(quote_spanned!(rust_ty.span() => duchess::JvmOp::to_rust(#arg_name).execute()))
-    }
-
-    fn return_ty_and_expr(
-        &self,
-        return_expr: TokenStream,
-        env_name: &Ident,
-    ) -> syn::Result<(TokenStream, TokenStream)> {
-        let span = self.selector.span();
-        match &self.method_info.return_ty {
-            Some(ty) => match ty {
-                class_info::Type::Scalar(ty) => {
-                    let output_rust_ty = ty.to_tokens(span);
-                    Ok((
-                        output_rust_ty.clone(),
-                        quote_spanned!(span => duchess::semver_unstable::native_function_returning_scalar::<#output_rust_ty, _>(#env_name, || #return_expr)),
-                    ))
-                }
-                class_info::Type::Ref(_) | class_info::Type::Repeat(_) => {
-                    let output_java_ty = self.convert_ty(ty)?;
-                    Ok((
-                        quote_spanned!(span => duchess::semver_unstable::jni_sys::jobject),
-                        quote_spanned!(span => duchess::semver_unstable::native_function_returning_object::<#output_java_ty, _>(#env_name, || #return_expr)),
-                    ))
-                }
-            },
-
-            None => Ok((quote_spanned!(span => ()), return_expr)),
-        }
     }
 }

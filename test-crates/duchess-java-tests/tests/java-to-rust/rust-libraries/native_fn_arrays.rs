@@ -13,8 +13,8 @@ duchess::java_package! {
 }
 
 #[duchess::java_function(java_to_rust_arrays.JavaArrayTests::combine_bytes)]
-fn combine_bytes(bytes: &duchess::java::Array<i8>) -> i64 {
-    let signed_bytes: &[i8] = &*bytes.execute::<Vec<i8>>().unwrap();
+fn combine_bytes(bytes: Option<&duchess::java::Array<i8>>) -> i64 {
+    let signed_bytes: &[i8] = &*bytes.assert_not_null().execute::<Vec<i8>>().unwrap();
     let unsigned_bytes = signed_bytes.iter().map(|x| *x as u8).collect::<Vec<u8>>();
     return i64::from_le_bytes(unsigned_bytes.try_into().unwrap());
 }

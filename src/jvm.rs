@@ -15,7 +15,7 @@ use crate::{
 use std::{
     any::Any,
     collections::HashMap,
-    ffi::{c_char, c_void, CStr, CString},
+    ffi::{c_char, c_void, CString},
     fmt::Display,
     panic::AssertUnwindSafe,
 };
@@ -40,7 +40,7 @@ pub trait JvmOp: Clone {
     fn assert_not_null<T>(self) -> NotNull<Self>
     where
         T: JavaObject,
-        for<'jvm> Self: JvmOp<Output<'jvm> = Option<Local<'jvm, T>>>,
+        for<'jvm> Self: JvmOp<Output<'jvm>: TryJDeref<Java = T>>,
     {
         NotNull::new(self)
     }
@@ -263,6 +263,26 @@ where
     };
 
     result
+}
+
+/// Invoked as the body from a JNI native function when it is called by the JVM.
+/// Initializes the environment and invokes `op`. Converts the result into a java
+/// object and returns it. Caller should then return this to the JVM.
+///
+/// # Safety condition
+///
+/// Must be invoked as the entire body of a JNI native function, with
+/// `env` being the `EnvPtr` argument provided.
+pub unsafe fn native_function_returning_unit<J, R>(env: EnvPtr<'_>, op: impl FnOnce()) {
+    init_jvm_from_native_function(env);
+    let _callback_guard = thread::attach_from_jni_callback(env);
+
+    match std::panic::catch_unwind(AssertUnwindSafe(|| op())) {
+        Ok(()) => (),
+        Err(e) => {
+            let () = rust_panic_to_java_exception(env, e);
+        }
+    }
 }
 
 /// Invoked as the body from a JNI native function when it is called by the JVM.
@@ -633,6 +653,7 @@ macro_rules! scalar {
             unsafe impl JavaType for $rust {
                 fn array_class<'jvm>(jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, Local<'jvm, Class>> {
                     // XX: Safety
+                    use std::ffi::CStr;
                     const CLASS_NAME: &CStr = unsafe { CStr::from_bytes_with_nul_unchecked($array_class) };
                     static CLASS: OnceCell<Java<crate::java::lang::Class>> = OnceCell::new();
 

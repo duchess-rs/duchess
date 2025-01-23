@@ -1,10 +1,19 @@
 # The `java_function` macro
 
-The `java_function` macro is used to implement native functions. Make sure to read about how you [link these native functions into the JVM](./linking_native_functions.md).
+The `java_function` macro is used to implement native functions. Make sure to read about how you [link these native functions into the JVM](./linking_native_functions.md). 
+
+`java_function` is a low-level primitive. For a more ergonomic, full-featured way to wrap Rust library and call it from Java,
+check out [the `gluegun` crate](gluegun).
+
+[gluegun]: https://gluegun-rs.github.io/gluegun/
 
 ## Examples
 
-Just want to see the code? Read [the `greeting` example](https://github.com/duchess-rs/duchess/blob/main/test-crates/duchess-java-tests/tests/ui/examples/greeting.rs) to see the setup in action.
+Just want to see the code? Read some of the tests:
+
+* https://github.com/duchess-rs/duchess/tree/main/test-crates/duchess-java-tests/tests/java-to-rust/rust-libraries
+
+[the `greeting` example](https://github.com/duchess-rs/duchess/blob/main/test-crates/duchess-java-tests/tests/ui/examples/greeting.rs) to see the setup in action.
 
 ## Specifying which function you are defining
 
@@ -18,14 +27,18 @@ This argument `X` can have the following forms:
 
 `#[java_function]` requires the decorated function to have the following arguments:
 
-* If not static, a `this` parameter -- can have any name, but we recommend `this`
+* If not static, a `this` parameter -- can have any name, but we recommend `this`, whose type is the Duchess version of the Java type
 * One parameter per Java argument -- can have any name, but we recommend matching the names used in Java
 
-For the `this` and other Java arguments, their type can be:
+If present, the `this` argument should have the type `&foo::Bar` where `foo::Bar` is the Duchess type of the Java class. i.e., if this is a native method defined on the class `java.lang.String`, you would have `this: &java::lang::String`.
 
-* `i32`, `i16`, etc for Java scalars
-* `&J` where `J` is the Java type
-* `R` where `R` is some Rust type that corresponds to the Java type
+The other arguments must match the types declared in Java:
+
+* For Java scalars, use `i32`, `i16`, etc.
+* For reference types, use `Option<&J>`, where `J` is the Java type (e.g., `Option<&java::lang::String>`).
+    * Note that `Option` is required as the Java code can always provide `null`. You can use the [`assert_not_null`][] method on `JvmOp`.
+
+[`assert_not_null`]: https://duchess-rs.github.io/duchess/rustdoc/doc/duchess/prelude/trait.JvmOp.html#method.assert_not_null
 
 ## Expected return type
 
@@ -33,8 +46,9 @@ If the underlying Java function returns a scalar value, your Rust function must 
 
 Otherwise, if the underlying Java function returns an object of type `J`, the value returned from your function will be converted to `J` by invoking the [`to_java`](./to_java.md) method. This means your functon can return:
 
-* a reference to a Java object of type `J` (e.g., `Java<J>`) 
-* a Rust value that can be converted to `J` via `to_java::<J>`
+* a reference to a Java object of type `J` (e.g., `&J` or `Java<J>`);
+* a reference to an optional Java object of type `J` (e.g., `Option<Java<J>>`), which permits returning `null`;
+* a Rust value that can be converted to `J` via `to_java::<J>`.
 
 ## Linking your native function into the JVM
 
