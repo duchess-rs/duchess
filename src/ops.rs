@@ -42,6 +42,7 @@ identity_jvm_op! {
     [R: JavaObject] &Java<R>,
     [R: JavaObject] &Option<Local<'_, R>>,
     [R: JavaObject] &Option<Java<R>>,
+    [R: JavaObject] &Option<&R>,
 
     [] Null,
 }
