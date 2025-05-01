@@ -519,6 +519,12 @@ impl JvmBuilder {
     }
 
     pub fn launch_or_use_existing(self) -> Result<()> {
+        let existing_jvm = unsafe { raw::existing_jvm() }?;
+
+        if let Some(jvm) = existing_jvm {
+            let _ = GLOBAL_JVM.set(jvm);
+            return Ok(());
+        }
         match self.try_launch() {
             Err(Error::JvmAlreadyExists) => {
                 // Two cases: (1) another thread successfully invoked try_launch() and we'll now get the pointer out of
