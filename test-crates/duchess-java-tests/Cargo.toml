@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 duchess = { path = "../.." }
 thiserror = "1.0.40"
+jni = { version = "0.21", features = ["invocation"] }
 
 [dev-dependencies]
 ui_test = "0.23"
