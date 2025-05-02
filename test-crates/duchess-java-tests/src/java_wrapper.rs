@@ -29,6 +29,7 @@ fn main() {
         .collect::<Vec<&str>>()
         .join(".");
 
+    args.push("-Xcheck:jni".to_string());
     args.push(path_converted_to_package_fmt);
 
     let output = Command::new("java").args(&args).output().unwrap();
