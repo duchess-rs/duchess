@@ -499,6 +499,16 @@ impl JvmBuilder {
     }
 
     pub fn launch_or_use_existing(self) -> Result<()> {
+        // The following code was added to address what appears to be a bug in jdk-17.0.15+6-LTS
+        // If try_launch is called before existing_jvm, then existing_jvm does not find an already running
+        // jvm. If existing_jvm is called before try_launch, then existing_jvm does find an already running
+        // jvm.
+        let existing_jvm = unsafe { raw::existing_jvm() }?;
+
+        if let Some(jvm) = existing_jvm {
+            let _ = GLOBAL_JVM.set(jvm);
+            return Ok(());
+        }
         match self.try_launch() {
             Err(Error::JvmAlreadyExists) => {
                 // Two cases: (1) another thread successfully invoked try_launch() and we'll now get the pointer out of
