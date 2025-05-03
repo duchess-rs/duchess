@@ -2,9 +2,9 @@ name: Rust
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "release-*" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "release-*" ]
 
 # Allow one instance of this workflow per pull request, and cancel older runs when new changes are pushed
 concurrency:
