@@ -943,11 +943,18 @@ impl ClassInfo {
             .chain(&input_names)
             .collect();
 
+       
+        let method_struct_generics_with_defaults: Vec<_> = method_struct_generics
+            .iter()
+            .map(|g| quote_spanned!(self.span => #g = java::lang::Object))
+            .collect();
+
         // For each method `m` in the Java type, we create a struct (named `m`)
-        // that will implement the `JvmOp`.
+        // that will implement the `JvmOp`. We need to provide defaults for all
+        // generic parameters to enable type inference at the instantiation site.
         let method_struct = quote_spanned!(self.span =>
             pub struct #rust_method_type_name<
-                #(#method_struct_generics,)*
+                #(#method_struct_generics_with_defaults,)*
             > {
                 #(#input_names : #input_names,)*
                 phantom: ::core::marker::PhantomData<(
@@ -1036,6 +1043,17 @@ impl ClassInfo {
             )
         });
 
+        // For the constructor call, we need explicit type parameters: class generics
+        // and method generics by name, but wildcards for input parameter types
+        // (which can be inferred from the arguments).
+        let method_struct_explicit_types: Vec<_> = java_class_generics
+            .iter()
+            .chain(rust_method_generics.iter())
+            .map(|g| quote_spanned!(self.span => #g))
+            .chain(input_names.iter().map(|_| quote_spanned!(self.span => _)))
+            .collect();
+
+
         let inherent_method = quote_spanned!(self.span =>
             pub fn #rust_method_name<#(#rust_method_generics),*>(
                 #(#input_names: impl #input_traits),*
@@ -1049,7 +1067,7 @@ impl ClassInfo {
 
                 #deref_impl
 
-                #rust_method_type_name {
+                #rust_method_type_name::<#(#method_struct_explicit_types),*> {
                     #(#input_names: #input_names.into_op(),)*
                     phantom: ::core::default::Default::default(),
                 }
