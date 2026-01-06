@@ -16,7 +16,7 @@ proc-macro2 = "1.0.56"
 quote = "1.0.26"
 rust-format = { version = "0.3.4", features = ["token_stream"] }
 str_inflector = "0.12.0"
-syn = "2.0.15"
+syn = { version = "2.0.15", features = ["parsing"] }
 tempfile = "3.8.1"
 
 [build-dependencies]
