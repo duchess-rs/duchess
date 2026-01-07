@@ -1,4 +1,4 @@
-use std::{marker::PhantomData, ops::Deref, ptr::NonNull};
+use std::{marker::PhantomData, mem::ManuallyDrop, ops::Deref, ptr::NonNull};
 
 use crate::jvm::JavaObjectExt;
 use crate::thread;
@@ -180,9 +180,15 @@ impl<'a, R: JavaObject> Local<'a, R> {
         R: Upcast<S>,
         S: JavaObject + 'a,
     {
-        // SAFETY: From the Upcast trait contract, we know R is also an instance of S
-        let upcast = unsafe { Local::<S>::from_raw(self.env, self.obj) };
-        upcast
+        // From the Upcast trait contract, we know R is also an instance of S, so the invariant of _marker must be satisfied.
+        // We also need to ensure the Drop of Self does not run as that would free the underlying JVM local ref, 
+        // causing a double-free when the upcasted Drop runs and frees the same local ref again.  
+        let self_ = ManuallyDrop::new(self);
+        Local {
+            env: self_.env,
+            obj: self_.obj,
+            _marker: PhantomData
+        }
     }
 }
 
@@ -203,8 +209,13 @@ impl<R: JavaObject> Java<R> {
         R: Upcast<S>,
         S: JavaObject + 'static,
     {
-        // SAFETY: From the Upcast trait contract, we know R is also an instance of S
-        let upcast = unsafe { Java::<S>::from_raw(self.obj) };
-        upcast
+        // From the Upcast trait contract, we know R is also an instance of S, so the invariant of _marker must be satisfied.
+        // We also need to ensure the Drop of Self does not run as that would free the underlying JVM global ref, 
+        // causing a double-free when the upcasted Drop runs and frees the same global ref again.  
+        let self_ = ManuallyDrop::new(self);
+        Java {
+            obj: self_.obj,
+            _marker: PhantomData,
+        }
     }
 }
