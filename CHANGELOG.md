@@ -1,3 +1,15 @@
+# 0.3.2 (February 5th, 2026)
+**New features**:
+* Support generic exceptions (#205)
+* Escape Rust keywords that appear in Java identifiers as raw literals (#205)
+
+**Bug fixes**:
+* Fix double free when object is upcasted (#206)
+
+# 0.3.1 (May 3rd, 2025)
+**Bug fixes**:
+* Fix JVM launch panic on aarch64 Linux with JDK 17.0.15+6-LTS (#202)
+
 # 0.3.0 (July 22nd, 2024)
 This release contains many improvements for calling Rust code from Java:
 1. Add support for returning scalars (#181)
