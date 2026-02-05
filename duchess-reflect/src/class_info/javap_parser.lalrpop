@@ -161,8 +161,13 @@ Privacy: Privacy = {
 
 Throws: Vec<ClassRef> = {
     () => vec![],
-    "throws" <Comma1<ClassRef>>,
-}
+    "throws" <Comma1<ThrowsType>>,
+};
+
+ThrowsType: ClassRef = {
+    ClassRef,
+    <Id> => ClassRef { name: <>.into(), generics: vec![] },
+};
 
 #[inline]
 ReturnType: Option<Type> = {

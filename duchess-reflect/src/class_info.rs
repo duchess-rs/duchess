@@ -622,7 +622,11 @@ impl Id {
 
     pub fn to_ident(&self, span: Span) -> Ident {
         let data = self.data.replace("$", "__");
-        Ident::new(&data, span)
+        // A legal Java identifier may be an illegal Rust identifier, in which case we'd 
+        // need to use raw syntax. 
+        let mut ident = syn::parse_str(data.as_str()).unwrap_or_else(|_| Ident::new_raw(&data, span));
+        ident.set_span(span);
+        ident
     }
 
     pub fn to_snake_case(&self) -> Self {
