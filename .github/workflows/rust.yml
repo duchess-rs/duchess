@@ -44,8 +44,8 @@ jobs:
       run: ./mdbook test book
 
   # JDK 25 changed Class.isInterface(), isArray(), isPrimitive() from native
-  # to ordinary methods. This causes duchess-reflect's native-method check to
-  # fail. This job exists to demonstrate the incompatibility.
+  # to ordinary methods backed by HotSpot intrinsics. This job verifies duchess
+  # works correctly on JDK 25+.
   build-jdk25:
     strategy:
       matrix:
@@ -53,7 +53,6 @@ jobs:
         jni-version: ['1_8']
       fail-fast: false
     runs-on: ${{ matrix.os }}
-    continue-on-error: true
 
     steps:
     - uses: actions/checkout@v4
