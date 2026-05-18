@@ -197,11 +197,13 @@ impl ClassInfo {
             ));
         }
 
-        if flags.is_native && !reflected_flags.is_native {
-            push_error(format!(
-                "member declared as native but it is not native in Java",
-            ));
-        }
+        // JDK 25 demoted java.lang.Class.isInterface(), isArray(), and isPrimitive()
+        // from `native` methods to ordinary methods backed by HotSpot intrinsics.
+        // Pre-existing duchess-reflect declarations in src/java.rs marked them as
+        // native, which is correct for JDK 21 and earlier but no longer matches
+        // what `javap` reports on JDK 25+. We accept native-in-Rust + non-native-in-Java
+        // to support both. The reverse direction (non-native-in-Rust + native-in-Java)
+        // is still treated as an error since that indicates a real binding mismatch.
 
         if !flags.is_native && reflected_flags.is_native {
             push_error(format!(
