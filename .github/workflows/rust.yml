@@ -56,7 +56,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - uses: actions/setup-java@v4
+    - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4.8.0
       with:
         distribution: 'temurin'
         java-version: '25'
@@ -68,6 +68,8 @@ jobs:
       run: cargo build --verbose
     - name: Test crates, jni_${{ matrix.jni-version }}
       run: cargo test --all-targets --verbose --features jni_${{ matrix.jni-version }}
+    - name: Test client crates, jni_${{ matrix.jni-version }}
+      run: cargo test --all-targets --verbose --manifest-path=test-crates/Cargo.toml --features jni_${{ matrix.jni-version }}
 
   coverage:
     runs-on: 'ubuntu-latest'
