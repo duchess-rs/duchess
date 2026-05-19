@@ -43,6 +43,34 @@ jobs:
       if: matrix.os == 'ubuntu-latest'
       run: ./mdbook test book
 
+  # JDK 25 changed Class.isInterface(), isArray(), isPrimitive() from native
+  # to ordinary methods backed by HotSpot intrinsics. This job verifies duchess
+  # works correctly on JDK 25+.
+  build-jdk25:
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        jni-version: ['1_8']
+      fail-fast: false
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4.8.0
+      with:
+        distribution: 'temurin'
+        java-version: '25'
+    - name: Show Java version
+      run: java -version
+    - name: Show javap output for Class native methods
+      run: javap -p java.lang.Class | grep -E "(isInterface|isArray|isPrimitive)"
+    - name: Build
+      run: cargo build --verbose
+    - name: Test crates, jni_${{ matrix.jni-version }}
+      run: cargo test --all-targets --verbose --features jni_${{ matrix.jni-version }}
+    - name: Test client crates, jni_${{ matrix.jni-version }}
+      run: cargo test --all-targets --verbose --manifest-path=test-crates/Cargo.toml --features jni_${{ matrix.jni-version }}
+
   coverage:
     runs-on: 'ubuntu-latest'
     steps:

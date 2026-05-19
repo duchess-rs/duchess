@@ -197,11 +197,17 @@ impl ClassInfo {
             ));
         }
 
-        if flags.is_native && !reflected_flags.is_native {
-            push_error(format!(
-                "member declared as native but it is not native in Java",
-            ));
-        }
+        // The is_native flag is only used for compile-time validation and does not
+        // affect codegen — duchess invokes all methods via JNI CallXxxMethodA regardless
+        // of native status.
+        //
+        // We allow native-in-Rust + non-native-in-Java because JDK 25 demoted
+        // Class.isInterface(), isArray(), and isPrimitive() from native to ordinary
+        // methods, and we need to support both JDK ≤21 and JDK 25+.
+        //
+        // The reverse (non-native-in-Rust + native-in-Java) is still an error because
+        // it means the user may need to provide a Rust implementation via
+        // #[duchess::java_function] and hasn't marked the method as native.
 
         if !flags.is_native && reflected_flags.is_native {
             push_error(format!(
