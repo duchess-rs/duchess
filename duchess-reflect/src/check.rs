@@ -199,13 +199,17 @@ impl ClassInfo {
             ));
         }
 
-        // JDK 25 demoted java.lang.Class.isInterface(), isArray(), and isPrimitive()
-        // from `native` methods to ordinary methods backed by HotSpot intrinsics.
-        // Pre-existing duchess-reflect declarations in src/java.rs marked them as
-        // native, which is correct for JDK 21 and earlier but no longer matches
-        // what `javap` reports on JDK 25+. We accept native-in-Rust + non-native-in-Java
-        // to support both. The reverse direction (non-native-in-Rust + native-in-Java)
-        // is still treated as an error since that indicates a real binding mismatch.
+        // The is_native flag is only used for compile-time validation and does not
+        // affect codegen — duchess invokes all methods via JNI CallXxxMethodA regardless
+        // of native status.
+        //
+        // We allow native-in-Rust + non-native-in-Java because JDK 25 demoted
+        // Class.isInterface(), isArray(), and isPrimitive() from native to ordinary
+        // methods, and we need to support both JDK ≤21 and JDK 25+.
+        //
+        // The reverse (non-native-in-Rust + native-in-Java) is still an error because
+        // it means the user may need to provide a Rust implementation via
+        // #[duchess::java_function] and hasn't marked the method as native.
 
         if !flags.is_native && reflected_flags.is_native {
             push_error(format!(
