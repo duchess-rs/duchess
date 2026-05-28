@@ -1,3 +1,8 @@
+# 0.3.3 (May 28th, 2026)
+**Bug fixes**:
+* Support JDK 25 by relaxing native-method check in duchess-reflect (#209)
+* Replace deprecated `TempDir::into_path()` with `TempDir::keep()`, bump tempfile to 3.15.0 (#210)
+
 # 0.3.2 (February 5th, 2026)
 **New features**:
 * Support generic exceptions (#205)
