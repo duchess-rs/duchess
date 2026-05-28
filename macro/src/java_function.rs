@@ -1,9 +1,10 @@
+use core::panic;
 use std::{iter::once, sync::Arc};
 
 use duchess_reflect::{class_info::ClassInfoAccessors, reflect::PrecomputedReflector};
 use proc_macro2::{Literal, TokenStream};
 use quote::quote_spanned;
-use syn::spanned::Spanned;
+use syn::{spanned::Spanned, FnArg};
 
 use crate::{
     argument::MethodSelector,
@@ -217,6 +218,29 @@ impl Driver<'_> {
         .forbid_capture(|sig| sig.java_ty_rs(ty))?)
     }
 
+    // fn is_option_mut_ref(pat_type: &syn::PatType) -> bool {
+    fn is_option_mut_ref(fnArg: &FnArg) -> bool {
+        let pat_type = match fnArg {
+            syn::FnArg::Typed(pat_type) => pat_type,
+            syn::FnArg::Receiver(_) => return false
+        };
+
+        if let syn::Type::Path(type_path) = &*pat_type.ty {
+            if let Some(segment) = type_path.path.segments.last() {
+                if segment.ident == "Option" {
+                    if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
+                        for arg in args.args.iter() {
+                            if let syn::GenericArgument::Type(syn::Type::Reference(type_ref)) = arg {
+                                return type_ref.mutability.is_some();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        false
+    }
+
     fn user_arguments(&self, input: &syn::ItemFn) -> syn::Result<Vec<Argument>> {
         let selector_span = self.selector.span();
         let mut arguments = vec![];
@@ -238,14 +262,23 @@ impl Driver<'_> {
 
             let name = syn::Ident::new(&format!("arg{index}"), arg_span);
 
+
+            let typed = input.sig.inputs.iter().nth(index + rust_offset).unwrap();
+            let is_mut = Self::is_option_mut_ref(typed);
+
             let java_ty = self.convert_ty(argument_ty)?;
             let ty = match argument_ty {
                 class_info::Type::Ref(_) | class_info::Type::Repeat(_) => {
-                    quote_spanned!(arg_span => Option<&#java_ty>)
+                    if is_mut {
+                        quote_spanned!(arg_span => Option<&mut #java_ty>)
+                    } else {
+                        quote_spanned!(arg_span => Option<&#java_ty>)
+                    }
                 }
 
                 class_info::Type::Scalar(_) => java_ty,
             };
+
 
             arguments.push(Argument { name, ty })
         }

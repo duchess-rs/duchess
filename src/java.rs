@@ -402,3 +402,4 @@ pub use auto::java::*;
 // Should it go somewhere outside of the JDK core classes?
 pub use crate::array::JavaArray as Array;
 pub use crate::array::JavaArrayExt as ArrayExt;
+pub use crate::array::JavaArrayModificationExt as ArrayModificationExt;

@@ -1,13 +1,14 @@
-use std::marker::PhantomData;
+use std::{env, marker::PhantomData};
 
 use crate::{
     cast::Upcast,
     java::{self, lang::Class},
-    jvm::JavaView,
+    jvm::{self, JavaScalar, JavaView, JvmBuilder},
+    raw,
     semver_unstable::{FromRef, JavaObjectExt},
     to_java::ToJavaImpl,
     AsJRef, Error, IntoRust, JDeref, JavaObject, JavaType, Jvm, JvmOp, Local, Nullable,
-    ScalarMethod, TryJDeref,
+    ScalarMethod, TryJDeref, VoidMethod,
 };
 
 pub struct JavaArray<T> {
@@ -49,13 +50,15 @@ unsafe impl<T: JavaType> JavaObject for JavaArray<T> {
 impl<T> JavaView for JavaArray<T> {
     type OfOp<J> = JavaArrayOp<T, J, <java::lang::Object as JavaView>::OfOpWith<J, ()>>;
 
-    type OfOpWith<J, N> = JavaArrayOp<T, J, N>
+    type OfOpWith<J, N>
+        = JavaArrayOp<T, J, N>
     where
         N: FromRef<J>;
 
     type OfObj<J> = JavaArrayObj<T, J, <java::lang::Object as JavaView>::OfObjWith<J, ()>>;
 
-    type OfObjWith<J, N> = JavaArrayObj<T, J, N>
+    type OfObjWith<J, N>
+        = JavaArrayObj<T, J, N>
     where
         N: FromRef<J>;
 }
@@ -86,6 +89,11 @@ pub trait JavaArrayExt<T: JavaType>: JvmOp {
     fn length(self) -> Self::Length;
 }
 
+pub trait JavaArrayModificationExt<T: JavaType, RT: JavaScalar>: JvmOp {
+    type SetArrayRegion<'a>: VoidMethod;
+    fn set_array_region<'a>(self, start: usize, values: &'a[RT]) -> Self::SetArrayRegion<'a>;
+}
+
 impl<This, T> JavaArrayExt<T> for This
 where
     This: JvmOp,
@@ -106,6 +114,15 @@ where
 pub struct Length<This: JvmOp, T> {
     this: This,
     element: PhantomData<T>,
+}
+
+#[derive_where::derive_where(Clone)]
+#[derive_where(Copy; This: Copy)]
+pub struct SetArrayRegion<'a, This: JvmOp, T, RT> {
+    this: This,
+    element: PhantomData<T>,
+    start: usize,
+    values: &'a [RT],
 }
 
 impl<This, T> JvmOp for Length<This, T>
@@ -205,6 +222,47 @@ macro_rules! primitive_array {
                     }
 
                     Ok(vec)
+                }
+            }
+
+            impl<This> JavaArrayModificationExt<JavaArray<$rust>, $rust> for This
+            where
+                This: JvmOp,
+                for<'jvm> This::Output<'jvm>: AsJRef<JavaArray<$rust>>,
+            {
+                type SetArrayRegion<'a> = SetArrayRegion<'a, Self, JavaArray<$rust>, $rust>;
+                fn set_array_region<'a>(mut self, start: usize, values: &'a[$rust]) -> Self::SetArrayRegion<'a> {
+                    SetArrayRegion {
+                        this: self,
+                        element: PhantomData,
+                        start,
+                        values
+                    }
+                }
+            }
+
+            impl<This> JvmOp for SetArrayRegion<'_, This, JavaArray<$rust>, $rust>
+            where
+                This: JvmOp,
+                for<'jvm> This::Output<'jvm>: AsJRef<JavaArray<$rust>>,
+            {
+                type Output<'jvm> = ();
+            
+                fn do_jni<'jvm>(self, jvm: &mut Jvm<'jvm>) -> crate::LocalResult<'jvm, Self::Output<'jvm>> {
+                    let this = self.this.do_jni(jvm)?;
+                    let this = this.as_jref()?.as_raw();
+                
+                    unsafe {
+                        jvm.env().invoke_unchecked(|env| env.$set_fn, |env, f| f(
+                            env,
+                            this.as_ptr(),
+                            self.start as jni_sys::jsize,
+                            self.values.len() as jni_sys::jsize,
+                            self.values.as_ptr().cast::<jni_sys::$java_ty>(),
+                        ));
+                    }
+                
+                    Ok(())
                 }
             }
         )*
