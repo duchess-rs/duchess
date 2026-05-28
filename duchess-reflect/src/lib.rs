@@ -16,7 +16,7 @@ pub mod upcasts;
 lazy_static::lazy_static! {
     pub static ref DEBUG_DIR: PathBuf = {
         let tmp_dir = tempfile::TempDir::new().expect("failed to create temp directory");
-        tmp_dir.into_path()
+        tmp_dir.keep()
     };
 }
 
