@@ -23,7 +23,7 @@ once_cell = "1.17.1"
 synstructure = "0.13.0"
 syn = "2.0.15"
 derive-where = "1.2.1"
-duchess-reflect = { version = "0.3.0", path = "../duchess-reflect" }
+duchess-reflect = { version = "0.3.3", path = "../duchess-reflect" }
 
 [build-dependencies]
 lalrpop = "0.19.9"
