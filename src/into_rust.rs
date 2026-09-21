@@ -30,6 +30,8 @@ identity_rust_op! {
     i16,
     i32,
     i64,
+    f32,
+    f64,
 }
 
 impl<O, E, JO, JE> IntoRust<Result<O, E>> for Result<JO, JE>

@@ -27,7 +27,11 @@ macro_rules! setup_class {
         #[allow(unused_imports)]
         #[allow(nonstandard_style)]
         const _: () = {
-            use duchess::{java, Java, Jvm, Local, LocalResult};
+            // `duchess::java` must not be imported here. A bare `java::...`
+            // path in the macro inputs can mean the local `mod java`, so it
+            // must resolve through the enclosing package module scope. The
+            // prelude names below are absolute, so they work either way.
+            use duchess::{Java, Jvm, Local, LocalResult};
             use duchess::semver_unstable::once_cell::sync::OnceCell;
             use duchess::semver_unstable::mro;
 
@@ -43,9 +47,9 @@ macro_rules! setup_class {
             where
                 $($G: duchess::JavaObject,)*
             {
-                fn class<'jvm>(jvm: &mut Jvm<'jvm>) -> LocalResult<'jvm, Local<'jvm, java::lang::Class>> {
-                    static CLASS: OnceCell<Java<java::lang::Class>> = OnceCell::new();
-                    let global = CLASS.get_or_try_init::<_, duchess::Error<Local<java::lang::Throwable>>>(|| {
+                fn class<'jvm>(jvm: &mut Jvm<'jvm>) -> LocalResult<'jvm, Local<'jvm, duchess::java::lang::Class>> {
+                    static CLASS: OnceCell<Java<duchess::java::lang::Class>> = OnceCell::new();
+                    let global = CLASS.get_or_try_init::<_, duchess::Error<Local<duchess::java::lang::Throwable>>>(|| {
                         let class = duchess::semver_unstable::find_class(jvm, $jni_class_name)?;
                         Ok(jvm.global(&class))
                     })?;

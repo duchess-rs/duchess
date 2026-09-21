@@ -32,7 +32,7 @@ impl JavapReflector {
         }
     }
 
-    fn serialize(&self) -> String {
+    pub(crate) fn serialize(&self) -> String {
         serde_json::to_string_pretty(&self.classes).expect("failed to serialize JSON")
     }
 

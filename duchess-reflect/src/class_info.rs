@@ -770,6 +770,64 @@ impl FromIterator<Id> for DotId {
     }
 }
 
+/// Handles java path resolution for codegen: how to write a `java.*` class
+/// name.
+///
+/// A `java.*` name can mean two things: a class from the current java_package!
+/// macro, or a class from the duchess prelude. The resolver checks the map of
+/// java classes defined in the current `java_package!` macro and writes local
+/// names relatively (`java::io::Foo`) and everything else as an absolute
+/// prelude path (`duchess::java::lang::String`).
+///
+/// For example, if the java_package! macro declares
+/// `java.io.ByteArrayOutputStream`, the Rust struct for it is generated into
+/// the local `mod java`, under `io`, at the user's call site, and the prelude
+/// has no such class, so writing `duchess::java::io::ByteArrayOutputStream`
+/// would not compile. Or worse, it could point somewhere unintended.
+///
+/// The generated modules never import the prelude, so a plain `java::...` name
+/// always means the local `mod java`. An absolute path is the only way to reach
+/// the prelude.
+///
+/// Note: the derive macros (`ToRust`, `ToJava`) do not use this type. They
+/// expand at the user's call site with no local class map, so they always
+/// mean the prelude for `java.*` names (see `rust_class_name` in the macro
+/// crate). If you change the rule here, check whether that helper needs
+/// the same change.
+#[derive(Clone, Copy, Debug)]
+pub struct JavaPathResolver<'a> {
+    local_classes: Option<&'a BTreeMap<DotId, Arc<ClassInfo>>>,
+}
+
+impl<'a> JavaPathResolver<'a> {
+    /// Resolver for an invocation from its class map.
+    pub fn for_root_map(root_map: &'a RootMap) -> Self {
+        JavaPathResolver {
+            local_classes: Some(&root_map.classes),
+        }
+    }
+
+    /// Resolver with no local classes. Any `java.*` name resolves to the
+    /// prelude.
+    pub fn empty() -> Self {
+        JavaPathResolver {
+            local_classes: None,
+        }
+    }
+
+    /// Returns the Rust path for the class `name`.
+    pub fn rust_name(self, name: &DotId, span: Span) -> TokenStream {
+        let is_local = self
+            .local_classes
+            .is_some_and(|local_classes| local_classes.contains_key(name));
+        if name.is_java_path() && !is_local {
+            name.to_duchess_prelude_name(span)
+        } else {
+            name.to_module_name(span)
+        }
+    }
+}
+
 impl DotId {
     pub fn new(package: &[Id], class: &Id) -> Self {
         DotId {
@@ -870,6 +928,25 @@ impl DotId {
         let package_idents: Vec<Ident> = package_names.iter().map(|n| n.to_ident(span)).collect();
         quote_spanned!(span => #(#package_idents ::)* #struct_ident)
     }
+
+    /// True for `java.*` paths: paths whose first segment is `java`, like
+    /// `java.io.Foo` but not `com.foo.java.Bar`. Only such paths can mean the
+    /// local `mod java` (see `JavaPathResolver`).
+    pub fn is_java_path(&self) -> bool {
+        let (package_names, _) = self.split();
+        matches!(package_names.first(), Some(id) if &id[..] == "java")
+    }
+
+    /// Returns an absolute path into the duchess `java` prelude, like
+    /// `duchess::java::lang::Object`. There is no leading `::`, so the path
+    /// also works when duchess builds itself, where `java.rs` aliases the
+    /// current crate as `duchess`.
+    pub fn to_duchess_prelude_name(&self, span: Span) -> TokenStream {
+        let (package_names, struct_name) = self.split();
+        let package_idents: Vec<Ident> = package_names.iter().map(|n| n.to_ident(span)).collect();
+        let struct_ident = struct_name.to_ident(span);
+        quote_spanned!(span => duchess :: #(#package_idents ::)* #struct_ident)
+    }
 }
 
 impl std::ops::Deref for DotId {
@@ -893,3 +970,120 @@ impl std::fmt::Display for DotId {
 
 mod from_syn;
 mod javap;
+
+#[cfg(test)]
+mod test {
+    use std::{collections::BTreeMap, sync::Arc};
+
+    use proc_macro2::Span;
+
+    use super::*;
+    use crate::upcasts::Upcasts;
+
+    #[test]
+    fn is_java_path_checks_first_segment() {
+        for name in ["java.io.Foo", "java.lang.String", "java.Foo"] {
+            assert!(DotId::parse(name).is_java_path(), "{name}");
+        }
+        for name in ["org.apache.Foo", "com.foo.java.Bar", "scala.Option"] {
+            assert!(!DotId::parse(name).is_java_path(), "{name}");
+        }
+    }
+
+    #[test]
+    fn duchess_prelude_name_is_absolute() {
+        let tokens = DotId::parse("java.lang.String").to_duchess_prelude_name(Span::call_site());
+        assert_eq!(tokens.to_string(), "duchess :: java :: lang :: String");
+    }
+
+    /// Builds a `RootMap` from dotted package paths, nesting packages the
+    /// same way the parser does, so `RootMap.subpackages` holds only first
+    /// segments.
+    fn root_with_packages(paths: &[&str]) -> RootMap {
+        fn insert(map: &mut BTreeMap<Id, SpannedPackageInfo>, segments: &[&str]) {
+            let Some((head, tail)) = segments.split_first() else {
+                return;
+            };
+            let node = map
+                .entry(Id::from(*head))
+                .or_insert_with(|| SpannedPackageInfo {
+                    name: Id::from(*head),
+                    span: Span::call_site(),
+                    subpackages: BTreeMap::new(),
+                    classes: Vec::new(),
+                });
+            insert(&mut node.subpackages, tail);
+        }
+
+        let mut root = RootMap {
+            subpackages: BTreeMap::new(),
+            classes: BTreeMap::new(),
+            upcasts: Upcasts::default(),
+        };
+        for path in paths {
+            insert(&mut root.subpackages, &path.split('.').collect::<Vec<_>>());
+        }
+        root
+    }
+
+    /// A bare class entry, just enough to put a name in `RootMap.classes`.
+    /// Only the key is ever read; the contents do not matter.
+    fn dummy_class(name: DotId) -> std::sync::Arc<super::ClassInfo> {
+        Arc::new(ClassInfo {
+            span: Span::call_site(),
+            flags: Flags::new(Privacy::Public),
+            name,
+            kind: ClassKind::Class,
+            generics: Vec::new(),
+            extends: Vec::new(),
+            implements: Vec::new(),
+            constructors: Vec::new(),
+            fields: Vec::new(),
+            methods: Vec::new(),
+        })
+    }
+
+    #[test]
+    fn resolver_without_local_classes_uses_absolute_prelude_paths() {
+        use super::JavaPathResolver;
+
+        let span = Span::call_site();
+        let resolver = JavaPathResolver::empty();
+
+        assert_eq!(
+            resolver
+                .rust_name(&DotId::parse("java.lang.String"), span)
+                .to_string(),
+            "duchess :: java :: lang :: String",
+        );
+        assert_eq!(
+            resolver
+                .rust_name(&DotId::parse("com.foo.Bar"), span)
+                .to_string(),
+            "com :: foo :: Bar",
+        );
+    }
+
+    #[test]
+    fn resolver_keeps_local_classes_relative() {
+        use super::JavaPathResolver;
+
+        let span = Span::call_site();
+        let local = DotId::parse("java.io.Foo");
+        let external = DotId::parse("java.lang.String");
+
+        let mut root = root_with_packages(&["java.io"]);
+        root.classes
+            .insert(local.clone(), dummy_class(local.clone()));
+        let resolver = JavaPathResolver::for_root_map(&root);
+
+        assert_eq!(
+            resolver.rust_name(&local, span).to_string(),
+            "java :: io :: Foo",
+        );
+        assert_eq!(
+            resolver.rust_name(&external, span).to_string(),
+            "duchess :: java :: lang :: String",
+        );
+    }
+}

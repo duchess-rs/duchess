@@ -2,6 +2,7 @@ use std::collections::HashSet;
 
 use crate::{
     class_info::{ClassInfo, ClassRef, Constructor, Flags, Method, RefType, RootMap, Type},
+    java::is_prelude_class,
     reflect::{JavapClassInfo, PrecomputedReflector},
 };
 
@@ -223,7 +224,11 @@ impl ClassRef {
     fn check(&self, root_map: &RootMap, push_error: &mut dyn FnMut(String)) {
         let (package_name, class_id) = self.name.split();
         if let Some(package) = root_map.find_package(package_name) {
-            if let None = package.find_class(&class_id) {
+            // A reference to a class from the duchess prelude is fine even
+            // when the invocation declares other classes in the same package:
+            // codegen resolves each class independently and sends the prelude
+            // reference to an absolute `duchess::java::...` path.
+            if package.find_class(&class_id).is_none() && !is_prelude_class(&self.name) {
                 push_error(format!(
                     "class `{}` not in list of classes to be translated",
                     self.name,
@@ -287,5 +292,81 @@ fn error_on_duplicates(
         } else {
             seen.insert(class_ref.name.clone());
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::collections::BTreeMap;
+
+    use proc_macro2::Span;
+
+    use super::*;
+    use crate::{
+        class_info::{DotId, Id, SpannedPackageInfo},
+        upcasts::Upcasts,
+    };
+
+    /// A `RootMap` declaring `package java.util` with exactly `declared` in
+    /// it, mirroring an invocation that declares some (but not all) classes
+    /// of a `java.*` package.
+    fn root_declaring_java_util(declared: &[&str]) -> RootMap {
+        let java_util = SpannedPackageInfo {
+            name: Id::from("util"),
+            span: Span::call_site(),
+            subpackages: BTreeMap::new(),
+            classes: declared.iter().map(|name| DotId::parse(*name)).collect(),
+        };
+        let java = SpannedPackageInfo {
+            name: Id::from("java"),
+            span: Span::call_site(),
+            subpackages: BTreeMap::from([(Id::from("util"), java_util)]),
+            classes: Vec::new(),
+        };
+        RootMap {
+            subpackages: BTreeMap::from([(Id::from("java"), java)]),
+            classes: BTreeMap::new(),
+            upcasts: Upcasts::default(),
+        }
+    }
+
+    fn check_errors(root: &RootMap, name: &str) -> Vec<String> {
+        let class_ref = ClassRef {
+            name: DotId::parse(name),
+            generics: Vec::new(),
+        };
+        let mut errors = Vec::new();
+        class_ref.check(root, &mut |message| errors.push(message));
+        errors
+    }
+
+    #[test]
+    fn declared_class_passes() {
+        let root = root_declaring_java_util(&["java.util.Set"]);
+        assert!(check_errors(&root, "java.util.Set").is_empty());
+    }
+
+    #[test]
+    fn undeclared_prelude_class_passes_alongside_local_package() {
+        // The invocation declares `java.util` (via `Set`) while the reference
+        // resolves to the duchess prelude.
+        let root = root_declaring_java_util(&["java.util.Set"]);
+        assert!(check_errors(&root, "java.util.List").is_empty());
+    }
+
+    #[test]
+    fn undeclared_non_prelude_class_still_fails() {
+        let root = root_declaring_java_util(&["java.util.Set"]);
+        let errors = check_errors(&root, "java.util.Nope");
+        assert_eq!(
+            errors,
+            ["class `java.util.Nope` not in list of classes to be translated"],
+        );
+    }
+
+    #[test]
+    fn reference_outside_declared_packages_passes() {
+        let root = root_declaring_java_util(&["java.util.Set"]);
+        assert!(check_errors(&root, "com.example.Foo").is_empty());
     }
 }
