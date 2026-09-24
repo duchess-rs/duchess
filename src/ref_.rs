@@ -180,8 +180,13 @@ impl<'a, R: JavaObject> Local<'a, R> {
         R: Upcast<S>,
         S: JavaObject + 'a,
     {
-        // SAFETY: From the Upcast trait contract, we know R is also an instance of S
+        // SAFETY: From the Upcast trait contract, we know R is also an instance of S.
+        // `self` is forgotten so the local ref has exactly one owner: the
+        // returned handle. Without this, `self` would run `DeleteLocalRef`
+        // on drop while the new handle still points at the same ref
+        // (double delete / use-after-free -> "Bad global or local ref").
         let upcast = unsafe { Local::<S>::from_raw(self.env, self.obj) };
+        std::mem::forget(self);
         upcast
     }
 }
@@ -203,8 +208,13 @@ impl<R: JavaObject> Java<R> {
         R: Upcast<S>,
         S: JavaObject + 'static,
     {
-        // SAFETY: From the Upcast trait contract, we know R is also an instance of S
+        // SAFETY: From the Upcast trait contract, we know R is also an instance of S.
+        // `self` is forgotten so the global ref has exactly one owner: the
+        // returned handle. Without this, `self` would run `DeleteGlobalRef`
+        // on drop while the new handle still points at the same ref
+        // (double delete / use-after-free -> "Bad global or local ref").
         let upcast = unsafe { Java::<S>::from_raw(self.obj) };
+        std::mem::forget(self);
         upcast
     }
 }
