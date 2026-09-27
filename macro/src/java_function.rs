@@ -83,22 +83,26 @@ pub fn java_function(selector: MethodSelector, input: syn::ItemFn) -> syn::Resul
 
     // Return types...
     let abi_return_ty; // ...that JNI expects
-    let rust_return_ty; // ...that Rust code should provide
+    let return_generics; // ...turbofish for the plumbing fn, built from the `javap`
+                         // return type (`()` methods take none:
+                         // `native_function_returning_unit` is not generic, and an
+                         // uninferrable `_` would be E0282)
     let native_function_returning; // ...and the function that converts into the former from the latter
     match &driver.method_info.return_ty {
         Some(class_info::Type::Scalar(ty)) => {
             let output_rust_ty = ty.to_tokens(span);
-            rust_return_ty = quote_spanned!(span => #output_rust_ty);
+            return_generics = quote_spanned!(span => ::<#output_rust_ty, _>);
             abi_return_ty = quote_spanned!(span => #output_rust_ty);
             native_function_returning = quote_spanned!(span => native_function_returning_scalar);
         }
         Some(ty @ class_info::Type::Ref(_)) | Some(ty @ class_info::Type::Repeat(_)) => {
-            rust_return_ty = driver.convert_ty(ty)?;
+            let converted_ty = driver.convert_ty(ty)?;
+            return_generics = quote_spanned!(span => ::<#converted_ty, _>);
             abi_return_ty = quote_spanned!(span => duchess::semver_unstable::jni_sys::jobject);
             native_function_returning = quote_spanned!(span => native_function_returning_object);
         }
         None => {
-            rust_return_ty = quote_spanned!(span => ());
+            return_generics = quote_spanned!(span =>);
             abi_return_ty = quote_spanned!(span => ());
             native_function_returning = quote_spanned!(span => native_function_returning_unit);
         }
@@ -116,7 +120,7 @@ pub fn java_function(selector: MethodSelector, input: syn::ItemFn) -> syn::Resul
             abi_argument_names: [#(#abi_argument_names),*],
             abi_argument_tys: [#(#abi_argument_tys),*],
             abi_return_ty: #abi_return_ty,
-            rust_return_ty: #rust_return_ty,
+            return_generics: [#return_generics],
             native_function_returning: #native_function_returning,
             method_name_literal: #method_name_literal,
             signature_literal: #signature_literal,

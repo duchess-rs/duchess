@@ -34,8 +34,11 @@ macro_rules! setup_java_function {
         // The return type expected by the C code (e.g., `jobject` or `i32`)
         abi_return_ty: $abi_return_ty:ty,
 
-        // The return type taken from `javap` and
-        rust_return_ty: $rust_return_ty:ty,
+        // Turbofish for the plumbing fn call below, built from the
+        // `javap` return type. Empty for `()` methods
+        // (`native_function_returning_unit` is not generic,
+        // an uninferrable `_` there is E0282).
+        return_generics: [$($return_generics:tt)*],
 
         // The appropriate function from `semver_unstable` to call.
         native_function_returning: $native_function_returning:ident,
@@ -63,10 +66,7 @@ macro_rules! setup_java_function {
                 // thanks to the `#[no_mangle]` attribute, in which case I'd say they are
                 // asking for a problem).
                 unsafe {
-                    duchess::semver_unstable::$native_function_returning::<
-                        $rust_return_ty,
-                        _,
-                    >(
+                    duchess::semver_unstable::$native_function_returning $($return_generics)* (
                         env,
                         || $input_fn_name(
                             $($call_this_name,)*

@@ -273,7 +273,7 @@ where
 ///
 /// Must be invoked as the entire body of a JNI native function, with
 /// `env` being the `EnvPtr` argument provided.
-pub unsafe fn native_function_returning_unit<J, R>(env: EnvPtr<'_>, op: impl FnOnce()) {
+pub unsafe fn native_function_returning_unit(env: EnvPtr<'_>, op: impl FnOnce()) {
     init_jvm_from_native_function(env);
     let _callback_guard = thread::attach_from_jni_callback(env);
 
