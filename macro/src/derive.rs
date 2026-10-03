@@ -48,6 +48,25 @@ pub fn derive_to_java(s: synstructure::Structure) -> proc_macro2::TokenStream {
     }
 }
 
+/// Returns the Rust path for a reflected class in derived code.
+///
+/// Derived impls expand at the user's call site, where a plain `java::...` name
+/// could mean the user's own `java` module. Prelude classes therefore use
+/// absolute paths.
+///
+/// Note this assumes every `java.*` class named here comes from the prelude.
+/// Unlike `java_package!` codegen (see `JavaPathResolver`), there is no local
+/// class map to check against: the reflector only knows real JDK classes. A
+/// class that exists both locally and in the JDK would resolve to the prelude
+/// here, even if the same name means the local class elsewhere.
+fn rust_class_name(class: &crate::class_info::DotId, span: Span) -> TokenStream {
+    if class.is_java_path() {
+        class.to_duchess_prelude_name(span)
+    } else {
+        class.to_module_name(span)
+    }
+}
+
 struct Driver<'a> {
     input: &'a synstructure::Structure<'a>,
     reflector: &'a PrecomputedReflector,
@@ -118,7 +137,7 @@ impl Driver<'_> {
         root: &ToRustVariant<'_>,
         children: &[&ToRustVariant<'_>],
     ) -> Result<proc_macro2::TokenStream, syn::Error> {
-        let root_class_name = root.class.name.to_module_name(root.selector.span());
+        let root_class_name = rust_class_name(&root.class.name, root.selector.span());
         let root_to_rust = self.variant_to_rust(
             quote_spanned!(root.variant.ast().ident.span() => self),
             root.variant,
@@ -126,7 +145,7 @@ impl Driver<'_> {
 
         let child_class_names = children
             .iter()
-            .map(|c| c.class.name.to_module_name(c.selector.span()))
+            .map(|c| rust_class_name(&c.class.name, c.selector.span()))
             .collect::<Vec<_>>();
         let child_to_rust = children
             .iter()
@@ -195,7 +214,7 @@ impl Driver<'_> {
         root_class: &JavapClassInfo,
         variants: impl IntoIterator<Item = &'a VariantInfo<'a>>,
     ) -> Result<proc_macro2::TokenStream, syn::Error> {
-        let root_class_name = root_class.name.to_module_name(Span::call_site());
+        let root_class_name = rust_class_name(&root_class.name, Span::call_site());
 
         let to_java_bodies = variants
             .into_iter()
@@ -386,10 +405,8 @@ impl Driver<'_> {
                 .collect::<Result<Vec<_>, _>>()
         })?;
 
-        let class_name = reflected_method
-            .class()
-            .name
-            .to_module_name(method_selector.class_span());
+        let class_name =
+            rust_class_name(&reflected_method.class().name, method_selector.class_span());
         let method_name = reflected_method
             .name()
             .to_snake_case()

@@ -4,6 +4,12 @@ mod auto {
     #[cfg(not(doctest))]
     use crate as duchess;
 
+    // The `java.*` classes declared here form the duchess prelude. Keep them
+    // in sync with `PRELUDE_CLASSES` in `duchess-reflect/src/java.rs` (a test
+    // there enforces this). Rationale: when a `java_package!` invocation
+    // declares its own classes in a `java.*` package (e.g. `java.util.Set`),
+    // references to other classes from that package (e.g. `java.util.List`)
+    // are only accepted if those classes are declared here.
     duchess_macro::java_package! {
         package java.lang;
 

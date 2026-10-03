@@ -1,6 +1,9 @@
 use crate::{
     argument::DuchessDeclaration,
-    class_info::{ClassInfo, Constructor, DotId, Field, Id, Method, RootMap, SpannedPackageInfo},
+    class_info::{
+        ClassInfo, Constructor, DotId, Field, Id, JavaPathResolver, Method, RootMap,
+        SpannedPackageInfo,
+    },
     config::Configuration,
     reflect::PrecomputedReflector,
     signature::Signature,
@@ -20,9 +23,14 @@ impl DuchessDeclaration {
 }
 
 impl RootMap {
-    fn to_tokens(self, reflector: &PrecomputedReflector) -> syn::Result<TokenStream> {
+    fn to_tokens(&self, reflector: &PrecomputedReflector) -> syn::Result<TokenStream> {
+        // Generated modules never import the duchess `java` prelude. A bare
+        // `java::...` path therefore always finds the local `mod java`,
+        // while prelude references use absolute `duchess::java::...` paths
+        // (see `JavaPathResolver` for how each name is classified).
+        let resolver = JavaPathResolver::for_root_map(self);
         self.to_packages()
-            .map(|p| p.to_tokens(&[], &self, reflector))
+            .map(|p| p.to_tokens(&[], self, reflector, resolver))
             .collect()
     }
 }
@@ -33,6 +41,7 @@ impl SpannedPackageInfo {
         parents: &[Id],
         root_map: &RootMap,
         reflector: &PrecomputedReflector,
+        resolver: JavaPathResolver<'_>,
     ) -> syn::Result<TokenStream> {
         let package_id = DotId::new(parents, &self.name);
         let name = self.name.to_ident(self.span);
@@ -40,13 +49,13 @@ impl SpannedPackageInfo {
         let subpackage_tokens: TokenStream = self
             .subpackages
             .values()
-            .map(|p| p.to_tokens(&package_id, root_map, reflector))
+            .map(|p| p.to_tokens(&package_id, root_map, reflector, resolver))
             .collect::<Result<_, _>>()?;
 
         let class_tokens: TokenStream = self
             .classes
             .iter()
-            .map(|class_id| root_map.classes[class_id].to_tokens(&root_map.upcasts))
+            .map(|class_id| root_map.classes[class_id].to_tokens(&root_map.upcasts, resolver))
             .collect::<Result<_, _>>()?;
 
         let supers: Vec<TokenStream> = package_id
@@ -60,9 +69,6 @@ impl SpannedPackageInfo {
                 // Import the contents of the parent module that we are created inside
                 use #(#supers ::)* *;
 
-                // Import the java package provided by duchess
-                use duchess::java;
-
                 #subpackage_tokens
                 #class_tokens
             }
@@ -71,7 +77,11 @@ impl SpannedPackageInfo {
 }
 
 impl ClassInfo {
-    pub fn to_tokens(&self, upcasts: &Upcasts) -> syn::Result<TokenStream> {
+    pub fn to_tokens(
+        &self,
+        upcasts: &Upcasts,
+        resolver: JavaPathResolver<'_>,
+    ) -> syn::Result<TokenStream> {
         let struct_name = self.struct_name();
         let java_class_generics = self.class_generic_names();
         let jni_class_name = self.jni_class_name();
@@ -80,7 +90,7 @@ impl ClassInfo {
         let constructors: Vec<_> = self
             .constructors
             .iter()
-            .map(|c| self.constructor(c))
+            .map(|c| self.constructor(c, resolver))
             .collect::<Result<_, _>>()?;
 
         // Convert static methods (not instance methods, those are different)
@@ -89,7 +99,7 @@ impl ClassInfo {
             .iter()
             .filter(|m| self.should_mirror_in_rust(m.flags.privacy))
             .filter(|m| m.flags.is_static)
-            .map(|m| self.static_method(m))
+            .map(|m| self.static_method(m, resolver))
             .collect::<Result<_, _>>()?;
 
         // Convert instance methods (not static methods, those are different)
@@ -98,7 +108,7 @@ impl ClassInfo {
             .iter()
             .filter(|m| self.should_mirror_in_rust(m.flags.privacy))
             .filter(|m| !m.flags.is_static)
-            .map(|m| self.op_struct_method(m))
+            .map(|m| self.op_struct_method(m, resolver))
             .collect::<Result<_, _>>()?;
 
         // Convert instance methods (not static methods, those are different)
@@ -107,7 +117,7 @@ impl ClassInfo {
             .iter()
             .filter(|m| self.should_mirror_in_rust(m.flags.privacy))
             .filter(|m| !m.flags.is_static)
-            .map(|m| self.obj_struct_method(m))
+            .map(|m| self.obj_struct_method(m, resolver))
             .collect::<Result<_, _>>()?;
 
         let op_name = Id::from(format!("ViewAs{}Op", self.name.class_name())).to_ident(self.span);
@@ -119,7 +129,7 @@ impl ClassInfo {
             .iter()
             .filter(|m| self.should_mirror_in_rust(m.flags.privacy))
             .filter(|m| !m.flags.is_static)
-            .map(|m| self.inherent_object_method(m))
+            .map(|m| self.inherent_object_method(m, resolver))
             .collect::<Result<_, _>>()?;
 
         // Generate static field getters
@@ -128,10 +138,10 @@ impl ClassInfo {
             .iter()
             .filter(|f: &&Field| self.should_mirror_in_rust(f.flags.privacy))
             .filter(|f| f.flags.is_static)
-            .map(|f| self.static_field_getter(f))
+            .map(|f| self.static_field_getter(f, resolver))
             .collect::<Result<_, _>>()?;
 
-        let mro_tys = self.mro(upcasts)?;
+        let mro_tys = self.mro(upcasts, resolver)?;
 
         let output = quote! {
             duchess::semver_unstable::setup_class! {
@@ -166,20 +176,30 @@ impl ClassInfo {
     /// refine the return type.
     ///
     /// [mro]: https://duchess-rs.github.io/duchess/methods.html#method-resolution-order
-    fn mro(&self, upcasts: &Upcasts) -> syn::Result<Vec<TokenStream>> {
+    fn mro(
+        &self,
+        upcasts: &Upcasts,
+        resolver: JavaPathResolver<'_>,
+    ) -> syn::Result<Vec<TokenStream>> {
         let class_refs = upcasts.upcasts_for_generated_class(&self.name);
         class_refs
             .iter()
             .map(|r| {
                 let mut sig = Signature::new(&Id::from("supertrait"), self.span, &[])
+                    .with_resolver(resolver)
                     .with_internal_generics(&self.generics)?;
                 Ok(sig.forbid_capture(|sig| sig.class_ref_ty_rs(r)).unwrap())
             })
             .collect()
     }
 
-    fn constructor(&self, constructor: &Constructor) -> syn::Result<TokenStream> {
-        let mut sig = Signature::new(self.name.class_name(), self.span, &self.generics);
+    fn constructor(
+        &self,
+        constructor: &Constructor,
+        resolver: JavaPathResolver<'_>,
+    ) -> syn::Result<TokenStream> {
+        let mut sig = Signature::new(self.name.class_name(), self.span, &self.generics)
+            .with_resolver(resolver);
 
         let input_ty_tts = constructor
             .argument_tys
@@ -225,11 +245,16 @@ impl ClassInfo {
     ///
     /// NB. This function (particularly the JvmOp impl) has significant overlap with `static_method`
     /// and `static_field_getter`, so if you make changes here, you may well need changes there.
-    fn op_struct_method(&self, method: &Method) -> syn::Result<TokenStream> {
+    fn op_struct_method(
+        &self,
+        method: &Method,
+        resolver: JavaPathResolver<'_>,
+    ) -> syn::Result<TokenStream> {
         let struct_name = self.struct_name();
         let java_class_generics = self.class_generic_names();
 
         let mut sig = Signature::new(&method.name, self.span, &self.generics)
+            .with_resolver(resolver)
             .with_internal_generics(&method.generics)?;
 
         let (input_ty_tts, _input_ty_ops, input_names, output_ty_tt) =
@@ -261,11 +286,16 @@ impl ClassInfo {
         }))
     }
 
-    fn obj_struct_method(&self, method: &Method) -> syn::Result<TokenStream> {
+    fn obj_struct_method(
+        &self,
+        method: &Method,
+        resolver: JavaPathResolver<'_>,
+    ) -> syn::Result<TokenStream> {
         let struct_name = self.struct_name();
         let java_class_generics = self.class_generic_names();
 
         let mut sig = Signature::new(&method.name, self.span, &self.generics)
+            .with_resolver(resolver)
             .with_internal_generics(&method.generics)?;
 
         let (input_ty_tts, _input_ty_ops, input_names, output_ty_tt) =
@@ -297,10 +327,15 @@ impl ClassInfo {
         }))
     }
 
-    fn inherent_object_method(&self, method: &Method) -> syn::Result<TokenStream> {
+    fn inherent_object_method(
+        &self,
+        method: &Method,
+        resolver: JavaPathResolver<'_>,
+    ) -> syn::Result<TokenStream> {
         let struct_name = self.struct_name();
         let java_class_generics = self.class_generic_names();
         let mut sig = Signature::new(&method.name, self.span, &self.generics)
+            .with_resolver(resolver)
             .with_internal_generics(&method.generics)?;
 
         let (input_ty_tts, input_ty_ops, input_names, output_ty_tt) =
@@ -346,13 +381,18 @@ impl ClassInfo {
     ///
     /// NB. This function (particularly the JvmOp impl) has significant overlap with `object_method`
     /// and `static_field_getter`, so if you make changes here, you may well need changes there.
-    fn static_method(&self, method: &Method) -> syn::Result<TokenStream> {
+    fn static_method(
+        &self,
+        method: &Method,
+        resolver: JavaPathResolver<'_>,
+    ) -> syn::Result<TokenStream> {
         assert!(method.flags.is_static);
 
         let struct_name = self.struct_name();
         let java_class_generics = self.class_generic_names();
 
         let mut sig = Signature::new(&method.name, self.span, &self.generics)
+            .with_resolver(resolver)
             .with_internal_generics(&method.generics)?;
 
         let (input_ty_tts, input_ty_ops, input_names, output_ty_tt) =
@@ -392,13 +432,18 @@ impl ClassInfo {
     ///
     /// NB. This function (particularly the JvmOp impl) has significant overlap with `object_method`
     /// and `static_method`, so if you make changes here, you may well need changes there.
-    fn static_field_getter(&self, field: &Field) -> syn::Result<TokenStream> {
+    fn static_field_getter(
+        &self,
+        field: &Field,
+        resolver: JavaPathResolver<'_>,
+    ) -> syn::Result<TokenStream> {
         assert!(field.flags.is_static);
 
         let struct_name = self.struct_name();
         let java_class_generics = self.class_generic_names();
 
-        let mut sig = Signature::new(&field.name, self.span, &self.generics);
+        let mut sig =
+            Signature::new(&field.name, self.span, &self.generics).with_resolver(resolver);
 
         let field_ty = sig.java_ty_tt(&field.ty)?;
 

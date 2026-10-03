@@ -372,7 +372,7 @@ impl ReflectedMethod {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "javap-reflection"))]
 mod test {
     use serde::Serialize;
 
@@ -383,7 +383,7 @@ mod test {
 
     #[test]
     fn reflector_rountrips() {
-        let mut reflector = Reflector::new_javap(&Configuration::default());
+        let mut reflector = JavapReflector::new(&Configuration::default());
         let _class = reflector
             .reflect_and_cache(
                 &DotId::parse("java.lang.String"),
@@ -392,7 +392,7 @@ mod test {
             .unwrap();
 
         let serialized = reflector.serialize();
-        let parsed = PrecomputedReflector::new_from_contents(serialized.as_bytes());
+        let parsed = PrecomputedReflector::new_from_contents(serialized.as_bytes()).unwrap();
         assert_eq!(parsed.classes.len(), 1);
     }
 }

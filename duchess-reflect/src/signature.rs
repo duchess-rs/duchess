@@ -1,5 +1,5 @@
 use crate::class_info::{
-    ClassRef, Generic, Id, Method, NonRepeatingType, RefType, ScalarType, Type,
+    ClassRef, Generic, Id, JavaPathResolver, Method, NonRepeatingType, RefType, ScalarType, Type,
 };
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::{quote, quote_spanned};
@@ -7,7 +7,7 @@ use quote::{quote, quote_spanned};
 /// "Signature" processes Java argument/return types and
 /// converts them into Rust types. This includes translating Java
 /// generics into Rust generics.
-pub struct Signature {
+pub struct Signature<'a> {
     /// Member being translated.
     item_name: Id,
 
@@ -38,9 +38,13 @@ pub struct Signature {
     /// If false, report an error if `?` appears, because it is a context where
     /// we don't support capture.
     capture_generics: bool,
+
+    /// How to write `java.*` names in the generated code. Borrowed from
+    /// the `RootMap`, which outlives every `Signature` made during codegen.
+    resolver: JavaPathResolver<'a>,
 }
 
-impl Signature {
+impl<'a> Signature<'a> {
     /// Creates a signature attached to an item (e.g., a method) named `method_name`,
     /// declared at `span`, which inherits `external_generics` from its class.
     ///
@@ -58,7 +62,17 @@ impl Signature {
             rust_generics: vec![],
             where_clauses: vec![],
             capture_generics: true,
+            resolver: JavaPathResolver::empty(),
         }
+    }
+
+    /// Sets how `java.*` names are written. By default every `java.*` name is
+    /// an absolute `duchess::java::...` path. Pass the resolver for this
+    /// invocation instead when it declares its own top-level `java` package
+    /// (see `JavaPathResolver`).
+    pub fn with_resolver(mut self, resolver: JavaPathResolver<'a>) -> Self {
+        self.resolver = resolver;
+        self
     }
 
     /// Declares the generic parameters on the method/constructor being translated.
@@ -277,7 +291,7 @@ impl Signature {
 
     fn class_ref_ty_tt(&mut self, ty: &ClassRef) -> syn::Result<TokenStream> {
         let ClassRef { name, generics } = ty;
-        let rust_name = name.to_module_name(self.span);
+        let rust_name = self.resolver.rust_name(name, self.span);
         let rust_ty_tts: Vec<_> = generics
             .iter()
             .map(|t| self.java_ref_ty_tt(t))

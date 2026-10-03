@@ -3,8 +3,8 @@
 /// # Examples
 ///
 /// * `byte` expands to `i8`
-/// * `(class[java::lang::Object])` expands to `java::lang::Object`
-/// * `(class[java::util::List] (class[java::lang::Object]))` expands to `java::util::List<java::lang::Object>`
+/// * `(class[duchess::java::lang::Object])` expands to `duchess::java::lang::Object`
+/// * `(class[duchess::java::util::List] (class[duchess::java::lang::Object]))` expands to `duchess::java::util::List<duchess::java::lang::Object>`
 #[macro_export]
 macro_rules! rust_ty {
     // Scalar types
@@ -43,7 +43,7 @@ macro_rules! rust_ty {
         ($($path)* < $(duchess::semver_unstable::rust_ty!($args),)* >)
     };
     ((array $elem:tt)) => {
-        java::Array<duchess::semver_unstable::rust_ty!($elem)>
+        duchess::java::Array<duchess::semver_unstable::rust_ty!($elem)>
     };
     ((generic $name:ident)) => {
         $name

@@ -11,6 +11,21 @@ use crate::{
     upcasts::Upcasts,
 };
 
+/// Rust keywords (strict and reserved, through edition 2024) that cannot be
+/// used as a generated module, struct or method name. See [`Id::to_ident`].
+///
+/// The list is hardcoded because neither `syn` nor `proc-macro2` exposes this.
+/// Its entries mirror syn's private ident validation, which doesn't yet include
+/// `gen`, so that one is added by hand. Contextual keywords like `union` are
+/// valid identifiers and are deliberately not listed.
+const RUST_KEYWORDS: &[&str] = &[
+    "abstract", "as", "async", "await", "become", "box", "break", "const", "continue", "crate",
+    "do", "dyn", "else", "enum", "extern", "false", "final", "fn", "for", "gen", "if", "impl",
+    "in", "let", "loop", "macro", "match", "mod", "move", "mut", "override", "priv", "pub", "ref",
+    "return", "Self", "self", "static", "struct", "super", "trait", "true", "try", "type",
+    "typeof", "unsafe", "unsized", "use", "virtual", "where", "while", "yield",
+];
+
 /// Stores all the data about the classes/packages to be translated
 /// as well as whatever we have learned from reflection.
 #[derive(Debug)]
@@ -704,9 +719,27 @@ impl Id {
         DotId::from(self).dot(s)
     }
 
+    /// Returns this segment as a valid Rust identifier, escaping characters
+    /// that Rust forbids and names that it reserves as keywords.
+    ///
+    /// A `$` becomes `__`, since `$` is not valid in a Rust identifier (e.g.
+    /// the nested class `Map$Entry` becomes `Map__Entry`).
+    ///
+    /// Rust keywords get a trailing `_` (e.g. `impl` becomes `impl_`). A raw
+    /// identifier like `r#impl` would keep the name as-is, but `crate`, `self`,
+    /// `Self` and `super` cannot be raw identifiers, so every keyword takes the
+    /// suffix for consistency.
+    ///
+    /// The rewrites never interact. Replacing `$` always inserts `__`, which no
+    /// keyword contains, so a name with `$` cannot also be a keyword.
     pub fn to_ident(&self, span: Span) -> Ident {
-        let data = self.data.replace("$", "__");
-        Ident::new(&data, span)
+        if self.data.contains('$') {
+            Ident::new(&self.data.replace('$', "__"), span)
+        } else if RUST_KEYWORDS.contains(&self.data.as_str()) {
+            Ident::new(&format!("{}_", self.data), span)
+        } else {
+            Ident::new(&self.data, span)
+        }
     }
 
     pub fn to_snake_case(&self) -> Self {
@@ -767,6 +800,64 @@ impl FromIterator<Id> for DotId {
         let ids: Vec<Id> = iter.into_iter().collect();
         assert!(ids.len() >= 1);
         DotId { ids }
+    }
+}
+
+/// Handles java path resolution for codegen: how to write a `java.*` class
+/// name.
+///
+/// A `java.*` name can mean two things: a class from the current java_package!
+/// macro, or a class from the duchess prelude. The resolver checks the map of
+/// java classes defined in the current `java_package!` macro and writes local
+/// names relatively (`java::io::Foo`) and everything else as an absolute
+/// prelude path (`duchess::java::lang::String`).
+///
+/// For example, if the java_package! macro declares
+/// `java.io.ByteArrayOutputStream`, the Rust struct for it is generated into
+/// the local `mod java`, under `io`, at the user's call site, and the prelude
+/// has no such class, so writing `duchess::java::io::ByteArrayOutputStream`
+/// would not compile. Or worse, it could point somewhere unintended.
+///
+/// The generated modules never import the prelude, so a plain `java::...` name
+/// always means the local `mod java`. An absolute path is the only way to reach
+/// the prelude.
+///
+/// Note: the derive macros (`ToRust`, `ToJava`) do not use this type. They
+/// expand at the user's call site with no local class map, so they always
+/// mean the prelude for `java.*` names (see `rust_class_name` in the macro
+/// crate). If you change the rule here, check whether that helper needs
+/// the same change.
+#[derive(Clone, Copy, Debug)]
+pub struct JavaPathResolver<'a> {
+    local_classes: Option<&'a BTreeMap<DotId, Arc<ClassInfo>>>,
+}
+
+impl<'a> JavaPathResolver<'a> {
+    /// Resolver for an invocation from its class map.
+    pub fn for_root_map(root_map: &'a RootMap) -> Self {
+        JavaPathResolver {
+            local_classes: Some(&root_map.classes),
+        }
+    }
+
+    /// Resolver with no local classes. Any `java.*` name resolves to the
+    /// prelude.
+    pub fn empty() -> Self {
+        JavaPathResolver {
+            local_classes: None,
+        }
+    }
+
+    /// Returns the Rust path for the class `name`.
+    pub fn rust_name(self, name: &DotId, span: Span) -> TokenStream {
+        let is_local = self
+            .local_classes
+            .is_some_and(|local_classes| local_classes.contains_key(name));
+        if name.is_java_path() && !is_local {
+            name.to_duchess_prelude_name(span)
+        } else {
+            name.to_module_name(span)
+        }
     }
 }
 
@@ -870,6 +961,25 @@ impl DotId {
         let package_idents: Vec<Ident> = package_names.iter().map(|n| n.to_ident(span)).collect();
         quote_spanned!(span => #(#package_idents ::)* #struct_ident)
     }
+
+    /// True for `java.*` paths: paths whose first segment is `java`, like
+    /// `java.io.Foo` but not `com.foo.java.Bar`. Only such paths can mean the
+    /// local `mod java` (see `JavaPathResolver`).
+    pub fn is_java_path(&self) -> bool {
+        let (package_names, _) = self.split();
+        matches!(package_names.first(), Some(id) if &id[..] == "java")
+    }
+
+    /// Returns an absolute path into the duchess `java` prelude, like
+    /// `duchess::java::lang::Object`. There is no leading `::`, so the path
+    /// also works when duchess builds itself, where `java.rs` aliases the
+    /// current crate as `duchess`.
+    pub fn to_duchess_prelude_name(&self, span: Span) -> TokenStream {
+        let (package_names, struct_name) = self.split();
+        let package_idents: Vec<Ident> = package_names.iter().map(|n| n.to_ident(span)).collect();
+        let struct_ident = struct_name.to_ident(span);
+        quote_spanned!(span => duchess :: #(#package_idents ::)* #struct_ident)
+    }
 }
 
 impl std::ops::Deref for DotId {
@@ -893,3 +1003,169 @@ impl std::fmt::Display for DotId {
 
 mod from_syn;
 mod javap;
+
+#[cfg(test)]
+mod test {
+    use std::{collections::BTreeMap, sync::Arc};
+
+    use proc_macro2::Span;
+
+    use super::*;
+    use crate::upcasts::Upcasts;
+
+    #[test]
+    fn is_java_path_checks_first_segment() {
+        for name in ["java.io.Foo", "java.lang.String", "java.Foo"] {
+            assert!(DotId::parse(name).is_java_path(), "{name}");
+        }
+        for name in ["org.apache.Foo", "com.foo.java.Bar", "scala.Option"] {
+            assert!(!DotId::parse(name).is_java_path(), "{name}");
+        }
+    }
+
+    #[test]
+    fn duchess_prelude_name_is_absolute() {
+        let tokens = DotId::parse("java.lang.String").to_duchess_prelude_name(Span::call_site());
+        assert_eq!(tokens.to_string(), "duchess :: java :: lang :: String");
+    }
+
+    /// Builds a `RootMap` from dotted package paths, nesting packages the
+    /// same way the parser does, so `RootMap.subpackages` holds only first
+    /// segments.
+    fn root_with_packages(paths: &[&str]) -> RootMap {
+        fn insert(map: &mut BTreeMap<Id, SpannedPackageInfo>, segments: &[&str]) {
+            let Some((head, tail)) = segments.split_first() else {
+                return;
+            };
+            let node = map
+                .entry(Id::from(*head))
+                .or_insert_with(|| SpannedPackageInfo {
+                    name: Id::from(*head),
+                    span: Span::call_site(),
+                    subpackages: BTreeMap::new(),
+                    classes: Vec::new(),
+                });
+            insert(&mut node.subpackages, tail);
+        }
+
+        let mut root = RootMap {
+            subpackages: BTreeMap::new(),
+            classes: BTreeMap::new(),
+            upcasts: Upcasts::default(),
+        };
+        for path in paths {
+            insert(&mut root.subpackages, &path.split('.').collect::<Vec<_>>());
+        }
+        root
+    }
+
+    /// A bare class entry, just enough to put a name in `RootMap.classes`.
+    /// Only the key is ever read; the contents do not matter.
+    fn dummy_class(name: DotId) -> std::sync::Arc<super::ClassInfo> {
+        Arc::new(ClassInfo {
+            span: Span::call_site(),
+            flags: Flags::new(Privacy::Public),
+            name,
+            kind: ClassKind::Class,
+            generics: Vec::new(),
+            extends: Vec::new(),
+            implements: Vec::new(),
+            constructors: Vec::new(),
+            fields: Vec::new(),
+            methods: Vec::new(),
+        })
+    }
+
+    #[test]
+    fn resolver_without_local_classes_uses_absolute_prelude_paths() {
+        use super::JavaPathResolver;
+
+        let span = Span::call_site();
+        let resolver = JavaPathResolver::empty();
+
+        assert_eq!(
+            resolver
+                .rust_name(&DotId::parse("java.lang.String"), span)
+                .to_string(),
+            "duchess :: java :: lang :: String",
+        );
+        assert_eq!(
+            resolver
+                .rust_name(&DotId::parse("com.foo.Bar"), span)
+                .to_string(),
+            "com :: foo :: Bar",
+        );
+    }
+
+    #[test]
+    fn resolver_keeps_local_classes_relative() {
+        use super::JavaPathResolver;
+
+        let span = Span::call_site();
+        let local = DotId::parse("java.io.Foo");
+        let external = DotId::parse("java.lang.String");
+
+        let mut root = root_with_packages(&["java.io"]);
+        root.classes
+            .insert(local.clone(), dummy_class(local.clone()));
+        let resolver = JavaPathResolver::for_root_map(&root);
+
+        assert_eq!(
+            resolver.rust_name(&local, span).to_string(),
+            "java :: io :: Foo",
+        );
+        assert_eq!(
+            resolver.rust_name(&external, span).to_string(),
+            "duchess :: java :: lang :: String",
+        );
+    }
+
+    #[test]
+    fn to_ident_escapes_rust_keywords() {
+        let span = Span::call_site();
+        for keyword in RUST_KEYWORDS {
+            assert_eq!(
+                Id::from(*keyword).to_ident(span).to_string(),
+                format!("{keyword}_"),
+            );
+        }
+        // Non-keywords are not changed, including the contextual keyword
+        // `union` and already-escaped names.
+        for name in ["metrics", "NullMetricsProvider", "impl_", "union"] {
+            assert_eq!(Id::from(name).to_ident(span).to_string(), name);
+        }
+    }
+
+    #[test]
+    fn to_ident_replaces_dollar_signs() {
+        let span = Span::call_site();
+        assert_eq!(
+            Id::from("Map$Entry").to_ident(span).to_string(),
+            "Map__Entry",
+        );
+    }
+
+    #[test]
+    fn module_name_escapes_keyword_segments() {
+        let span = Span::call_site();
+        let name = DotId::parse("org.apache.zookeeper.metrics.impl.NullMetricsProvider");
+        assert_eq!(
+            name.to_module_name(span).to_string(),
+            "org :: apache :: zookeeper :: metrics :: impl_ :: NullMetricsProvider",
+        );
+    }
+
+    #[test]
+    fn rust_keywords_match_syn_ident_parsing() {
+        for keyword in RUST_KEYWORDS {
+            let parsed = syn::parse_str::<syn::Ident>(keyword);
+            if *keyword == "gen" {
+                // Reserved in edition 2024; syn does not know it yet. If this
+                // assert fails, syn has caught up and the exception can go.
+                assert!(parsed.is_ok(), "syn now rejects `gen`");
+            } else {
+                assert!(parsed.is_err(), "`{keyword}` is not a Rust keyword per syn");
+            }
+        }
+    }
+}
